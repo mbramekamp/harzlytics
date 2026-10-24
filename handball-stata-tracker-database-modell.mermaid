@@ -1,0 +1,99 @@
+erDiagram 
+
+    PLAYER {
+        INTEGER player_id PK
+        INTEGER position_id FK
+        STRING first_name
+        STRING last_name
+        STRING email 
+        STRING role
+        INTEGER jersey_number_home_kit
+        INTEGER jersey_number_away_kit
+    }
+
+    GAME {
+        INTEGER game_id PK
+        INTEGER season_id FK
+        INTEGER opponent_id FK
+        STRING location
+        STRING game_type
+        DATE game_date
+        INTEGER home_team_halftime_score
+        INTEGER away_team_halftime_score
+        INTEGER home_team_score
+        INTEGER away_team_score
+    }
+
+    PLAYER_GAME {
+        INTEGER player_game_id PK
+        INTEGER game_id FK
+        INTEGER player_id FK
+        INTEGER two_minute_suspensions
+        BOOLEAN yellow_card
+        BOOLEAN red_card
+        BOOLEAN blue_card
+    }
+
+    FIELD_PLAYER_GAMESTATS {
+        INTEGER field_player_gamestats_id PK
+        INTEGER player_game_id FK
+        INTEGER goals_scored
+        INTEGER goales_attempted
+        INTEGER penalties_scored
+        INTEGER penalties_attempted
+        INTEGER penalties_drawn
+        INTEGER assists
+        INTEGER steals
+        INTEGER blocks
+        INTEGER technical_mistakes
+    }
+
+    GOAL_KEEPER_GAMESTATS {
+        INTEGER goal_keeper_gamestats_id PK
+        INTEGER player_game_id FK
+        INTEGER saves
+        INTEGER goales_conceded
+        INTEGER penalties_saved
+        INTEGER penalties_conceded
+        INTEGER sucessful_fast_break_passes
+        INTEGER attempted_fast_break_passes
+    }
+
+    COACH_GAMESTATS {
+        INTEGER coach_gamestats_id PK
+        INTEGER player_game_id FK
+        INTEGER timeout_id FK
+    }
+
+    TIMEOUT {
+        INTEGER timeout_id PK
+        TEXT timeout_reason
+    }
+
+    SEASON {
+        INTEGER season_id PK
+        STRING division
+        DATE start_of_season
+        DATE end_of_season
+    }
+
+    POSITION {
+        INTEGER position_id PK
+        STRING position_name
+    }
+
+    OPPONENT_TEAMS {
+        INTEGER opponent_team_id PK
+        STRING opponent_name
+        STRING opponent_location
+    }
+
+    PLAYER ||--|| POSITION : is_playing_as
+    PLAYER ||--o{ PLAYER_GAME : pariticapated_in
+    PLAYER_GAME }|--|{ GAME : attended
+    PLAYER_GAME ||--o{ FIELD_PLAYER_GAMESTATS : performed_as
+    PLAYER_GAME ||--o{ GOAL_KEEPER_GAMESTATS : performed_as
+    PLAYER_GAME ||--o{ COACH_GAMESTATS : coached_game
+    COACH_GAMESTATS ||--o{ TIMEOUT : took_timeout
+    GAME }o--|| SEASON : take_place_in
+    GAME ||--|| OPPONENT_TEAMS : played_against

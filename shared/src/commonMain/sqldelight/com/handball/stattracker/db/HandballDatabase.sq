@@ -1,0 +1,134 @@
+-- SQLDelight Schema basierend auf handball-stata-tracker-database-modell.mermaid
+-- Erweitert um Trainer-Support (nullable Position/Trikotnummern in PLAYER)
+-- sowie Liga-Replika Support (SEASON_OPPONENT & is_home_game / second_opponent_id in GAME)
+
+CREATE TABLE POSITION (
+    position_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    position_name TEXT NOT NULL
+);
+
+CREATE TABLE PLAYER (
+    player_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    position_id INTEGER,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL,
+    jersey_number_home_kit INTEGER,
+    jersey_number_away_kit INTEGER,
+    FOREIGN KEY (position_id) REFERENCES POSITION(position_id)
+);
+
+CREATE TABLE SEASON (
+    season_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    division TEXT NOT NULL,
+    start_of_season TEXT NOT NULL,
+    end_of_season TEXT NOT NULL
+);
+
+CREATE TABLE OPPONENT_TEAMS (
+    opponent_team_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    opponent_name TEXT NOT NULL,
+    opponent_location TEXT NOT NULL
+);
+
+CREATE TABLE SEASON_OPPONENT (
+    season_id INTEGER NOT NULL,
+    opponent_team_id INTEGER NOT NULL,
+    PRIMARY KEY (season_id, opponent_team_id),
+    FOREIGN KEY (season_id) REFERENCES SEASON(season_id) ON DELETE CASCADE,
+    FOREIGN KEY (opponent_team_id) REFERENCES OPPONENT_TEAMS(opponent_team_id) ON DELETE CASCADE
+);
+
+CREATE TABLE GAME (
+    game_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    season_id INTEGER NOT NULL,
+    opponent_id INTEGER NOT NULL,
+    second_opponent_id INTEGER,
+    is_home_game INTEGER NOT NULL DEFAULT 1,
+    location TEXT NOT NULL,
+    game_type TEXT NOT NULL,
+    game_date TEXT NOT NULL,
+    home_team_halftime_score INTEGER NOT NULL DEFAULT 0,
+    away_team_halftime_score INTEGER NOT NULL DEFAULT 0,
+    home_team_score INTEGER NOT NULL DEFAULT 0,
+    away_team_score INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (season_id) REFERENCES SEASON(season_id) ON DELETE CASCADE,
+    FOREIGN KEY (opponent_id) REFERENCES OPPONENT_TEAMS(opponent_team_id),
+    FOREIGN KEY (second_opponent_id) REFERENCES OPPONENT_TEAMS(opponent_team_id)
+);
+
+CREATE TABLE PLAYER_GAME (
+    player_game_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    game_id INTEGER NOT NULL,
+    player_id INTEGER NOT NULL,
+    two_minute_suspensions INTEGER NOT NULL DEFAULT 0,
+    yellow_card INTEGER NOT NULL DEFAULT 0,
+    red_card INTEGER NOT NULL DEFAULT 0,
+    blue_card INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (game_id) REFERENCES GAME(game_id) ON DELETE CASCADE,
+    FOREIGN KEY (player_id) REFERENCES PLAYER(player_id) ON DELETE CASCADE
+);
+
+CREATE TABLE FIELD_PLAYER_GAMESTATS (
+    field_player_gamestats_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    player_game_id INTEGER NOT NULL,
+    goals_scored INTEGER NOT NULL DEFAULT 0,
+    goales_attempted INTEGER NOT NULL DEFAULT 0,
+    penalties_scored INTEGER NOT NULL DEFAULT 0,
+    penalties_attempted INTEGER NOT NULL DEFAULT 0,
+    penalties_drawn INTEGER NOT NULL DEFAULT 0,
+    assists INTEGER NOT NULL DEFAULT 0,
+    steals INTEGER NOT NULL DEFAULT 0,
+    blocks INTEGER NOT NULL DEFAULT 0,
+    technical_mistakes INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (player_game_id) REFERENCES PLAYER_GAME(player_game_id) ON DELETE CASCADE
+);
+
+CREATE TABLE GOAL_KEEPER_GAMESTATS (
+    goal_keeper_gamestats_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    player_game_id INTEGER NOT NULL,
+    saves INTEGER NOT NULL DEFAULT 0,
+    goales_conceded INTEGER NOT NULL DEFAULT 0,
+    penalties_saved INTEGER NOT NULL DEFAULT 0,
+    penalties_conceded INTEGER NOT NULL DEFAULT 0,
+    sucessful_fast_break_passes INTEGER NOT NULL DEFAULT 0,
+    attempted_fast_break_passes INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (player_game_id) REFERENCES PLAYER_GAME(player_game_id) ON DELETE CASCADE
+);
+
+CREATE TABLE TIMEOUT (
+    timeout_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    timeout_reason TEXT NOT NULL
+);
+
+CREATE TABLE COACH_GAMESTATS (
+    coach_gamestats_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    player_game_id INTEGER NOT NULL,
+    timeout_id INTEGER NOT NULL,
+    FOREIGN KEY (player_game_id) REFERENCES PLAYER_GAME(player_game_id) ON DELETE CASCADE,
+    FOREIGN KEY (timeout_id) REFERENCES TIMEOUT(timeout_id) ON DELETE CASCADE
+);
+
+-- Queries
+selectAllPositions:
+SELECT * FROM POSITION ORDER BY position_id;
+
+insertPosition:
+INSERT INTO POSITION(position_id, position_name) VALUES (?, ?);
+
+selectAllPlayers:
+SELECT * FROM PLAYER ORDER BY last_name, first_name;
+
+insertPlayer:
+INSERT INTO PLAYER(player_id, position_id, first_name, last_name, email, role, jersey_number_home_kit, jersey_number_away_kit)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAllSeasons:
+SELECT * FROM SEASON ORDER BY start_of_season DESC;
+
+selectAllOpponents:
+SELECT * FROM OPPONENT_TEAMS ORDER BY opponent_name;
+
+selectAllGames:
+SELECT * FROM GAME ORDER BY game_date DESC;
