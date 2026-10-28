@@ -42,7 +42,11 @@ läuft. Von einer Login-Implementierung ist bewusst abgesehen.
      3. *Neuen Gegner (mit Saison-Zuweisung)*
      4. *Neuer Trainer*
      5. *Neue Saison* (auch direkt im Saison-Screen anlegbar)
-   - **Statistik-Erfassung**: Interaktives Statistik-Dashboard pro Spiel mit schnellen `+/-` Buttons (für Live-Tracking und nachträgliche Eingabe) sowie direkter Zahleneingabe für alle Felder aus `FIELD_PLAYER_GAMESTATS`, `GOAL_KEEPER_GAMESTATS`, `PLAYER_GAME` (2-Minuten, Gelb/Rot/Blau) und `COACH_GAMESTATS` / `TIMEOUT`.
+   - **Statistik-Erfassung & Bearbeitungsmodus pro Spiel**:
+     - Spiele öffnen standardmäßig im **schreibgeschützten Ansichtsmodus** (`isEditMode = false`), in dem der Spielstand sowie die komplette Kaderliste mit allen Statistiken unbearbeitbar dargestellt werden.
+     - Erst über den Button **„Bearbeitungsmodus“** (`isEditMode = true`) werden die schnellen `+/-` Buttons, die direkte Zahleneingabe, die Straf-Chips (`2Min`, `Gelb`, `Rot`, `Blau`), die Timeout-Verwaltung und die Spieltagskader-Nominierung freigeschaltet.
+   - **Performance-Reiter, Positionsvergleich & Spieler-Ranking**:
+     - Spieler- und Trainerprofile verfügen über den Reiter **„Performance & Ranking“** (`PlayerPerformanceTab.kt`) mit Handball-Performance-Index (`0–100 Pkt`), chronologischen Spielverlaufs-Graphen (inkl. gestrichelter Positions-Durchschnittslinie), 6-Achsen-Stärken-Radar, Einzelwert-Vergleich mit allen Spielern derselben Position sowie einem filter- und sortierbaren **Trainer-Spieler-Ranking** (inkl. Startsieben-Empfehlung je Position).
 
 ---
 
@@ -51,17 +55,18 @@ läuft. Von einer Login-Implementierung ist bewusst abgesehen.
 - **`gradle/libs.versions.toml`**: Version Catalog (`Kotlin 2.4.21`, `Compose Multiplatform 1.12.2`, `SQLDelight 2.4.1`, `Ktor 3.6.0`, `Gradle 9.8.2`).
 - **`:shared`**:
   - `shared/src/commonMain/sqldelight/com/handball/stattracker/db/HandballDatabase.sq` – SQLDelight-Tabellen & Queries
-  - `shared/src/commonMain/kotlin/com/handball/stattracker/model/Models.kt` – Alle Entitäten, `DatabaseSnapshot`, `StandingsRow`, `PlayerAggregatedStats`, `PlayerGameHistoryEntry`
-  - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/HandballRepository.kt` – StateFlow-Datenhaltung, CRUD, 2-Punkte-Tabellenberechnung, Quoten-Aggregation, Ktor-Sync
-  - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/DemoDataSeed.kt` – Initiale Demo-Daten
+  - `shared/src/commonMain/kotlin/com/handball/stattracker/model/Models.kt` – Alle Entitäten, `DatabaseSnapshot`, `StandingsRow`, `PlayerAggregatedStats`, `PlayerGameHistoryEntry`, `PlayerGamePerformancePoint`, `PositionMetricComparison`, `PlayerRankingEntry`, `RadarMetricAxis`
+  - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/HandballRepository.kt` – StateFlow-Datenhaltung, CRUD, 2-Punkte-Tabellenberechnung, Quoten-Aggregation, Performance-Index, Positionsvergleich, Spieler-Ranking, Ktor-Sync
+  - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/DemoDataSeed.kt` – Initiale Demo-Daten (mit mindestens 2 Spielern auf allen 7 Positionen)
   - `shared/src/commonMain/kotlin/com/handball/stattracker/storage/PlatformStorage.kt` (+ `desktopMain`, `jsMain`, `iosMain`, `androidMain`)
   - `shared/src/commonTest/kotlin/com/handball/stattracker/HandballRepositoryTest.kt` – Unit-Tests
 - **`:composeApp`**:
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/HandballApp.kt` – Haupt-App-Shell, responsive Navbar & statische Titelzeile
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/theme/HandballTheme.kt` – Material 3 Sport-Dashboard-Theme (Light & Dark)
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/DashboardScreen.kt` – `[H]` Home-Dashboard
-  - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/RosterScreen.kt` – Kader-Ansicht & Spieler-/Trainerprofil mit Spielhistorie
-  - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/SeasonScreen.kt` – Saison-Ansicht & interaktives Spiel-Statistik-Dashboard
+  - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/RosterScreen.kt` – Kader-Ansicht & Spieler-/Trainerprofil mit Reitern (*Übersicht & Spiele* sowie *Performance & Ranking*)
+  - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/PlayerPerformanceTab.kt` – Performance-Graphen (Formkurve & 6-Achsen-Radar), Positionsvergleich der Einzelwerte & Trainer-Spieler-Ranking
+  - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/SeasonScreen.kt` – Saison-Ansicht & Spiel-Dashboard (Ansichtsmodus vs. expliziter Bearbeitungsmodus)
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/StandingsScreen.kt` – Ligatabelle (Liga-Replika)
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/PlusCreationDialogs.kt` – `+`-Menü & Erstellungsdialoge
 - **`:server`**:
@@ -82,7 +87,10 @@ läuft. Von einer Login-Implementierung ist bewusst abgesehen.
 
 ## 5. Mögliche nächste Schritte für kommende Sessions
 
-- Feinabstimmung des UI-Stylings / Animationen oder zusätzliche Diagramme (z. B. Wurfbild / Torverteilung oder Formkurve im Spielerprofil).
+- **Gesamtwerte & Quoten pro Spiel anzeigen**:
+  - In der Spiel-Detailansicht (`SeasonScreen.kt`) sollen die aggregierten Team-Gesamtwerte für das jeweilige Spiel (Gesamttore/-würfe, Team-Wurfquote %, 7m-Quote %, Torwart-Fangquote %, gesamte Assists, Steals, Blocks, Technische Fehler und 2-Minuten-Strafen) übersichtlich ausgewiesen werden.
+- **Excel-Export für Saison-Daten & Einzelspiele**:
+  - **Saison-Export (Excel)**: Export der gesamten Saisondaten (Spielübersicht, Ligatabelle, aggregierte Spieler- & Torwartstatistiken inkl. Quoten).
+  - **Spiel-Export (Excel)**: Direkter Export eines einzelnen Spiels inkl. Endergebnis, Halbzeitstand, Team-Gesamtwerten/Quoten und den Einzelstatistiken des gesamten Spieltagskaders.
 - Vollständige Konfliktauflösung auf Einzeldatensatz-Ebene (Granularer Entity-Merge statt Snapshot-Timestamp-Abgleich) zwischen `:shared` und `:server`.
-- Export-/Import-Funktionen (z. B. Spielbericht als PDF/CSV exportieren).
 - Aktivierung des Android-App-Plugins in `composeApp/build.gradle.kts`, sobald ein lokales Android SDK (`local.properties` / `ANDROID_HOME`) eingerichtet ist.

@@ -235,4 +235,120 @@ data class PlayerAggregatedStats(
         get() = if (totalFastBreakPassesAttempted > 0) {
             ((totalFastBreakPassesSuccess * 100.0) / totalFastBreakPassesAttempted).toInt()
         } else 0
+
+    val goalsPerGame: Double
+        get() = if (gamesAttended > 0) totalGoals.toDouble() / gamesAttended else 0.0
+
+    val shotsPerGame: Double
+        get() = if (gamesAttended > 0) totalShots.toDouble() / gamesAttended else 0.0
+
+    val assistsPerGame: Double
+        get() = if (gamesAttended > 0) totalAssists.toDouble() / gamesAttended else 0.0
+
+    val stealsPerGame: Double
+        get() = if (gamesAttended > 0) totalSteals.toDouble() / gamesAttended else 0.0
+
+    val blocksPerGame: Double
+        get() = if (gamesAttended > 0) totalBlocks.toDouble() / gamesAttended else 0.0
+
+    val defensiveActionsPerGame: Double
+        get() = if (gamesAttended > 0) (totalSteals + totalBlocks).toDouble() / gamesAttended else 0.0
+
+    val penaltiesDrawnPerGame: Double
+        get() = if (gamesAttended > 0) totalPenaltiesDrawn.toDouble() / gamesAttended else 0.0
+
+    val technicalMistakesPerGame: Double
+        get() = if (gamesAttended > 0) totalTechnicalMistakes.toDouble() / gamesAttended else 0.0
+
+    val twoMinPerGame: Double
+        get() = if (gamesAttended > 0) totalTwoMin.toDouble() / gamesAttended else 0.0
+
+    val savesPerGame: Double
+        get() = if (gamesAttended > 0) totalSaves.toDouble() / gamesAttended else 0.0
+
+    val goalsConcededPerGame: Double
+        get() = if (gamesAttended > 0) totalGoalsConceded.toDouble() / gamesAttended else 0.0
 }
+
+/**
+ * Einzelner Datenpunkt für die chronologischen Performance-Graphen eines Spielers pro Spiel.
+ */
+data class PlayerGamePerformancePoint(
+    val gameId: Int,
+    val gameDate: String,
+    val shortLabel: String,
+    val matchupTitle: String,
+    val outcomeBadge: String,
+    val performanceScore: Double,
+    // Feldspieler-Metriken
+    val goals: Int = 0,
+    val shots: Int = 0,
+    val shotAccuracyPercent: Int = 0,
+    val assists: Int = 0,
+    val steals: Int = 0,
+    val blocks: Int = 0,
+    val penaltiesDrawn: Int = 0,
+    val technicalMistakes: Int = 0,
+    // Torhüter-Metriken
+    val saves: Int = 0,
+    val goalsConceded: Int = 0,
+    val savePercentage: Int = 0,
+    val penaltiesSaved: Int = 0,
+    val fastBreakPassesSuccess: Int = 0,
+    val fastBreakPassPercentage: Int = 0,
+    // Disziplin
+    val twoMinuteSuspensions: Int = 0
+) {
+    val defensiveActions: Int get() = steals + blocks
+}
+
+/**
+ * Vergleich eines einzelnen Statistik-Werts eines Spielers mit allen anderen Spielern derselben Position.
+ */
+data class PositionMetricComparison(
+    val metricKey: String,
+    val metricLabel: String,
+    val unit: String = "",
+    val higherIsBetter: Boolean = true,
+    val playerValue: Double,
+    val positionAverage: Double,
+    val positionBest: Double,
+    val bestPlayerName: String,
+    val rankInPosition: Int,
+    val totalPlayersInPosition: Int
+)
+
+/**
+ * Sortierkriterien für das Trainer-Spieler-Ranking.
+ */
+enum class RankingSortCriterion(val label: String) {
+    PERFORMANCE_INDEX("Performance-Index"),
+    GOALS_OR_SAVES("Tore / Paraden"),
+    ACCURACY_OR_SAVE_RATE("Quote (%)"),
+    ASSISTS_OR_FASTBREAK("Assists / Gegenstoß"),
+    DEFENSE("Abwehr (Steals+Blocks/7m)"),
+    DISCIPLINE("Disziplin (Wenig TF)")
+}
+
+/**
+ * Eintrag im Positions- und Kader-Spieler-Ranking für Trainer.
+ */
+data class PlayerRankingEntry(
+    val rank: Int,
+    val player: Player,
+    val positionName: String,
+    val stats: PlayerAggregatedStats,
+    val performanceScore: Double
+)
+
+/**
+ * Normalisierte Achse (0..100) für das Radar-/Stärkenprofil (Spieler vs. Positions-Durchschnitt).
+ */
+data class RadarMetricAxis(
+    val label: String,
+    val playerNormalized: Float, // 0f..1f
+    val positionAvgNormalized: Float, // 0f..1f
+    val playerFormatted: String,
+    val avgFormatted: String
+)
+

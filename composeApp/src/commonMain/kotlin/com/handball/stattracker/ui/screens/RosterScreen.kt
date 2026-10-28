@@ -28,6 +28,11 @@ import com.handball.stattracker.repository.HandballRepository
  *   und einer Historie an Spielen (inkl. Einzelstatistiken) angezeigt.
  * - Master-Detail auf breiten Screens, Vollbild-Profil mit Zurück-Button auf Mobile.
  */
+enum class PlayerProfileTab(val label: String) {
+    OVERVIEW("Übersicht & Spiele"),
+    PERFORMANCE("Performance & Ranking")
+}
+
 @Composable
 fun RosterScreen(
     repository: HandballRepository,
@@ -40,6 +45,7 @@ fun RosterScreen(
     onOpenNewTrainerDialog: () -> Unit
 ) {
     val selectedPlayer = snapshot.players.find { it.playerId == selectedPlayerId }
+    var activeProfileTab by remember { mutableStateOf(PlayerProfileTab.OVERVIEW) }
 
     if (isWideScreen) {
         Row(
@@ -61,7 +67,7 @@ fun RosterScreen(
                 )
             }
 
-            // Rechte Spalte: Spieler-/Trainerprofil mit Spiel-Historie
+            // Rechte Spalte: Spieler-/Trainerprofil mit Reitern (Übersicht & Spiele | Performance & Ranking)
             Card(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 shape = RoundedCornerShape(16.dp),
@@ -72,8 +78,12 @@ fun RosterScreen(
                         repository = repository,
                         snapshot = snapshot,
                         player = selectedPlayer,
+                        activeTab = activeProfileTab,
+                        onSelectTab = { activeProfileTab = it },
+                        isWideScreen = true,
                         showBackButton = false,
                         onBack = {},
+                        onSelectPlayer = { onSelectPlayer(it) },
                         onNavigateToGame = onNavigateToGame,
                         onDeleted = { onSelectPlayer(null) }
                     )
@@ -98,7 +108,7 @@ fun RosterScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Das Spielerprofil zeigt alle Saison-/Karrierewerte sowie die komplette Historie an Spielen.",
+                                text = "Das Spielerprofil zeigt Karrierewerte, Spielhistorie sowie im Reiter 'Performance' Graphen, Positionsvergleiche und das Spieler-Ranking.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -114,8 +124,12 @@ fun RosterScreen(
                 repository = repository,
                 snapshot = snapshot,
                 player = selectedPlayer,
+                activeTab = activeProfileTab,
+                onSelectTab = { activeProfileTab = it },
+                isWideScreen = false,
                 showBackButton = true,
                 onBack = { onSelectPlayer(null) },
+                onSelectPlayer = { onSelectPlayer(it) },
                 onNavigateToGame = onNavigateToGame,
                 onDeleted = { onSelectPlayer(null) }
             )
@@ -315,8 +329,12 @@ private fun PlayerProfileDetailPanel(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
     player: Player,
+    activeTab: PlayerProfileTab,
+    onSelectTab: (PlayerProfileTab) -> Unit,
+    isWideScreen: Boolean,
     showBackButton: Boolean,
     onBack: () -> Unit,
+    onSelectPlayer: (Int) -> Unit,
     onNavigateToGame: (Int) -> Unit,
     onDeleted: () -> Unit
 ) {
@@ -424,13 +442,61 @@ private fun PlayerProfileDetailPanel(
             }
         }
 
-        // Saison-Filter für Statistik & Historie
+        // Reiter (Tabs) im Spielerprofil: "Übersicht & Spiele" vs. "Performance & Ranking"
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PlayerProfileTab.entries.forEach { tab ->
+                    val isSelected = activeTab == tab
+                    val tabLabel = if (tab == PlayerProfileTab.PERFORMANCE && player.role == PlayerRole.COACH) {
+                        "Performance & Spieler-Ranking"
+                    } else {
+                        tab.label
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onSelectTab(tab) },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (tab == PlayerProfileTab.OVERVIEW) Icons.Default.History else Icons.Default.QueryStats,
+                                contentDescription = tabLabel,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = tabLabel,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Saison-Filter für Statistik, Historie, Performance-Graphen & Positions-Ranking
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Filter:",
+                text = "Zeitraum:",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
@@ -448,131 +514,143 @@ private fun PlayerProfileDetailPanel(
             }
         }
 
-        // Rollenspezifische Statistik-Übersicht
-        Text(
-            text = "Statistik-Zusammenfassung (${stats.gamesAttended} Spiele)",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        when (player.role) {
-            PlayerRole.FIELD_PLAYER -> {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Tore / Würfe",
-                        value = "${stats.totalGoals} / ${stats.totalShots}",
-                        sub = "Wurfquote: ${stats.shotAccuracyPercent}%"
-                    )
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "7-Meter",
-                        value = "${stats.totalPenaltyGoals} / ${stats.totalPenaltyAttempts}",
-                        sub = "Quote: ${stats.penaltyAccuracyPercent}% (${stats.totalPenaltiesDrawn} gezogen)"
-                    )
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Assists & Steals",
-                        value = "${stats.totalAssists} / ${stats.totalSteals}",
-                        sub = "${stats.totalBlocks} Blocks • ${stats.totalTechnicalMistakes} TF"
-                    )
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Strafen",
-                        value = "${stats.totalTwoMin}× 2Min",
-                        sub = "Gelb: ${stats.yellowCards} • Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
-                    )
-                }
-            }
-
-            PlayerRole.GOALKEEPER -> {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Paraden / Gegentore",
-                        value = "${stats.totalSaves} / ${stats.totalGoalsConceded}",
-                        sub = "Fangquote: ${stats.savePercentage}%"
-                    )
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "7m-Paraden",
-                        value = "${stats.totalPenaltiesSaved} / ${stats.totalPenaltiesSaved + stats.totalPenaltiesConceded}",
-                        sub = "7m-Quote: ${stats.penaltySavePercentage}%"
-                    )
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Gegenstoßpässe",
-                        value = "${stats.totalFastBreakPassesSuccess} / ${stats.totalFastBreakPassesAttempted}",
-                        sub = "Passquote: ${stats.fastBreakPassPercentage}%"
-                    )
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Strafen",
-                        value = "${stats.totalTwoMin}× 2Min",
-                        sub = "Gelb: ${stats.yellowCards} • Rot: ${stats.redCards}"
-                    )
-                }
-            }
-
-            PlayerRole.COACH -> {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Betreute Spiele",
-                        value = "${stats.gamesAttended}",
-                        sub = "Als verantwortlicher Trainer"
-                    )
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Genommene Auszeiten",
-                        value = "${stats.totalTimeoutsTaken} TTOs",
-                        sub = "Team-Timeouts mit Coaching-Grund"
-                    )
-                    ProfileStatBox(
-                        modifier = Modifier.weight(1f),
-                        label = "Bank-Strafen",
-                        value = "${stats.yellowCards} Gelb / ${stats.totalTwoMin}× 2Min",
-                        sub = "Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
-                    )
-                }
-            }
-        }
-
-        // Spiel-Historie (laut UI-Konzept: "mit den Spielen einer Historie an spielen")
-        Text(
-            text = "Historie an Spielen (${gameHistory.size})",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        if (gameHistory.isEmpty()) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Noch keine Spiele für diese Person erfasst.",
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        if (activeTab == PlayerProfileTab.PERFORMANCE) {
+            PlayerPerformanceTabContent(
+                repository = repository,
+                snapshot = snapshot,
+                player = player,
+                seasonFilterId = seasonFilterId,
+                isWideScreen = isWideScreen,
+                onSelectPlayer = onSelectPlayer,
+                onNavigateToGame = onNavigateToGame
+            )
         } else {
-            gameHistory.forEach { entry ->
-                PlayerGameHistoryCard(
-                    entry = entry,
-                    role = player.role,
-                    onClick = { onNavigateToGame(entry.game.gameId) }
-                )
+            // Rollenspezifische Statistik-Übersicht
+            Text(
+                text = "Statistik-Zusammenfassung (${stats.gamesAttended} Spiele)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            when (player.role) {
+                PlayerRole.FIELD_PLAYER -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Tore / Würfe",
+                            value = "${stats.totalGoals} / ${stats.totalShots}",
+                            sub = "Wurfquote: ${stats.shotAccuracyPercent}%"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "7-Meter",
+                            value = "${stats.totalPenaltyGoals} / ${stats.totalPenaltyAttempts}",
+                            sub = "Quote: ${stats.penaltyAccuracyPercent}% (${stats.totalPenaltiesDrawn} gezogen)"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Assists & Steals",
+                            value = "${stats.totalAssists} / ${stats.totalSteals}",
+                            sub = "${stats.totalBlocks} Blocks • ${stats.totalTechnicalMistakes} TF"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Strafen",
+                            value = "${stats.totalTwoMin}× 2Min",
+                            sub = "Gelb: ${stats.yellowCards} • Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
+                        )
+                    }
+                }
+
+                PlayerRole.GOALKEEPER -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Paraden / Gegentore",
+                            value = "${stats.totalSaves} / ${stats.totalGoalsConceded}",
+                            sub = "Fangquote: ${stats.savePercentage}%"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "7m-Paraden",
+                            value = "${stats.totalPenaltiesSaved} / ${stats.totalPenaltiesSaved + stats.totalPenaltiesConceded}",
+                            sub = "7m-Quote: ${stats.penaltySavePercentage}%"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Gegenstoßpässe",
+                            value = "${stats.totalFastBreakPassesSuccess} / ${stats.totalFastBreakPassesAttempted}",
+                            sub = "Passquote: ${stats.fastBreakPassPercentage}%"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Strafen",
+                            value = "${stats.totalTwoMin}× 2Min",
+                            sub = "Gelb: ${stats.yellowCards} • Rot: ${stats.redCards}"
+                        )
+                    }
+                }
+
+                PlayerRole.COACH -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Betreute Spiele",
+                            value = "${stats.gamesAttended}",
+                            sub = "Als verantwortlicher Trainer"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Genommene Auszeiten",
+                            value = "${stats.totalTimeoutsTaken} TTOs",
+                            sub = "Team-Timeouts mit Coaching-Grund"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Bank-Strafen",
+                            value = "${stats.yellowCards} Gelb / ${stats.totalTwoMin}× 2Min",
+                            sub = "Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
+                        )
+                    }
+                }
+            }
+
+            // Spiel-Historie (laut UI-Konzept: "mit den Spielen einer Historie an spielen")
+            Text(
+                text = "Historie an Spielen (${gameHistory.size})",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            if (gameHistory.isEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Noch keine Spiele für diese Person erfasst.",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                gameHistory.forEach { entry ->
+                    PlayerGameHistoryCard(
+                        entry = entry,
+                        role = player.role,
+                        onClick = { onNavigateToGame(entry.game.gameId) }
+                    )
+                }
             }
         }
     }

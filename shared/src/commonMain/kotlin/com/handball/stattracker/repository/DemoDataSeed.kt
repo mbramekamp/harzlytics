@@ -130,6 +130,57 @@ object DemoDataSeed {
                 role = PlayerRole.COACH,
                 jerseyNumberHomeKit = null,
                 jerseyNumberAwayKit = null
+            ),
+            // Weitere Spieler je Position für aussagekräftige Positionsvergleiche & Rankings
+            Player(
+                playerId = 12,
+                positionId = 2, // LA
+                firstName = "Rune",
+                lastName = "Dahmke-Vogel",
+                email = "r.vogel@handball-loewen.de",
+                role = PlayerRole.FIELD_PLAYER,
+                jerseyNumberHomeKit = 34,
+                jerseyNumberAwayKit = 43
+            ),
+            Player(
+                playerId = 13,
+                positionId = 4, // RM
+                firstName = "Luca",
+                lastName = "Witzke-Hartmann",
+                email = "l.hartmann@handball-loewen.de",
+                role = PlayerRole.FIELD_PLAYER,
+                jerseyNumberHomeKit = 20,
+                jerseyNumberAwayKit = 20
+            ),
+            Player(
+                playerId = 14,
+                positionId = 5, // RR
+                firstName = "Franz",
+                lastName = "Semper-Koch",
+                email = "f.koch@handball-loewen.de",
+                role = PlayerRole.FIELD_PLAYER,
+                jerseyNumberHomeKit = 32,
+                jerseyNumberAwayKit = 23
+            ),
+            Player(
+                playerId = 15,
+                positionId = 6, // RA
+                firstName = "Christoph",
+                lastName = "Steinert-Neumann",
+                email = "c.neumann@handball-loewen.de",
+                role = PlayerRole.FIELD_PLAYER,
+                jerseyNumberHomeKit = 19,
+                jerseyNumberAwayKit = 91
+            ),
+            Player(
+                playerId = 16,
+                positionId = 7, // KM
+                firstName = "Jannik",
+                lastName = "Kohlbacher-Schwarz",
+                email = "j.schwarz@handball-loewen.de",
+                role = PlayerRole.FIELD_PLAYER,
+                jerseyNumberHomeKit = 80,
+                jerseyNumberAwayKit = 80
             )
         )
 
@@ -257,7 +308,25 @@ object DemoDataSeed {
             PlayerGame(21, gameId = 3, playerId = 6, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
             PlayerGame(22, gameId = 3, playerId = 8, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
             PlayerGame(23, gameId = 3, playerId = 9, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(24, gameId = 3, playerId = 10, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false)
+            PlayerGame(24, gameId = 3, playerId = 10, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            // Zusätzliche Einsätze für Positionsvergleich & Formkurven
+            PlayerGame(25, gameId = 1, playerId = 9, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(26, gameId = 2, playerId = 9, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(27, gameId = 1, playerId = 12, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(28, gameId = 2, playerId = 12, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(29, gameId = 3, playerId = 12, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(30, gameId = 1, playerId = 13, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(31, gameId = 2, playerId = 13, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(32, gameId = 3, playerId = 13, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(33, gameId = 1, playerId = 14, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(34, gameId = 2, playerId = 14, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(35, gameId = 3, playerId = 14, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(36, gameId = 1, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(37, gameId = 2, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(38, gameId = 3, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(39, gameId = 1, playerId = 16, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
+            PlayerGame(40, gameId = 2, playerId = 16, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false),
+            PlayerGame(41, gameId = 3, playerId = 16, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false)
         )
 
         val keeperStats = listOf(
@@ -287,7 +356,25 @@ object DemoDataSeed {
             FieldPlayerGameStats(13, playerGameId = 20, goalsScored = 8, goalesAttempted = 10, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 5, steals = 1, blocks = 1, technicalMistakes = 1),
             FieldPlayerGameStats(14, playerGameId = 21, goalsScored = 6, goalesAttempted = 7, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 3, assists = 2, steals = 1, blocks = 3, technicalMistakes = 0),
             FieldPlayerGameStats(15, playerGameId = 22, goalsScored = 5, goalesAttempted = 6, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 0, assists = 1, steals = 2, blocks = 0, technicalMistakes = 0),
-            FieldPlayerGameStats(16, playerGameId = 23, goalsScored = 5, goalesAttempted = 8, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 2, steals = 1, blocks = 2, technicalMistakes = 2)
+            FieldPlayerGameStats(16, playerGameId = 23, goalsScored = 5, goalesAttempted = 8, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 2, steals = 1, blocks = 2, technicalMistakes = 2),
+            // Zusätzliche Spielstatistiken für Positionsvergleich
+            FieldPlayerGameStats(17, playerGameId = 25, goalsScored = 3, goalesAttempted = 6, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 2, steals = 1, blocks = 1, technicalMistakes = 1),
+            FieldPlayerGameStats(18, playerGameId = 26, goalsScored = 4, goalesAttempted = 7, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 3, steals = 1, blocks = 2, technicalMistakes = 2),
+            FieldPlayerGameStats(19, playerGameId = 27, goalsScored = 2, goalesAttempted = 4, penaltiesScored = 1, penaltiesAttempted = 1, penaltiesDrawn = 0, assists = 1, steals = 1, blocks = 0, technicalMistakes = 1),
+            FieldPlayerGameStats(20, playerGameId = 28, goalsScored = 3, goalesAttempted = 4, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 1, steals = 2, blocks = 0, technicalMistakes = 0),
+            FieldPlayerGameStats(21, playerGameId = 29, goalsScored = 4, goalesAttempted = 5, penaltiesScored = 1, penaltiesAttempted = 1, penaltiesDrawn = 0, assists = 2, steals = 1, blocks = 0, technicalMistakes = 1),
+            FieldPlayerGameStats(22, playerGameId = 30, goalsScored = 4, goalesAttempted = 6, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 2, assists = 5, steals = 1, blocks = 0, technicalMistakes = 1),
+            FieldPlayerGameStats(23, playerGameId = 31, goalsScored = 5, goalesAttempted = 8, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 4, steals = 1, blocks = 0, technicalMistakes = 2),
+            FieldPlayerGameStats(24, playerGameId = 32, goalsScored = 6, goalesAttempted = 8, penaltiesScored = 1, penaltiesAttempted = 1, penaltiesDrawn = 2, assists = 6, steals = 2, blocks = 1, technicalMistakes = 1),
+            FieldPlayerGameStats(25, playerGameId = 33, goalsScored = 4, goalesAttempted = 7, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 2, steals = 0, blocks = 1, technicalMistakes = 1),
+            FieldPlayerGameStats(26, playerGameId = 34, goalsScored = 5, goalesAttempted = 8, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 2, steals = 1, blocks = 1, technicalMistakes = 2),
+            FieldPlayerGameStats(27, playerGameId = 35, goalsScored = 4, goalesAttempted = 6, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 3, steals = 1, blocks = 0, technicalMistakes = 1),
+            FieldPlayerGameStats(28, playerGameId = 36, goalsScored = 2, goalesAttempted = 4, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 0, assists = 1, steals = 1, blocks = 0, technicalMistakes = 1),
+            FieldPlayerGameStats(29, playerGameId = 37, goalsScored = 3, goalesAttempted = 5, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 1, assists = 2, steals = 1, blocks = 0, technicalMistakes = 0),
+            FieldPlayerGameStats(30, playerGameId = 38, goalsScored = 4, goalesAttempted = 6, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 0, assists = 1, steals = 1, blocks = 0, technicalMistakes = 1),
+            FieldPlayerGameStats(31, playerGameId = 39, goalsScored = 3, goalesAttempted = 4, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 2, assists = 1, steals = 1, blocks = 2, technicalMistakes = 1),
+            FieldPlayerGameStats(32, playerGameId = 40, goalsScored = 4, goalesAttempted = 5, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 2, assists = 0, steals = 1, blocks = 2, technicalMistakes = 1),
+            FieldPlayerGameStats(33, playerGameId = 41, goalsScored = 4, goalesAttempted = 5, penaltiesScored = 0, penaltiesAttempted = 0, penaltiesDrawn = 2, assists = 1, steals = 2, blocks = 2, technicalMistakes = 0)
         )
 
         val timeouts = listOf(

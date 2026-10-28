@@ -751,6 +751,482 @@ class HandballRepository {
         )
     }
 
+    // --- PERFORMANCE-INDEX, GRAPHEN, POSITIONSVERGLEICH & TRAINER-RANKING ---
+
+    private fun roundToOneDecimal(value: Double): Double =
+        kotlin.math.round(value * 10.0) / 10.0
+
+    /**
+     * Berechnet einen objektiven Handball-Performance-Index (0..100 Punkte) auf Basis der aggregierten Werte.
+     */
+    fun computePerformanceScore(role: PlayerRole, stats: PlayerAggregatedStats): Double {
+        if (stats.gamesAttended == 0) return 0.0
+        val raw = when (role) {
+            PlayerRole.FIELD_PLAYER -> {
+                val offense = (stats.goalsPerGame * 4.8) +
+                    (stats.shotAccuracyPercent * 0.30) +
+                    (stats.assistsPerGame * 3.8) +
+                    (stats.penaltiesDrawnPerGame * 2.5)
+                val defense = stats.defensiveActionsPerGame * 4.5
+                val penalties = (stats.technicalMistakesPerGame * 3.5) +
+                    (stats.twoMinPerGame * 2.2) +
+                    ((stats.redCards + stats.blueCards) * 6.0 / stats.gamesAttended)
+                18.0 + offense + defense - penalties
+            }
+            PlayerRole.GOALKEEPER -> {
+                val keeping = (stats.savePercentage * 0.95) +
+                    (stats.savesPerGame * 2.2) +
+                    (stats.penaltySavePercentage * 0.20) +
+                    (stats.fastBreakPassPercentage * 0.15)
+                val penalties = (stats.twoMinPerGame * 2.5) +
+                    ((stats.redCards + stats.blueCards) * 6.0 / stats.gamesAttended)
+                keeping - penalties
+            }
+            PlayerRole.COACH -> {
+                50.0 + (stats.totalTimeoutsTaken.toDouble() / stats.gamesAttended) * 10.0 - (stats.twoMinPerGame * 4.0)
+            }
+        }
+        return roundToOneDecimal(raw.coerceIn(0.0, 100.0))
+    }
+
+    /**
+     * Berechnet den Performance-Index (0..100) für ein einzelnes Spiel.
+     */
+    fun computeSingleGamePerformanceScore(role: PlayerRole, entry: PlayerGameHistoryEntry): Double {
+        val singleAgg = when (role) {
+            PlayerRole.FIELD_PLAYER -> {
+                val fs = entry.fieldStats ?: FieldPlayerGameStats(0, entry.playerGame.playerGameId)
+                PlayerAggregatedStats(
+                    gamesAttended = 1,
+                    totalTwoMin = entry.playerGame.twoMinuteSuspensions,
+                    yellowCards = if (entry.playerGame.yellowCard) 1 else 0,
+                    redCards = if (entry.playerGame.redCard) 1 else 0,
+                    blueCards = if (entry.playerGame.blueCard) 1 else 0,
+                    totalGoals = fs.goalsScored,
+                    totalShots = fs.goalesAttempted,
+                    totalPenaltyGoals = fs.penaltiesScored,
+                    totalPenaltyAttempts = fs.penaltiesAttempted,
+                    totalPenaltiesDrawn = fs.penaltiesDrawn,
+                    totalAssists = fs.assists,
+                    totalSteals = fs.steals,
+                    totalBlocks = fs.blocks,
+                    totalTechnicalMistakes = fs.technicalMistakes
+                )
+            }
+            PlayerRole.GOALKEEPER -> {
+                val ks = entry.keeperStats ?: GoalKeeperGameStats(0, entry.playerGame.playerGameId)
+                PlayerAggregatedStats(
+                    gamesAttended = 1,
+                    totalTwoMin = entry.playerGame.twoMinuteSuspensions,
+                    yellowCards = if (entry.playerGame.yellowCard) 1 else 0,
+                    redCards = if (entry.playerGame.redCard) 1 else 0,
+                    blueCards = if (entry.playerGame.blueCard) 1 else 0,
+                    totalSaves = ks.saves,
+                    totalGoalsConceded = ks.goalesConceded,
+                    totalPenaltiesSaved = ks.penaltiesSaved,
+                    totalPenaltiesConceded = ks.penaltiesConceded,
+                    totalFastBreakPassesSuccess = ks.sucessfulFastBreakPasses,
+                    totalFastBreakPassesAttempted = ks.attemptedFastBreakPasses
+                )
+            }
+            PlayerRole.COACH -> {
+                PlayerAggregatedStats(
+                    gamesAttended = 1,
+                    totalTwoMin = entry.playerGame.twoMinuteSuspensions,
+                    yellowCards = if (entry.playerGame.yellowCard) 1 else 0,
+                    redCards = if (entry.playerGame.redCard) 1 else 0,
+                    blueCards = if (entry.playerGame.blueCard) 1 else 0,
+                    totalTimeoutsTaken = entry.coachTimeouts.size
+                )
+            }
+        }
+        return computePerformanceScore(role, singleAgg)
+    }
+
+    /**
+     * Liefert die chronologische Zeitreihe (ältestes bis neuestes Spiel) für die Performance-Graphen im Spielerprofil.
+     */
+    fun getPlayerPerformanceSeries(
+        playerId: Int,
+        seasonIdFilter: Int? = null,
+        state: DatabaseSnapshot = _snapshot.value
+    ): List<PlayerGamePerformancePoint> {
+        val player = state.players.find { it.playerId == playerId } ?: return emptyList()
+        val chronological = getPlayerGameHistory(playerId, seasonIdFilter, state)
+            .sortedWith(compareBy<PlayerGameHistoryEntry> { it.game.gameDate }.thenBy { it.game.gameId })
+
+        return chronological.mapIndexed { idx, entry ->
+            val opp = state.opponentTeams.find { it.opponentTeamId == entry.game.opponentId }
+            val oppShort = opp?.opponentName?.split(" ")?.firstOrNull() ?: "Sp.${idx + 1}"
+            val dateShort = if (entry.game.gameDate.length >= 10) {
+                "${entry.game.gameDate.substring(8, 10)}.${entry.game.gameDate.substring(5, 7)}."
+            } else {
+                entry.game.gameDate
+            }
+
+            val fs = entry.fieldStats
+            val ks = entry.keeperStats
+            val shots = fs?.goalesAttempted ?: 0
+            val goals = fs?.goalsScored ?: 0
+            val shotAcc = if (shots > 0) ((goals * 100.0) / shots).toInt() else 0
+
+            val saves = ks?.saves ?: 0
+            val conceded = ks?.goalesConceded ?: 0
+            val savePct = if (saves + conceded > 0) ((saves * 100.0) / (saves + conceded)).toInt() else 0
+            val fbSucc = ks?.sucessfulFastBreakPasses ?: 0
+            val fbAtt = ks?.attemptedFastBreakPasses ?: 0
+            val fbPct = if (fbAtt > 0) ((fbSucc * 100.0) / fbAtt).toInt() else 0
+
+            PlayerGamePerformancePoint(
+                gameId = entry.game.gameId,
+                gameDate = entry.game.gameDate,
+                shortLabel = "$dateShort $oppShort",
+                matchupTitle = entry.matchupTitle,
+                outcomeBadge = entry.outcomeBadge,
+                performanceScore = computeSingleGamePerformanceScore(player.role, entry),
+                goals = goals,
+                shots = shots,
+                shotAccuracyPercent = shotAcc,
+                assists = fs?.assists ?: 0,
+                steals = fs?.steals ?: 0,
+                blocks = fs?.blocks ?: 0,
+                penaltiesDrawn = fs?.penaltiesDrawn ?: 0,
+                technicalMistakes = fs?.technicalMistakes ?: 0,
+                saves = saves,
+                goalsConceded = conceded,
+                savePercentage = savePct,
+                penaltiesSaved = ks?.penaltiesSaved ?: 0,
+                fastBreakPassesSuccess = fbSucc,
+                fastBreakPassPercentage = fbPct,
+                twoMinuteSuspensions = entry.playerGame.twoMinuteSuspensions
+            )
+        }
+    }
+
+    /**
+     * Vergleicht jeden Einzelwert eines Spielers mit allen anderen Spielern auf derselben Position.
+     */
+    fun computePositionMetricComparisons(
+        playerId: Int,
+        seasonIdFilter: Int? = null,
+        state: DatabaseSnapshot = _snapshot.value
+    ): List<PositionMetricComparison> {
+        val player = state.players.find { it.playerId == playerId } ?: return emptyList()
+        if (player.role == PlayerRole.COACH) return emptyList()
+
+        val peers = state.players.filter {
+            it.role == player.role && (player.positionId == null || it.positionId == player.positionId)
+        }.ifEmpty { listOf(player) }
+
+        val peerStats = peers.associateWith { p ->
+            computePlayerAggregatedStats(p.playerId, seasonIdFilter, state)
+        }
+
+        data class MetricSpec(
+            val key: String,
+            val label: String,
+            val unit: String,
+            val higherIsBetter: Boolean,
+            val extractor: (Player, PlayerAggregatedStats) -> Double
+        )
+
+        val specs = if (player.role == PlayerRole.FIELD_PLAYER) {
+            listOf(
+                MetricSpec("perf_index", "Performance-Index", "Pkt", true) { p, s ->
+                    computePerformanceScore(p.role, s)
+                },
+                MetricSpec("goals_pg", "Tore pro Spiel", "", true) { _, s ->
+                    roundToOneDecimal(s.goalsPerGame)
+                },
+                MetricSpec("shot_acc", "Wurfquote", "%", true) { _, s ->
+                    s.shotAccuracyPercent.toDouble()
+                },
+                MetricSpec("assists_pg", "Assists pro Spiel", "", true) { _, s ->
+                    roundToOneDecimal(s.assistsPerGame)
+                },
+                MetricSpec("defense_pg", "Steals & Blocks pro Spiel", "", true) { _, s ->
+                    roundToOneDecimal(s.defensiveActionsPerGame)
+                },
+                MetricSpec("pen_drawn_pg", "Gezogene 7m pro Spiel", "", true) { _, s ->
+                    roundToOneDecimal(s.penaltiesDrawnPerGame)
+                },
+                MetricSpec("pen_acc", "7-Meter-Quote", "%", true) { _, s ->
+                    s.penaltyAccuracyPercent.toDouble()
+                },
+                MetricSpec("mistakes_pg", "Technische Fehler pro Spiel", "", false) { _, s ->
+                    roundToOneDecimal(s.technicalMistakesPerGame)
+                },
+                MetricSpec("twomin_pg", "2-Minuten-Strafen pro Spiel", "", false) { _, s ->
+                    roundToOneDecimal(s.twoMinPerGame)
+                }
+            )
+        } else {
+            listOf(
+                MetricSpec("perf_index", "Performance-Index", "Pkt", true) { p, s ->
+                    computePerformanceScore(p.role, s)
+                },
+                MetricSpec("saves_pg", "Paraden pro Spiel", "", true) { _, s ->
+                    roundToOneDecimal(s.savesPerGame)
+                },
+                MetricSpec("save_pct", "Fangquote", "%", true) { _, s ->
+                    s.savePercentage.toDouble()
+                },
+                MetricSpec("pen_save_pct", "7-Meter-Fangquote", "%", true) { _, s ->
+                    s.penaltySavePercentage.toDouble()
+                },
+                MetricSpec("fb_pass_pct", "Gegenstoß-Passquote", "%", true) { _, s ->
+                    s.fastBreakPassPercentage.toDouble()
+                },
+                MetricSpec("conceded_pg", "Gegentore pro Spiel", "", false) { _, s ->
+                    roundToOneDecimal(s.goalsConcededPerGame)
+                },
+                MetricSpec("twomin_pg", "2-Minuten-Strafen pro Spiel", "", false) { _, s ->
+                    roundToOneDecimal(s.twoMinPerGame)
+                }
+            )
+        }
+
+        return specs.map { spec ->
+            val valuesByPlayer = peers.map { p ->
+                val st = peerStats[p] ?: PlayerAggregatedStats()
+                p to spec.extractor(p, st)
+            }
+            val sorted = if (spec.higherIsBetter) {
+                valuesByPlayer.sortedWith(compareByDescending<Pair<Player, Double>> { it.second }.thenBy { it.first.lastName })
+            } else {
+                valuesByPlayer.sortedWith(compareBy<Pair<Player, Double>> { it.second }.thenBy { it.first.lastName })
+            }
+
+            val myVal = valuesByPlayer.firstOrNull { it.first.playerId == player.playerId }?.second ?: 0.0
+            val avgVal = roundToOneDecimal(valuesByPlayer.map { it.second }.average())
+            val bestPair = sorted.first()
+            val myRank = sorted.indexOfFirst { it.first.playerId == player.playerId }.let { if (it >= 0) it + 1 else 1 }
+
+            PositionMetricComparison(
+                metricKey = spec.key,
+                metricLabel = spec.label,
+                unit = spec.unit,
+                higherIsBetter = spec.higherIsBetter,
+                playerValue = myVal,
+                positionAverage = avgVal,
+                positionBest = bestPair.second,
+                bestPlayerName = bestPair.first.fullName,
+                rankInPosition = myRank,
+                totalPlayersInPosition = peers.size
+            )
+        }
+    }
+
+    /**
+     * Erzeugt die 6 normalisierten Achsen (0..1) für das Spinnennetz-/Radar-Diagramm (Spieler vs. Positions-Durchschnitt).
+     */
+    fun computeRadarAxesForPlayer(
+        playerId: Int,
+        seasonIdFilter: Int? = null,
+        state: DatabaseSnapshot = _snapshot.value
+    ): List<RadarMetricAxis> {
+        val comparisons = computePositionMetricComparisons(playerId, seasonIdFilter, state)
+        if (comparisons.isEmpty()) return emptyList()
+        val byKey = comparisons.associateBy { it.metricKey }
+        val player = state.players.find { it.playerId == playerId } ?: return emptyList()
+
+        fun normHigher(value: Double, maxScale: Double): Float =
+            (value / maxScale).coerceIn(0.08, 1.0).toFloat()
+
+        fun normLower(value: Double, worstScale: Double): Float =
+            (1.0 - (value / worstScale).coerceIn(0.0, 0.92)).toFloat()
+
+        return if (player.role == PlayerRole.FIELD_PLAYER) {
+            val goals = byKey["goals_pg"]
+            val acc = byKey["shot_acc"]
+            val assists = byKey["assists_pg"]
+            val defense = byKey["defense_pg"]
+            val penDrawn = byKey["pen_drawn_pg"]
+            val mistakes = byKey["mistakes_pg"]
+
+            val maxGoals = maxOf(10.0, (goals?.positionBest ?: 8.0) * 1.1)
+            val maxAssists = maxOf(8.0, (assists?.positionBest ?: 6.0) * 1.1)
+            val maxDefense = maxOf(5.0, (defense?.positionBest ?: 4.0) * 1.1)
+            val maxPen = maxOf(3.0, (penDrawn?.positionBest ?: 2.5) * 1.1)
+
+            listOf(
+                RadarMetricAxis(
+                    label = "Tore/Sp.",
+                    playerNormalized = normHigher(goals?.playerValue ?: 0.0, maxGoals),
+                    positionAvgNormalized = normHigher(goals?.positionAverage ?: 0.0, maxGoals),
+                    playerFormatted = "${goals?.playerValue ?: 0.0}",
+                    avgFormatted = "${goals?.positionAverage ?: 0.0}"
+                ),
+                RadarMetricAxis(
+                    label = "Wurfquote",
+                    playerNormalized = normHigher(acc?.playerValue ?: 0.0, 100.0),
+                    positionAvgNormalized = normHigher(acc?.positionAverage ?: 0.0, 100.0),
+                    playerFormatted = "${acc?.playerValue?.toInt() ?: 0}%",
+                    avgFormatted = "${acc?.positionAverage?.toInt() ?: 0}%"
+                ),
+                RadarMetricAxis(
+                    label = "Assists",
+                    playerNormalized = normHigher(assists?.playerValue ?: 0.0, maxAssists),
+                    positionAvgNormalized = normHigher(assists?.positionAverage ?: 0.0, maxAssists),
+                    playerFormatted = "${assists?.playerValue ?: 0.0}",
+                    avgFormatted = "${assists?.positionAverage ?: 0.0}"
+                ),
+                RadarMetricAxis(
+                    label = "Abwehr",
+                    playerNormalized = normHigher(defense?.playerValue ?: 0.0, maxDefense),
+                    positionAvgNormalized = normHigher(defense?.positionAverage ?: 0.0, maxDefense),
+                    playerFormatted = "${defense?.playerValue ?: 0.0}",
+                    avgFormatted = "${defense?.positionAverage ?: 0.0}"
+                ),
+                RadarMetricAxis(
+                    label = "7m gezogen",
+                    playerNormalized = normHigher(penDrawn?.playerValue ?: 0.0, maxPen),
+                    positionAvgNormalized = normHigher(penDrawn?.positionAverage ?: 0.0, maxPen),
+                    playerFormatted = "${penDrawn?.playerValue ?: 0.0}",
+                    avgFormatted = "${penDrawn?.positionAverage ?: 0.0}"
+                ),
+                RadarMetricAxis(
+                    label = "Ballkontrolle",
+                    playerNormalized = normLower(mistakes?.playerValue ?: 0.0, 4.0),
+                    positionAvgNormalized = normLower(mistakes?.positionAverage ?: 0.0, 4.0),
+                    playerFormatted = "${mistakes?.playerValue ?: 0.0} TF",
+                    avgFormatted = "${mistakes?.positionAverage ?: 0.0} TF"
+                )
+            )
+        } else {
+            val saves = byKey["saves_pg"]
+            val savePct = byKey["save_pct"]
+            val penPct = byKey["pen_save_pct"]
+            val fbPct = byKey["fb_pass_pct"]
+            val conceded = byKey["conceded_pg"]
+            val perf = byKey["perf_index"]
+
+            val maxSaves = maxOf(16.0, (saves?.positionBest ?: 14.0) * 1.1)
+
+            listOf(
+                RadarMetricAxis(
+                    label = "Paraden/Sp.",
+                    playerNormalized = normHigher(saves?.playerValue ?: 0.0, maxSaves),
+                    positionAvgNormalized = normHigher(saves?.positionAverage ?: 0.0, maxSaves),
+                    playerFormatted = "${saves?.playerValue ?: 0.0}",
+                    avgFormatted = "${saves?.positionAverage ?: 0.0}"
+                ),
+                RadarMetricAxis(
+                    label = "Fangquote",
+                    playerNormalized = normHigher(savePct?.playerValue ?: 0.0, 60.0),
+                    positionAvgNormalized = normHigher(savePct?.positionAverage ?: 0.0, 60.0),
+                    playerFormatted = "${savePct?.playerValue?.toInt() ?: 0}%",
+                    avgFormatted = "${savePct?.positionAverage?.toInt() ?: 0}%"
+                ),
+                RadarMetricAxis(
+                    label = "7m-Abwehr",
+                    playerNormalized = normHigher(penPct?.playerValue ?: 0.0, 60.0),
+                    positionAvgNormalized = normHigher(penPct?.positionAverage ?: 0.0, 60.0),
+                    playerFormatted = "${penPct?.playerValue?.toInt() ?: 0}%",
+                    avgFormatted = "${penPct?.positionAverage?.toInt() ?: 0}%"
+                ),
+                RadarMetricAxis(
+                    label = "Gegenstoß",
+                    playerNormalized = normHigher(fbPct?.playerValue ?: 0.0, 100.0),
+                    positionAvgNormalized = normHigher(fbPct?.positionAverage ?: 0.0, 100.0),
+                    playerFormatted = "${fbPct?.playerValue?.toInt() ?: 0}%",
+                    avgFormatted = "${fbPct?.positionAverage?.toInt() ?: 0}%"
+                ),
+                RadarMetricAxis(
+                    label = "Gegentor-Schutz",
+                    playerNormalized = normLower(conceded?.playerValue ?: 0.0, 35.0),
+                    positionAvgNormalized = normLower(conceded?.positionAverage ?: 0.0, 35.0),
+                    playerFormatted = "${conceded?.playerValue ?: 0.0} GT",
+                    avgFormatted = "${conceded?.positionAverage ?: 0.0} GT"
+                ),
+                RadarMetricAxis(
+                    label = "Gesamt-Index",
+                    playerNormalized = normHigher(perf?.playerValue ?: 0.0, 100.0),
+                    positionAvgNormalized = normHigher(perf?.positionAverage ?: 0.0, 100.0),
+                    playerFormatted = "${perf?.playerValue ?: 0.0}",
+                    avgFormatted = "${perf?.positionAverage ?: 0.0}"
+                )
+            )
+        }
+    }
+
+    /**
+     * Berechnet das Spieler-Ranking für Trainer (optional gefiltert nach Position, Rolle und Saison,
+     * sowie sortierbar nach Gesamt-Performance oder Einzelkriterien).
+     */
+    fun computePlayerRankings(
+        positionIdFilter: Int? = null,
+        roleFilter: PlayerRole? = null,
+        seasonIdFilter: Int? = null,
+        sortCriterion: RankingSortCriterion = RankingSortCriterion.PERFORMANCE_INDEX,
+        state: DatabaseSnapshot = _snapshot.value
+    ): List<PlayerRankingEntry> {
+        val candidates = state.players.filter { p ->
+            p.role != PlayerRole.COACH &&
+                (positionIdFilter == null || p.positionId == positionIdFilter) &&
+                (roleFilter == null || p.role == roleFilter)
+        }
+
+        val rawEntries = candidates.map { player ->
+            val stats = computePlayerAggregatedStats(player.playerId, seasonIdFilter, state)
+            val perfScore = computePerformanceScore(player.role, stats)
+            val posName = state.positions.find { it.positionId == player.positionId }?.positionName ?: player.role.label
+            PlayerRankingEntry(
+                rank = 0,
+                player = player,
+                positionName = posName,
+                stats = stats,
+                performanceScore = perfScore
+            )
+        }
+
+        val sorted = when (sortCriterion) {
+            RankingSortCriterion.PERFORMANCE_INDEX -> {
+                rawEntries.sortedWith(
+                    compareByDescending<PlayerRankingEntry> { it.performanceScore }
+                        .thenByDescending { it.stats.totalGoals + it.stats.totalSaves }
+                        .thenBy { it.player.lastName }
+                )
+            }
+            RankingSortCriterion.GOALS_OR_SAVES -> {
+                rawEntries.sortedWith(
+                    compareByDescending<PlayerRankingEntry> {
+                        if (it.player.role == PlayerRole.GOALKEEPER) it.stats.savesPerGame else it.stats.goalsPerGame
+                    }.thenByDescending { it.performanceScore }
+                )
+            }
+            RankingSortCriterion.ACCURACY_OR_SAVE_RATE -> {
+                rawEntries.sortedWith(
+                    compareByDescending<PlayerRankingEntry> {
+                        if (it.player.role == PlayerRole.GOALKEEPER) it.stats.savePercentage else it.stats.shotAccuracyPercent
+                    }.thenByDescending { it.performanceScore }
+                )
+            }
+            RankingSortCriterion.ASSISTS_OR_FASTBREAK -> {
+                rawEntries.sortedWith(
+                    compareByDescending<PlayerRankingEntry> {
+                        if (it.player.role == PlayerRole.GOALKEEPER) it.stats.fastBreakPassPercentage.toDouble() else it.stats.assistsPerGame
+                    }.thenByDescending { it.performanceScore }
+                )
+            }
+            RankingSortCriterion.DEFENSE -> {
+                rawEntries.sortedWith(
+                    compareByDescending<PlayerRankingEntry> {
+                        if (it.player.role == PlayerRole.GOALKEEPER) it.stats.penaltySavePercentage.toDouble() else it.stats.defensiveActionsPerGame
+                    }.thenByDescending { it.performanceScore }
+                )
+            }
+            RankingSortCriterion.DISCIPLINE -> {
+                rawEntries.sortedWith(
+                    compareBy<PlayerRankingEntry> { it.stats.technicalMistakesPerGame + it.stats.twoMinPerGame }
+                        .thenByDescending { it.performanceScore }
+                )
+            }
+        }
+
+        return sorted.mapIndexed { idx, entry -> entry.copy(rank = idx + 1) }
+    }
+
     fun formatGameMatchup(game: Game, state: DatabaseSnapshot = _snapshot.value): String {
         val opp1 = state.opponentTeams.find { it.opponentTeamId == game.opponentId }?.opponentName ?: "Gegner"
         return if (game.secondOpponentId == null) {
