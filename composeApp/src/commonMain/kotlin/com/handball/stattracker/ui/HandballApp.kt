@@ -1,7 +1,6 @@
 package com.handball.stattracker.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,8 +42,6 @@ fun HandballApp(
     var selectedGameId by remember { mutableStateOf<Int?>(null) }
     var creationModal by remember { mutableStateOf(CreationModalType.NONE) }
 
-    // Statische Titelzeile ('Spieler/Saison/Spiel' aus dem UI-Grundkonzept):
-    // Zeigt den Namen des aktuell geöffneten Elements (Spielername, Saison oder Spielpaarung).
     val staticHeaderTitle = remember(currentScreen, selectedPlayerId, selectedSeasonId, selectedGameId, snapshot) {
         computeHeaderTitle(
             currentScreen = currentScreen,
@@ -65,8 +62,6 @@ fun HandballApp(
                 val isWideScreen = maxWidth >= 700.dp
 
                 if (isWideScreen) {
-                    // Desktop / Web / Tablet Layout exakt wie in der UI-Skizze:
-                    // Links vertikale abgerundete Navbar (mit [H] oben), rechts oben statische Titel-Box, darunter Content-Box
                     Row(
                         modifier = Modifier.fillMaxSize().padding(14.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -126,8 +121,6 @@ fun HandballApp(
                         }
                     }
                 } else {
-                    // Mobile Layout (iOS / Android Hochformat):
-                    // Navbar am unteren Bildschirmrand für optimale Daumen-Bedienung
                     Column(
                         modifier = Modifier.fillMaxSize().padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -184,7 +177,6 @@ fun HandballApp(
                 }
             }
 
-            // Plus-Menü & Erstellungs-Dialoge
             PlusCreationModalHost(
                 modalType = creationModal,
                 repository = repository,
@@ -222,7 +214,7 @@ private fun computeHeaderTitle(
     val activeSeason = snapshot.seasons.find { it.seasonId == selectedSeasonId } ?: snapshot.seasons.firstOrNull()
     return when (currentScreen) {
         MainNavScreen.HOME_DASHBOARD -> {
-            "${snapshot.ownClubName} • ${activeSeason?.division ?: "Übersicht"}"
+            activeSeason?.division ?: "Übersicht"
         }
         MainNavScreen.ROSTER -> {
             val player = snapshot.players.find { it.playerId == selectedPlayerId }
@@ -231,7 +223,7 @@ private fun computeHeaderTitle(
                 val nr = player.jerseyNumberHomeKit?.let { "#$it • " } ?: ""
                 "$nr${player.fullName} ($pos)"
             } else {
-                "Kader – ${snapshot.ownClubName}"
+                "Kader"
             }
         }
         MainNavScreen.SEASON -> {
@@ -243,7 +235,7 @@ private fun computeHeaderTitle(
             }
         }
         MainNavScreen.STANDINGS -> {
-            "Tabelle – ${activeSeason?.division ?: "Liga"}"
+            "Tabelle • ${activeSeason?.division ?: "Liga"}"
         }
     }
 }
@@ -306,7 +298,6 @@ private fun VerticalRoundedNavbar(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Oben links: [H]-Box für Home / Dashboard gemäß UI-Grundkonzept
                 val isHomeSelected = currentScreen == MainNavScreen.HOME_DASHBOARD
                 Surface(
                     shape = RoundedCornerShape(14.dp),
@@ -336,7 +327,6 @@ private fun VerticalRoundedNavbar(
 
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 6.dp))
 
-                // Screen-Icons: Kader, Saison, Tabelle
                 NavbarIconItem(
                     label = "Kader",
                     icon = Icons.Default.Groups,
@@ -360,7 +350,6 @@ private fun VerticalRoundedNavbar(
 
                 Spacer(Modifier.height(4.dp))
 
-                // Plus Icon in der Navbar
                 FilledIconButton(
                     onClick = onOpenPlusMenu,
                     modifier = Modifier.size(52.dp),
@@ -377,7 +366,6 @@ private fun VerticalRoundedNavbar(
                 }
             }
 
-            // Unten: Dark-/Light-Mode Umschalter
             IconButton(onClick = onToggleDarkTheme) {
                 Icon(
                     imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
@@ -454,7 +442,6 @@ private fun BottomMobileNavbar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // [H] Home Button
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = if (currentScreen == MainNavScreen.HOME_DASHBOARD) {

@@ -34,11 +34,81 @@ class HandballRepository {
     private fun loadInitialSnapshot(): DatabaseSnapshot {
         val loaded = PlatformStorage.loadSnapshot()
         if (loaded != null && loaded.positions.isNotEmpty()) {
-            return loaded
+            val migrated = migrateSnapshotIfNeeded(loaded)
+            if (migrated != loaded) {
+                PlatformStorage.saveSnapshot(migrated)
+            }
+            return migrated
         }
         val seeded = DemoDataSeed.createDemoSnapshot()
         PlatformStorage.saveSnapshot(seeded)
         return seeded
+    }
+
+    /**
+     * Stellt sicher, dass ältere gespeicherte Snapshots (vor Einführung von Aufstellung, +/- und Spielprotokoll)
+     * automatisch eine aktive Startsieben auf dem Feld sowie realistische Demo-Protokolle erhalten.
+     */
+    private fun migrateSnapshotIfNeeded(snapshot: DatabaseSnapshot): DatabaseSnapshot {
+        val hasAnyOnCourt = snapshot.playerGames.any { it.isOnCourt }
+        if (hasAnyOnCourt && snapshot.gameLogs.isNotEmpty()) {
+            return snapshot
+        }
+
+        val demo = DemoDataSeed.createDemoSnapshot()
+        val demoPgById = demo.playerGames.associateBy { it.playerGameId }
+
+        val updatedGames = snapshot.games.map { g ->
+            if (g.elapsedSeconds == 0 && (g.homeTeamScore > 0 || g.awayTeamScore > 0)) {
+                g.copy(elapsedSeconds = 3600)
+            } else g
+        }
+
+        val updatedPlayerGames = snapshot.playerGames.groupBy { it.gameId }.flatMap { (_, pbs) ->
+            val anyActive = pbs.any { it.isOnCourt }
+            if (anyActive) {
+                pbs
+            } else {
+                // Prüfe ob Demo-Werte vorhanden sind, sonst wähle bis zu 7 Spieler (1 TW + 6 Feld)
+                val keeperCandidates = pbs.filter { pg ->
+                    snapshot.players.find { it.playerId == pg.playerId }?.role == PlayerRole.GOALKEEPER
+                }
+                val fieldCandidates = pbs.filter { pg ->
+                    snapshot.players.find { it.playerId == pg.playerId }?.role == PlayerRole.FIELD_PLAYER
+                }
+                val defaultActiveIds = (keeperCandidates.take(1) + fieldCandidates.take(6))
+                    .map { it.playerGameId }
+                    .toSet()
+
+                pbs.map { pg ->
+                    val demoPg = demoPgById[pg.playerGameId]
+                    if (demoPg != null && demoPg.gameId == pg.gameId && demoPg.playerId == pg.playerId) {
+                        pg.copy(
+                            isOnCourt = demoPg.isOnCourt,
+                            plusMinus = if (pg.plusMinus == 0) demoPg.plusMinus else pg.plusMinus,
+                            secondsPlayed = if (pg.secondsPlayed == 0) demoPg.secondsPlayed else pg.secondsPlayed
+                        )
+                    } else {
+                        pg.copy(
+                            isOnCourt = pg.playerGameId in defaultActiveIds,
+                            secondsPlayed = if (pg.secondsPlayed == 0 && pg.playerGameId in defaultActiveIds) 1800 else pg.secondsPlayed
+                        )
+                    }
+                }
+            }
+        }
+
+        val updatedLogs = if (snapshot.gameLogs.isEmpty()) {
+            demo.gameLogs.filter { log -> snapshot.games.any { it.gameId == log.gameId } }
+        } else {
+            snapshot.gameLogs
+        }
+
+        return snapshot.copy(
+            games = updatedGames,
+            playerGames = updatedPlayerGames,
+            gameLogs = updatedLogs
+        )
     }
 
     private fun mutate(block: (DatabaseSnapshot) -> DatabaseSnapshot) {
@@ -111,7 +181,8 @@ class HandballRepository {
                 playerGames = state.playerGames.filterNot { it.playerId == playerId },
                 fieldPlayerStats = state.fieldPlayerStats.filterNot { it.playerGameId in removedPgIds },
                 goalKeeperStats = state.goalKeeperStats.filterNot { it.playerGameId in removedPgIds },
-                coachStats = state.coachStats.filterNot { it.playerGameId in removedPgIds }
+                coachStats = state.coachStats.filterNot { it.playerGameId in removedPgIds },
+                gameLogs = state.gameLogs.filterNot { it.primaryPlayerId == playerId || it.secondaryPlayerId == playerId }
             )
         }
     }
@@ -198,7 +269,8 @@ class HandballRepository {
             homeTeamHalftimeScore = homeHalftime,
             awayTeamHalftimeScore = awayHalftime,
             homeTeamScore = homeScore,
-            awayTeamScore = awayScore
+            awayTeamScore = awayScore,
+            elapsedSeconds = 0
         )
 
         var nextPgId = (state.playerGames.maxOfOrNull { it.playerGameId } ?: 0) + 1
@@ -208,15 +280,30 @@ class HandballRepository {
         val newPlayerGames = mutableListOf<PlayerGame>()
         val newFieldStats = mutableListOf<FieldPlayerGameStats>()
         val newKeeperStats = mutableListOf<GoalKeeperGameStats>()
+        val initialLogs = mutableListOf<GameLogEntry>()
 
         if (secondOpponentId == null) {
-            nominatedPlayerIds.forEach { pid ->
-                val player = state.players.find { it.playerId == pid } ?: return@forEach
+            val nominatedPlayers = nominatedPlayerIds.mapNotNull { pid ->
+                state.players.find { it.playerId == pid }
+            }
+            // Wähle bis zu 7 Spieler als initiale Startsieben (1 Torwart + bis zu 6 Feldspieler)
+            val startingKeeper = nominatedPlayers.firstOrNull { it.role == PlayerRole.GOALKEEPER }
+            val startingField = nominatedPlayers
+                .filter { it.role == PlayerRole.FIELD_PLAYER }
+                .distinctBy { it.positionId ?: it.playerId }
+                .let { distinctPos ->
+                    if (distinctPos.size >= 6) distinctPos.take(6)
+                    else (distinctPos + nominatedPlayers.filter { it.role == PlayerRole.FIELD_PLAYER && it !in distinctPos }).take(6)
+                }
+            val startingSevenIds = (listOfNotNull(startingKeeper) + startingField).map { it.playerId }.toSet()
+
+            nominatedPlayers.forEach { player ->
                 val pgId = nextPgId++
                 newPlayerGames += PlayerGame(
                     playerGameId = pgId,
                     gameId = nextGameId,
-                    playerId = pid
+                    playerId = player.playerId,
+                    isOnCourt = player.playerId in startingSevenIds
                 )
                 when (player.role) {
                     PlayerRole.FIELD_PLAYER -> {
@@ -236,6 +323,23 @@ class HandballRepository {
                     }
                 }
             }
+
+            if (startingSevenIds.isNotEmpty()) {
+                val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+                val names = nominatedPlayers
+                    .filter { it.playerId in startingSevenIds }
+                    .joinToString(", ") { "#${it.jerseyNumberHomeKit ?: "-"} ${it.lastName}" }
+                initialLogs += GameLogEntry(
+                    logId = nextLogId,
+                    gameId = nextGameId,
+                    gameSecond = 0,
+                    eventType = GameLogEventType.LINEUP_SET,
+                    primaryPlayerId = startingSevenIds.firstOrNull(),
+                    homeScoreAtEvent = homeScore,
+                    awayScoreAtEvent = awayScore,
+                    description = "Startaufstellung (${startingSevenIds.size}/7): $names"
+                )
+            }
         }
 
         // Stelle sicher, dass Gegner der Saison zugewiesen sind
@@ -252,7 +356,8 @@ class HandballRepository {
                 playerGames = current.playerGames + newPlayerGames,
                 fieldPlayerStats = current.fieldPlayerStats + newFieldStats,
                 goalKeeperStats = current.goalKeeperStats + newKeeperStats,
-                seasonOpponents = (current.seasonOpponents + extraSeasonOpponents).distinct()
+                seasonOpponents = (current.seasonOpponents + extraSeasonOpponents).distinct(),
+                gameLogs = current.gameLogs + initialLogs
             )
         }
         return newGame
@@ -271,8 +376,24 @@ class HandballRepository {
                 )
             } else {
                 val player = state.players.find { it.playerId == playerId } ?: return@mutate state
+                val activeCourtPlayers = state.playerGames.mapNotNull { pg ->
+                    if (pg.gameId == gameId && pg.isOnCourt) {
+                        state.players.find { it.playerId == pg.playerId && it.role != PlayerRole.COACH }
+                    } else null
+                }
+                val activeFieldCount = activeCourtPlayers.count { it.role == PlayerRole.FIELD_PLAYER }
+                val activeKeeperCount = activeCourtPlayers.count { it.role == PlayerRole.GOALKEEPER }
+                val newFieldCount = activeFieldCount + (if (player.role == PlayerRole.FIELD_PLAYER) 1 else 0)
+                val newKeeperCount = activeKeeperCount + (if (player.role == PlayerRole.GOALKEEPER) 1 else 0)
+                val putOnCourt = player.role != PlayerRole.COACH &&
+                    isValidActiveCourtLineup(newFieldCount, newKeeperCount)
                 val nextPgId = (state.playerGames.maxOfOrNull { it.playerGameId } ?: 0) + 1
-                val newPg = PlayerGame(playerGameId = nextPgId, gameId = gameId, playerId = playerId)
+                val newPg = PlayerGame(
+                    playerGameId = nextPgId,
+                    gameId = gameId,
+                    playerId = playerId,
+                    isOnCourt = putOnCourt
+                )
                 val updatedField = if (player.role == PlayerRole.FIELD_PLAYER) {
                     val nextId = (state.fieldPlayerStats.maxOfOrNull { it.fieldPlayerGamestatsId } ?: 0) + 1
                     state.fieldPlayerStats + FieldPlayerGameStats(fieldPlayerGamestatsId = nextId, playerGameId = nextPgId)
@@ -291,6 +412,342 @@ class HandballRepository {
         }
     }
 
+    // --- MATCH CLOCK & EINSATZZEIT ---
+    fun advanceGameClock(gameId: Int, deltaSeconds: Int) {
+        if (deltaSeconds == 0) return
+        mutate { state ->
+            val game = state.games.find { it.gameId == gameId } ?: return@mutate state
+            val newElapsed = (game.elapsedSeconds + deltaSeconds).coerceIn(0, 3600)
+            val actualDelta = newElapsed - game.elapsedSeconds
+
+            val updatedGames = state.games.map { g ->
+                if (g.gameId == gameId) g.copy(elapsedSeconds = newElapsed) else g
+            }
+
+            val updatedPlayerGames = state.playerGames.map { pg ->
+                if (pg.gameId == gameId) {
+                    val role = state.players.find { it.playerId == pg.playerId }?.role
+                    val addedTime = if (pg.isOnCourt && role != PlayerRole.COACH && actualDelta > 0) actualDelta else 0
+                    val clearedSuspension = if (pg.activeSuspensionUntilSeconds != null && newElapsed >= pg.activeSuspensionUntilSeconds) {
+                        null
+                    } else {
+                        pg.activeSuspensionUntilSeconds
+                    }
+                    pg.copy(
+                        secondsPlayed = (pg.secondsPlayed + addedTime).coerceAtLeast(0),
+                        activeSuspensionUntilSeconds = clearedSuspension
+                    )
+                } else pg
+            }
+
+            state.copy(
+                games = updatedGames,
+                playerGames = updatedPlayerGames
+            )
+        }
+    }
+
+    fun setGameClockSeconds(gameId: Int, targetSeconds: Int) {
+        val clamped = targetSeconds.coerceIn(0, 3600)
+        val current = _snapshot.value.games.find { it.gameId == gameId }?.elapsedSeconds ?: return
+        if (clamped == current) return
+        advanceGameClock(gameId, clamped - current)
+    }
+
+    // --- AKTIVE 7-ON-COURT AUFSTELLUNG & WECHSEL (SUBSTITUTIONS) ---
+
+    /**
+     * Prüft die Handball-Regel für die aktiven Spieler auf dem Feld:
+     * - Maximal 7 aktive Spieler gleichzeitig auf dem Feld:
+     *   Entweder **6 Feldspieler + 1 Torwart** ODER **7 Feldspieler + 0 Torwart** (bzw. weniger bei Unterzahl).
+     * - Maximal 1 Torwart gleichzeitig auf dem Feld (`goalKeeperCount <= 1`).
+     * - Maximal 7 Feldspieler gleichzeitig auf dem Feld (`fieldPlayerCount <= 7`).
+     */
+    fun isValidActiveCourtLineup(fieldPlayerCount: Int, goalKeeperCount: Int): Boolean =
+        fieldPlayerCount in 0..7 &&
+            goalKeeperCount in 0..1 &&
+            (fieldPlayerCount + goalKeeperCount) <= 7
+
+    /**
+     * Prüft vorab, ob ein Bank-Spieler ([playerInId]) eingewechselt werden darf:
+     * - Wenn [playerOutId] != null: 1-zu-1 Wechsel (muss eine gültige Kombination aus max. 6 Feld + 1 TW oder 7 Feld + 0 TW ergeben).
+     * - Wenn [playerOutId] == null: Direkt aufs Feld (nur erlaubt, wenn < 7 aktiv sind UND bei einem Torwart noch kein Torwart auf dem Feld steht).
+     */
+    fun canSubstituteOrEnterCourt(
+        gameId: Int,
+        playerInId: Int,
+        playerOutId: Int? = null,
+        state: DatabaseSnapshot = _snapshot.value
+    ): Boolean {
+        val game = state.games.find { it.gameId == gameId } ?: return false
+        val pgIn = state.playerGames.find { it.gameId == gameId && it.playerId == playerInId } ?: return false
+        val playerIn = state.players.find { it.playerId == playerInId } ?: return false
+        if (playerIn.role == PlayerRole.COACH) return false
+        if (pgIn.isOnCourt) return false
+        if (pgIn.isDisqualified || pgIn.hasActiveSuspension(game.elapsedSeconds)) return false
+
+        val activeCourtPlayers = state.playerGames.mapNotNull { pg ->
+            if (pg.gameId == gameId && pg.isOnCourt) {
+                state.players.find { it.playerId == pg.playerId && it.role != PlayerRole.COACH }
+            } else null
+        }
+        val activeFieldCount = activeCourtPlayers.count { it.role == PlayerRole.FIELD_PLAYER }
+        val activeKeeperCount = activeCourtPlayers.count { it.role == PlayerRole.GOALKEEPER }
+
+        return if (playerOutId != null) {
+            if (playerOutId == playerInId) return false
+            val pgOut = state.playerGames.find { it.gameId == gameId && it.playerId == playerOutId } ?: return false
+            val playerOut = state.players.find { it.playerId == playerOutId } ?: return false
+            if (!pgOut.isOnCourt || playerOut.role == PlayerRole.COACH) return false
+
+            val newFieldCount = activeFieldCount -
+                (if (playerOut.role == PlayerRole.FIELD_PLAYER) 1 else 0) +
+                (if (playerIn.role == PlayerRole.FIELD_PLAYER) 1 else 0)
+            val newKeeperCount = activeKeeperCount -
+                (if (playerOut.role == PlayerRole.GOALKEEPER) 1 else 0) +
+                (if (playerIn.role == PlayerRole.GOALKEEPER) 1 else 0)
+
+            isValidActiveCourtLineup(newFieldCount, newKeeperCount)
+        } else {
+            val newFieldCount = activeFieldCount + (if (playerIn.role == PlayerRole.FIELD_PLAYER) 1 else 0)
+            val newKeeperCount = activeKeeperCount + (if (playerIn.role == PlayerRole.GOALKEEPER) 1 else 0)
+            isValidActiveCourtLineup(newFieldCount, newKeeperCount)
+        }
+    }
+
+    /**
+     * Führt einen Spielerwechsel durch:
+     * - Wenn [playerOutId] angegeben ist: 1-zu-1 Wechsel ([playerInId] kommt von der Bank aufs Feld, [playerOutId] geht auf die Bank).
+     * - Wenn [playerOutId] null ist: [playerInId] wird direkt von der Bank aufs Feld gestellt (sofern < 7 Feld-/Torwart-Spieler aktiv sind und max. 1 TW).
+     * Prüft zwingend die Regel: 6 Feldspieler + 1 Torwart ODER 7 Feldspieler (0 Torwart).
+     * Protokolliert den Wechsel automatisch im Spielprotokoll (GAME_LOG).
+     */
+    fun substitutePlayer(gameId: Int, playerInId: Int, playerOutId: Int? = null): Boolean {
+        var success = false
+        mutate { state ->
+            if (!canSubstituteOrEnterCourt(gameId, playerInId, playerOutId, state)) return@mutate state
+            val game = state.games.find { it.gameId == gameId } ?: return@mutate state
+            val pgIn = state.playerGames.find { it.gameId == gameId && it.playerId == playerInId } ?: return@mutate state
+            val playerIn = state.players.find { it.playerId == playerInId } ?: return@mutate state
+
+            val activeCourtPlayers = state.playerGames.mapNotNull { pg ->
+                if (pg.gameId == gameId && pg.isOnCourt) {
+                    state.players.find { it.playerId == pg.playerId && it.role != PlayerRole.COACH }
+                } else null
+            }
+            val activeFieldCount = activeCourtPlayers.count { it.role == PlayerRole.FIELD_PLAYER }
+            val activeKeeperCount = activeCourtPlayers.count { it.role == PlayerRole.GOALKEEPER }
+
+            if (playerOutId != null) {
+                val pgOut = state.playerGames.find { it.gameId == gameId && it.playerId == playerOutId } ?: return@mutate state
+                val playerOut = state.players.find { it.playerId == playerOutId } ?: return@mutate state
+
+                val newFieldCount = activeFieldCount -
+                    (if (playerOut.role == PlayerRole.FIELD_PLAYER) 1 else 0) +
+                    (if (playerIn.role == PlayerRole.FIELD_PLAYER) 1 else 0)
+                val newKeeperCount = activeKeeperCount -
+                    (if (playerOut.role == PlayerRole.GOALKEEPER) 1 else 0) +
+                    (if (playerIn.role == PlayerRole.GOALKEEPER) 1 else 0)
+
+                val updatedPgs = state.playerGames.map { pg ->
+                    when (pg.playerGameId) {
+                        pgIn.playerGameId -> pg.copy(isOnCourt = true)
+                        pgOut.playerGameId -> pg.copy(isOnCourt = false)
+                        else -> pg
+                    }
+                }
+
+                val inNr = playerIn.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+                val outNr = playerOut.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+                val modePrefix = when {
+                    newFieldCount == 7 && newKeeperCount == 0 -> "Wechsel (7. Feldspieler / Empty Net)"
+                    playerIn.role == PlayerRole.GOALKEEPER && playerOut.role == PlayerRole.FIELD_PLAYER -> "Wechsel (TW zurück → 6+1)"
+                    playerIn.role == PlayerRole.GOALKEEPER && playerOut.role == PlayerRole.GOALKEEPER -> "Torwart-Wechsel"
+                    else -> "Wechsel"
+                }
+                val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+                val logEntry = GameLogEntry(
+                    logId = nextLogId,
+                    gameId = gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.SUBSTITUTION,
+                    primaryPlayerId = playerIn.playerId,
+                    secondaryPlayerId = playerOut.playerId,
+                    homeScoreAtEvent = game.homeTeamScore,
+                    awayScoreAtEvent = game.awayTeamScore,
+                    description = "$modePrefix: $inNr${playerIn.fullName} rein für $outNr${playerOut.fullName} ($newFieldCount Feld + $newKeeperCount TW)"
+                )
+                success = true
+                state.copy(
+                    playerGames = updatedPgs,
+                    gameLogs = state.gameLogs + logEntry
+                )
+            } else {
+                val newFieldCount = activeFieldCount + (if (playerIn.role == PlayerRole.FIELD_PLAYER) 1 else 0)
+                val newKeeperCount = activeKeeperCount + (if (playerIn.role == PlayerRole.GOALKEEPER) 1 else 0)
+                val updatedPgs = state.playerGames.map { pg ->
+                    if (pg.playerGameId == pgIn.playerGameId) pg.copy(isOnCourt = true) else pg
+                }
+                val inNr = playerIn.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+                val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+                val logEntry = GameLogEntry(
+                    logId = nextLogId,
+                    gameId = gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.SUBSTITUTION,
+                    primaryPlayerId = playerIn.playerId,
+                    secondaryPlayerId = null,
+                    homeScoreAtEvent = game.homeTeamScore,
+                    awayScoreAtEvent = game.awayTeamScore,
+                    description = "Einwechslung: $inNr${playerIn.fullName} aufs Feld ($newFieldCount Feld + $newKeeperCount TW)"
+                )
+                success = true
+                state.copy(
+                    playerGames = updatedPgs,
+                    gameLogs = state.gameLogs + logEntry
+                )
+            }
+        }
+        return success
+    }
+
+    /**
+     * Nimmt einen aktuell auf dem Feld stehenden Spieler auf die Bank herunter (z.B. bei Unterzahl oder taktischem Wechsel).
+     */
+    fun movePlayerToBench(gameId: Int, playerOutId: Int, reasonSuffix: String = "") {
+        mutate { state ->
+            val game = state.games.find { it.gameId == gameId } ?: return@mutate state
+            val pgOut = state.playerGames.find { it.gameId == gameId && it.playerId == playerOutId } ?: return@mutate state
+            if (!pgOut.isOnCourt) return@mutate state
+            val playerOut = state.players.find { it.playerId == playerOutId } ?: return@mutate state
+
+            val updatedPgs = state.playerGames.map { pg ->
+                if (pg.playerGameId == pgOut.playerGameId) pg.copy(isOnCourt = false) else pg
+            }
+            val remainingCount = updatedPgs.count { pg ->
+                pg.gameId == gameId && pg.isOnCourt &&
+                    state.players.find { it.playerId == pg.playerId }?.role != PlayerRole.COACH
+            }
+            val outNr = playerOut.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+            val extra = if (reasonSuffix.isNotBlank()) " ($reasonSuffix)" else ""
+            val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+            val logEntry = GameLogEntry(
+                logId = nextLogId,
+                gameId = gameId,
+                gameSecond = game.elapsedSeconds,
+                eventType = GameLogEventType.SUBSTITUTION,
+                primaryPlayerId = null,
+                secondaryPlayerId = playerOut.playerId,
+                homeScoreAtEvent = game.homeTeamScore,
+                awayScoreAtEvent = game.awayTeamScore,
+                description = "Auf die Bank: $outNr${playerOut.fullName}$extra ($remainingCount/7 auf dem Feld)"
+            )
+            state.copy(
+                playerGames = updatedPgs,
+                gameLogs = state.gameLogs + logEntry
+            )
+        }
+    }
+
+    /**
+     * Besetzt das Spielfeld automatisch mit der empfohlenen Startsieben:
+     * - [useSeventhFieldPlayer] == false (Standard): **6 Feldspieler + 1 Torwart** (nach bestem Performance-Index je Position).
+     * - [useSeventhFieldPlayer] == true: **7 Feldspieler + 0 Torwart** (Empty Net / 7. Feldspieler).
+     */
+    fun applyRecommendedStartingSevenToGame(gameId: Int, useSeventhFieldPlayer: Boolean = false) {
+        mutate { state ->
+            val game = state.games.find { it.gameId == gameId } ?: return@mutate state
+            val gamePgs = state.playerGames.filter { it.gameId == gameId }
+            val eligiblePgs = gamePgs.filter { pg ->
+                val p = state.players.find { it.playerId == pg.playerId }
+                p != null && p.role != PlayerRole.COACH && !pg.isDisqualified && !pg.hasActiveSuspension(game.elapsedSeconds)
+            }
+            if (eligiblePgs.isEmpty()) return@mutate state
+
+            val rankings = computePlayerRankings(seasonIdFilter = game.seasonId, state = state)
+                .associateBy { it.player.playerId }
+
+            val keeperPg = if (useSeventhFieldPlayer) {
+                null
+            } else {
+                eligiblePgs
+                    .filter { pg -> state.players.find { it.playerId == pg.playerId }?.role == PlayerRole.GOALKEEPER }
+                    .maxByOrNull { pg -> rankings[pg.playerId]?.performanceScore ?: 0.0 }
+            }
+
+            val targetFieldCount = if (keeperPg != null) 6 else 7
+
+            val fieldPgs = eligiblePgs
+                .filter { pg -> state.players.find { it.playerId == pg.playerId }?.role == PlayerRole.FIELD_PLAYER }
+                .sortedByDescending { pg -> rankings[pg.playerId]?.performanceScore ?: 0.0 }
+
+            val selectedFieldByPos = fieldPgs
+                .distinctBy { pg -> state.players.find { it.playerId == pg.playerId }?.positionId ?: pg.playerId }
+                .take(targetFieldCount)
+
+            val finalField = if (selectedFieldByPos.size >= targetFieldCount) {
+                selectedFieldByPos
+            } else {
+                (selectedFieldByPos + fieldPgs.filterNot { it in selectedFieldByPos }).take(targetFieldCount)
+            }
+
+            val chosenPgIds = (listOfNotNull(keeperPg) + finalField).take(7).map { it.playerGameId }.toSet()
+
+            val updatedPgs = state.playerGames.map { pg ->
+                if (pg.gameId == gameId) {
+                    pg.copy(isOnCourt = pg.playerGameId in chosenPgIds)
+                } else pg
+            }
+
+            val chosenNames = chosenPgIds.mapNotNull { pgId ->
+                val pid = gamePgs.find { it.playerGameId == pgId }?.playerId
+                state.players.find { it.playerId == pid }
+            }.joinToString(", ") { "#${it.jerseyNumberHomeKit ?: "-"} ${it.lastName}" }
+
+            val formationText = if (keeperPg != null) "${finalField.size} Feld + 1 TW" else "${finalField.size} Feld + 0 TW"
+            val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+            val logEntry = GameLogEntry(
+                logId = nextLogId,
+                gameId = gameId,
+                gameSecond = game.elapsedSeconds,
+                eventType = GameLogEventType.LINEUP_SET,
+                primaryPlayerId = null,
+                homeScoreAtEvent = game.homeTeamScore,
+                awayScoreAtEvent = game.awayTeamScore,
+                description = "Aufstellung gesetzt ($formationText): $chosenNames"
+            )
+
+            state.copy(
+                playerGames = updatedPgs,
+                gameLogs = state.gameLogs + logEntry
+            )
+        }
+    }
+
+    fun adjustPlayerPlusMinus(playerGameId: Int, delta: Int) {
+        if (delta == 0) return
+        mutate { state ->
+            state.copy(
+                playerGames = state.playerGames.map { pg ->
+                    if (pg.playerGameId == playerGameId) {
+                        pg.copy(plusMinus = pg.plusMinus + delta)
+                    } else pg
+                }
+            )
+        }
+    }
+
+    fun deleteGameLogEntry(logId: Int) {
+        mutate { state ->
+            state.copy(gameLogs = state.gameLogs.filterNot { it.logId == logId })
+        }
+    }
+
+    fun getGameLogs(gameId: Int, state: DatabaseSnapshot = _snapshot.value): List<GameLogEntry> =
+        state.gameLogs
+            .filter { it.gameId == gameId }
+            .sortedWith(compareByDescending<GameLogEntry> { it.gameSecond }.thenByDescending { it.logId })
+
     fun updateGameScores(
         gameId: Int,
         homeScore: Int,
@@ -299,17 +756,55 @@ class HandballRepository {
         awayHalftime: Int
     ) {
         mutate { state ->
-            state.copy(
-                games = state.games.map { game ->
-                    if (game.gameId == gameId) {
-                        game.copy(
-                            homeTeamScore = homeScore.coerceAtLeast(0),
-                            awayTeamScore = awayScore.coerceAtLeast(0),
-                            homeTeamHalftimeScore = homeHalftime.coerceAtLeast(0),
-                            awayTeamHalftimeScore = awayHalftime.coerceAtLeast(0)
-                        )
-                    } else game
+            val oldGame = state.games.find { it.gameId == gameId } ?: return@mutate state
+            val newHome = homeScore.coerceAtLeast(0)
+            val newAway = awayScore.coerceAtLeast(0)
+            val newHomeHalf = homeHalftime.coerceAtLeast(0)
+            val newAwayHalf = awayHalftime.coerceAtLeast(0)
+
+            val homeDelta = newHome - oldGame.homeTeamScore
+            val awayDelta = newAway - oldGame.awayTeamScore
+            val netOwnDelta = if (oldGame.isOwnTeamGame) {
+                if (oldGame.isHomeGame) homeDelta - awayDelta else awayDelta - homeDelta
+            } else 0
+
+            val updatedGames = state.games.map { game ->
+                if (game.gameId == gameId) {
+                    game.copy(
+                        homeTeamScore = newHome,
+                        awayTeamScore = newAway,
+                        homeTeamHalftimeScore = newHomeHalf,
+                        awayTeamHalftimeScore = newAwayHalf
+                    )
+                } else game
+            }
+
+            val updatedPlayerGames = if (netOwnDelta != 0) {
+                state.playerGames.map { pg ->
+                    val role = state.players.find { it.playerId == pg.playerId }?.role
+                    if (pg.gameId == gameId && pg.isOnCourt && role != PlayerRole.COACH) {
+                        pg.copy(plusMinus = pg.plusMinus + netOwnDelta)
+                    } else pg
                 }
+            } else state.playerGames
+
+            val newLogs = if (homeDelta != 0 || awayDelta != 0) {
+                val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+                state.gameLogs + GameLogEntry(
+                    logId = nextLogId,
+                    gameId = gameId,
+                    gameSecond = oldGame.elapsedSeconds,
+                    eventType = GameLogEventType.SCORE_UPDATE,
+                    homeScoreAtEvent = newHome,
+                    awayScoreAtEvent = newAway,
+                    description = "Spielstand angepasst auf $newHome:$newAway (HZ $newHomeHalf:$newAwayHalf)"
+                )
+            } else state.gameLogs
+
+            state.copy(
+                games = updatedGames,
+                playerGames = updatedPlayerGames,
+                gameLogs = newLogs
             )
         }
     }
@@ -322,12 +817,13 @@ class HandballRepository {
                 playerGames = state.playerGames.filterNot { it.gameId == gameId },
                 fieldPlayerStats = state.fieldPlayerStats.filterNot { it.playerGameId in pgIds },
                 goalKeeperStats = state.goalKeeperStats.filterNot { it.playerGameId in pgIds },
-                coachStats = state.coachStats.filterNot { it.playerGameId in pgIds }
+                coachStats = state.coachStats.filterNot { it.playerGameId in pgIds },
+                gameLogs = state.gameLogs.filterNot { it.gameId == gameId }
             )
         }
     }
 
-    // --- PLAYER_GAME DISCIPLINARY ---
+    // --- PLAYER_GAME DISCIPLINARY (INKL. AUTOMATISCHEM BANK-WECHSEL BEI 2-MIN & ROT/BLAU) ---
     fun updatePlayerDisciplinary(
         playerGameId: Int,
         twoMinuteSuspensions: Int,
@@ -336,28 +832,114 @@ class HandballRepository {
         blueCard: Boolean
     ) {
         mutate { state ->
+            val pg = state.playerGames.find { it.playerGameId == playerGameId } ?: return@mutate state
+            val game = state.games.find { it.gameId == pg.gameId } ?: return@mutate state
+            val player = state.players.find { it.playerId == pg.playerId }
+
+            val clampedTwoMin = twoMinuteSuspensions.coerceIn(0, 3)
+            val twoMinIncreased = clampedTwoMin > pg.twoMinuteSuspensions
+            val yellowAdded = yellowCard && !pg.yellowCard
+            val redAdded = redCard && !pg.redCard
+            val blueAdded = blueCard && !pg.blueCard
+
+            // 2-Minuten-Strafe, Rote Karte und Blaue Karte versetzen den Spieler automatisch auf die Bank
+            val forceToBench = twoMinIncreased || redCard || blueCard || clampedTwoMin >= 3
+            val newSuspensionUntil = when {
+                twoMinIncreased -> (game.elapsedSeconds + 120).coerceAtMost(3600)
+                clampedTwoMin < pg.twoMinuteSuspensions -> null
+                else -> pg.activeSuspensionUntilSeconds
+            }
+
+            val updatedPlayerGames = state.playerGames.map { item ->
+                if (item.playerGameId == playerGameId) {
+                    item.copy(
+                        twoMinuteSuspensions = clampedTwoMin,
+                        yellowCard = yellowCard,
+                        redCard = redCard,
+                        blueCard = blueCard,
+                        isOnCourt = if (forceToBench) false else item.isOnCourt,
+                        activeSuspensionUntilSeconds = newSuspensionUntil
+                    )
+                } else item
+            }
+
+            val nrPrefix = player?.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+            val pName = player?.fullName ?: "Spieler"
+            val benchNote = if (pg.isOnCourt && forceToBench) " → automatisch auf die Bank" else ""
+
+            val addedLogs = mutableListOf<GameLogEntry>()
+            var nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+
+            if (twoMinIncreased) {
+                addedLogs += GameLogEntry(
+                    logId = nextLogId++,
+                    gameId = game.gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.TWO_MINUTE_SUSPENSION,
+                    primaryPlayerId = pg.playerId,
+                    homeScoreAtEvent = game.homeTeamScore,
+                    awayScoreAtEvent = game.awayTeamScore,
+                    description = "2-Minuten-Strafe ($clampedTwoMin.) gegen $nrPrefix$pName$benchNote"
+                )
+            }
+            if (yellowAdded) {
+                addedLogs += GameLogEntry(
+                    logId = nextLogId++,
+                    gameId = game.gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.YELLOW_CARD,
+                    primaryPlayerId = pg.playerId,
+                    homeScoreAtEvent = game.homeTeamScore,
+                    awayScoreAtEvent = game.awayTeamScore,
+                    description = "Gelbe Karte gegen $nrPrefix$pName"
+                )
+            }
+            if (redAdded) {
+                addedLogs += GameLogEntry(
+                    logId = nextLogId++,
+                    gameId = game.gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.RED_CARD,
+                    primaryPlayerId = pg.playerId,
+                    homeScoreAtEvent = game.homeTeamScore,
+                    awayScoreAtEvent = game.awayTeamScore,
+                    description = "Rote Karte (Disqualifikation) gegen $nrPrefix$pName$benchNote"
+                )
+            }
+            if (blueAdded) {
+                addedLogs += GameLogEntry(
+                    logId = nextLogId++,
+                    gameId = game.gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.BLUE_CARD,
+                    primaryPlayerId = pg.playerId,
+                    homeScoreAtEvent = game.homeTeamScore,
+                    awayScoreAtEvent = game.awayTeamScore,
+                    description = "Blaue Karte (mit Bericht) gegen $nrPrefix$pName$benchNote"
+                )
+            }
+
             state.copy(
-                playerGames = state.playerGames.map { pg ->
-                    if (pg.playerGameId == playerGameId) {
-                        pg.copy(
-                            twoMinuteSuspensions = twoMinuteSuspensions.coerceIn(0, 3),
-                            yellowCard = yellowCard,
-                            redCard = redCard,
-                            blueCard = blueCard
-                        )
-                    } else pg
-                }
+                playerGames = updatedPlayerGames,
+                gameLogs = state.gameLogs + addedLogs
             )
         }
     }
 
-    // --- FIELD_PLAYER_GAMESTATS ---
+    // --- FIELD_PLAYER_GAMESTATS (NUR FÜR AKTIVE SPIELER AUF DEM FELD + AUTO +/- & GAME LOG) ---
     fun updateFieldPlayerStats(
         playerGameId: Int,
         autoSyncTeamScore: Boolean = false,
         transform: (FieldPlayerGameStats) -> FieldPlayerGameStats
     ) {
         mutate { state ->
+            val pg = state.playerGames.find { it.playerGameId == playerGameId } ?: return@mutate state
+            // Bank-Spieler sind im inaktiven Zustand und können keine Spielstatistiken verbuchen
+            if (!pg.isOnCourt) return@mutate state
+
+            val game = state.games.find { it.gameId == pg.gameId }
+            val player = state.players.find { it.playerId == pg.playerId }
+
             val existing = state.fieldPlayerStats.find { it.playerGameId == playerGameId }
             val currentStats = existing ?: FieldPlayerGameStats(
                 fieldPlayerGamestatsId = (state.fieldPlayerStats.maxOfOrNull { it.fieldPlayerGamestatsId } ?: 0) + 1,
@@ -377,6 +959,8 @@ class HandballRepository {
                 technicalMistakes = rawUpdated.technicalMistakes.coerceAtLeast(0)
             )
             val goalDelta = updated.goalsScored - currentStats.goalsScored
+            val penGoalDelta = updated.penaltiesScored - currentStats.penaltiesScored
+            val shotDelta = updated.goalesAttempted - currentStats.goalesAttempted
 
             val newStatsList = if (existing != null) {
                 state.fieldPlayerStats.map { if (it.playerGameId == playerGameId) updated else it }
@@ -384,33 +968,90 @@ class HandballRepository {
                 state.fieldPlayerStats + updated
             }
 
-            val updatedGames = if (autoSyncTeamScore && goalDelta != 0) {
-                val pg = state.playerGames.find { it.playerGameId == playerGameId }
+            var newHomeScore = game?.homeTeamScore ?: 0
+            var newAwayScore = game?.awayTeamScore ?: 0
+
+            val updatedGames = if (autoSyncTeamScore && goalDelta != 0 && game != null && game.isOwnTeamGame) {
+                if (game.isHomeGame) {
+                    newHomeScore = (game.homeTeamScore + goalDelta).coerceAtLeast(0)
+                } else {
+                    newAwayScore = (game.awayTeamScore + goalDelta).coerceAtLeast(0)
+                }
                 state.games.map { g ->
-                    if (g.gameId == pg?.gameId && g.isOwnTeamGame) {
-                        if (g.isHomeGame) {
-                            g.copy(homeTeamScore = (g.homeTeamScore + goalDelta).coerceAtLeast(0))
-                        } else {
-                            g.copy(awayTeamScore = (g.awayTeamScore + goalDelta).coerceAtLeast(0))
-                        }
+                    if (g.gameId == game.gameId) {
+                        g.copy(homeTeamScore = newHomeScore, awayTeamScore = newAwayScore)
                     } else g
                 }
             } else state.games
 
+            // Plus/Minus (+/-) für alle aktuell auf dem Feld stehenden Spieler automatisch aktualisieren
+            val updatedPlayerGames = if (goalDelta != 0 && game != null) {
+                state.playerGames.map { item ->
+                    val role = state.players.find { it.playerId == item.playerId }?.role
+                    if (item.gameId == game.gameId && item.isOnCourt && role != PlayerRole.COACH) {
+                        item.copy(plusMinus = item.plusMinus + goalDelta)
+                    } else item
+                }
+            } else state.playerGames
+
+            val nrPrefix = player?.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+            val pName = player?.fullName ?: "Feldspieler"
+            val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+            val updatedLogs = when {
+                game != null && goalDelta > 0 -> {
+                    val isSevenMeter = penGoalDelta > 0
+                    state.gameLogs + GameLogEntry(
+                        logId = nextLogId,
+                        gameId = game.gameId,
+                        gameSecond = game.elapsedSeconds,
+                        eventType = if (isSevenMeter) GameLogEventType.SEVEN_METER_GOAL else GameLogEventType.GOAL,
+                        primaryPlayerId = pg.playerId,
+                        homeScoreAtEvent = newHomeScore,
+                        awayScoreAtEvent = newAwayScore,
+                        description = if (isSevenMeter) {
+                            "7m-Tor durch $nrPrefix$pName (${updated.goalsScored}. Tor)"
+                        } else {
+                            "Tor durch $nrPrefix$pName (${updated.goalsScored}. Tor)"
+                        }
+                    )
+                }
+                game != null && goalDelta == 0 && shotDelta > 0 -> {
+                    state.gameLogs + GameLogEntry(
+                        logId = nextLogId,
+                        gameId = game.gameId,
+                        gameSecond = game.elapsedSeconds,
+                        eventType = GameLogEventType.MISSED_SHOT,
+                        primaryPlayerId = pg.playerId,
+                        homeScoreAtEvent = newHomeScore,
+                        awayScoreAtEvent = newAwayScore,
+                        description = "Fehlwurf von $nrPrefix$pName"
+                    )
+                }
+                else -> state.gameLogs
+            }
+
             state.copy(
                 fieldPlayerStats = newStatsList,
-                games = updatedGames
+                games = updatedGames,
+                playerGames = updatedPlayerGames,
+                gameLogs = updatedLogs
             )
         }
     }
 
-    // --- GOAL_KEEPER_GAMESTATS ---
+    // --- GOAL_KEEPER_GAMESTATS (NUR FÜR AKTIVE TORHÜTER AUF DEM FELD + AUTO +/- & GAME LOG) ---
     fun updateGoalKeeperStats(
         playerGameId: Int,
         autoSyncOpponentScore: Boolean = false,
         transform: (GoalKeeperGameStats) -> GoalKeeperGameStats
     ) {
         mutate { state ->
+            val pg = state.playerGames.find { it.playerGameId == playerGameId } ?: return@mutate state
+            if (!pg.isOnCourt) return@mutate state
+
+            val game = state.games.find { it.gameId == pg.gameId }
+            val keeper = state.players.find { it.playerId == pg.playerId }
+
             val existing = state.goalKeeperStats.find { it.playerGameId == playerGameId }
             val currentStats = existing ?: GoalKeeperGameStats(
                 goalKeeperGamestatsId = (state.goalKeeperStats.maxOfOrNull { it.goalKeeperGamestatsId } ?: 0) + 1,
@@ -429,6 +1070,8 @@ class HandballRepository {
                 )
             )
             val concededDelta = updated.goalesConceded - currentStats.goalesConceded
+            val savesDelta = updated.saves - currentStats.saves
+            val penSavedDelta = updated.penaltiesSaved - currentStats.penaltiesSaved
 
             val newStatsList = if (existing != null) {
                 state.goalKeeperStats.map { if (it.playerGameId == playerGameId) updated else it }
@@ -436,22 +1079,69 @@ class HandballRepository {
                 state.goalKeeperStats + updated
             }
 
-            val updatedGames = if (autoSyncOpponentScore && concededDelta != 0) {
-                val pg = state.playerGames.find { it.playerGameId == playerGameId }
+            var newHomeScore = game?.homeTeamScore ?: 0
+            var newAwayScore = game?.awayTeamScore ?: 0
+
+            val updatedGames = if (autoSyncOpponentScore && concededDelta != 0 && game != null && game.isOwnTeamGame) {
+                if (game.isHomeGame) {
+                    newAwayScore = (game.awayTeamScore + concededDelta).coerceAtLeast(0)
+                } else {
+                    newHomeScore = (game.homeTeamScore + concededDelta).coerceAtLeast(0)
+                }
                 state.games.map { g ->
-                    if (g.gameId == pg?.gameId && g.isOwnTeamGame) {
-                        if (g.isHomeGame) {
-                            g.copy(awayTeamScore = (g.awayTeamScore + concededDelta).coerceAtLeast(0))
-                        } else {
-                            g.copy(homeTeamScore = (g.homeTeamScore + concededDelta).coerceAtLeast(0))
-                        }
+                    if (g.gameId == game.gameId) {
+                        g.copy(homeTeamScore = newHomeScore, awayTeamScore = newAwayScore)
                     } else g
                 }
             } else state.games
 
+            // Bei Gegentor erhalten alle aktuell auf dem Feld stehenden Spieler -1 auf ihren Plus/Minus-Wert
+            val updatedPlayerGames = if (concededDelta != 0 && game != null) {
+                state.playerGames.map { item ->
+                    val role = state.players.find { it.playerId == item.playerId }?.role
+                    if (item.gameId == game.gameId && item.isOnCourt && role != PlayerRole.COACH) {
+                        item.copy(plusMinus = item.plusMinus - concededDelta)
+                    } else item
+                }
+            } else state.playerGames
+
+            val nrPrefix = keeper?.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+            val kName = keeper?.fullName ?: "Torwart"
+            val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+            val updatedLogs = when {
+                game != null && savesDelta > 0 -> {
+                    val detail = if (penSavedDelta > 0) "7m-Parade" else "Parade"
+                    state.gameLogs + GameLogEntry(
+                        logId = nextLogId,
+                        gameId = game.gameId,
+                        gameSecond = game.elapsedSeconds,
+                        eventType = GameLogEventType.GOALKEEPER_SAVE,
+                        primaryPlayerId = pg.playerId,
+                        homeScoreAtEvent = newHomeScore,
+                        awayScoreAtEvent = newAwayScore,
+                        description = "$detail durch $nrPrefix$kName (${updated.saves}. Parade)"
+                    )
+                }
+                game != null && concededDelta > 0 -> {
+                    state.gameLogs + GameLogEntry(
+                        logId = nextLogId,
+                        gameId = game.gameId,
+                        gameSecond = game.elapsedSeconds,
+                        eventType = GameLogEventType.GOAL_CONCEDED,
+                        primaryPlayerId = pg.playerId,
+                        homeScoreAtEvent = newHomeScore,
+                        awayScoreAtEvent = newAwayScore,
+                        description = "Gegentor gegen $nrPrefix$kName"
+                    )
+                }
+                else -> state.gameLogs
+            }
+
             state.copy(
                 goalKeeperStats = newStatsList,
-                games = updatedGames
+                games = updatedGames,
+                playerGames = updatedPlayerGames,
+                gameLogs = updatedLogs
             )
         }
     }
@@ -460,6 +1150,10 @@ class HandballRepository {
     fun addCoachTimeout(playerGameId: Int, timeoutReason: String) {
         val reason = timeoutReason.trim().ifEmpty { "Team-Timeout (TTO)" }
         mutate { state ->
+            val pg = state.playerGames.find { it.playerGameId == playerGameId }
+            val game = state.games.find { it.gameId == pg?.gameId }
+            val coach = state.players.find { it.playerId == pg?.playerId }
+
             val nextTimeoutId = (state.timeouts.maxOfOrNull { it.timeoutId } ?: 0) + 1
             val nextCoachStatId = (state.coachStats.maxOfOrNull { it.coachGamestatsId } ?: 0) + 1
             val timeout = Timeout(timeoutId = nextTimeoutId, timeoutReason = reason)
@@ -468,9 +1162,26 @@ class HandballRepository {
                 playerGameId = playerGameId,
                 timeoutId = nextTimeoutId
             )
+
+            val updatedLogs = if (game != null) {
+                val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
+                val cName = coach?.fullName ?: "Trainer"
+                state.gameLogs + GameLogEntry(
+                    logId = nextLogId,
+                    gameId = game.gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.TIMEOUT,
+                    primaryPlayerId = pg?.playerId,
+                    homeScoreAtEvent = game.homeTeamScore,
+                    awayScoreAtEvent = game.awayTeamScore,
+                    description = "Auszeit (TTO – $cName): $reason"
+                )
+            } else state.gameLogs
+
             state.copy(
                 timeouts = state.timeouts + timeout,
-                coachStats = state.coachStats + coachStat
+                coachStats = state.coachStats + coachStat,
+                gameLogs = updatedLogs
             )
         }
     }
@@ -532,7 +1243,6 @@ class HandballRepository {
         }
 
         seasonGames.forEach { game ->
-            // Nur gespielte Spiele werten (mindestens 1 Tor oder reguläres Ergebnis)
             val isPlayed = game.homeTeamScore > 0 || game.awayTeamScore > 0 ||
                 state.playerGames.any { it.gameId == game.gameId }
             if (!isPlayed) return@forEach
@@ -676,6 +1386,8 @@ class HandballRepository {
         var yellow = 0
         var red = 0
         var blue = 0
+        var plusMinus = 0
+        var secondsPlayed = 0
 
         var goals = 0
         var shots = 0
@@ -701,6 +1413,8 @@ class HandballRepository {
             if (entry.playerGame.yellowCard) yellow++
             if (entry.playerGame.redCard) red++
             if (entry.playerGame.blueCard) blue++
+            plusMinus += entry.playerGame.plusMinus
+            secondsPlayed += entry.playerGame.secondsPlayed
 
             entry.fieldStats?.let { fs ->
                 goals += fs.goalsScored
@@ -732,6 +1446,8 @@ class HandballRepository {
             yellowCards = yellow,
             redCards = red,
             blueCards = blue,
+            totalPlusMinus = plusMinus,
+            totalSecondsPlayed = secondsPlayed,
             totalGoals = goals,
             totalShots = shots,
             totalPenaltyGoals = penGoals,
@@ -757,10 +1473,12 @@ class HandballRepository {
         kotlin.math.round(value * 10.0) / 10.0
 
     /**
-     * Berechnet einen objektiven Handball-Performance-Index (0..100 Punkte) auf Basis der aggregierten Werte.
+     * Berechnet einen objektiven Handball-Performance-Index (0..100 Punkte) auf Basis der aggregierten Werte
+     * inklusive Plus/Minus (+/-) auf dem Feld.
      */
     fun computePerformanceScore(role: PlayerRole, stats: PlayerAggregatedStats): Double {
         if (stats.gamesAttended == 0) return 0.0
+        val plusMinusImpact = (stats.plusMinusPerGame * 1.1).coerceIn(-8.0, 10.0)
         val raw = when (role) {
             PlayerRole.FIELD_PLAYER -> {
                 val offense = (stats.goalsPerGame * 4.8) +
@@ -771,7 +1489,7 @@ class HandballRepository {
                 val penalties = (stats.technicalMistakesPerGame * 3.5) +
                     (stats.twoMinPerGame * 2.2) +
                     ((stats.redCards + stats.blueCards) * 6.0 / stats.gamesAttended)
-                18.0 + offense + defense - penalties
+                18.0 + offense + defense + plusMinusImpact - penalties
             }
             PlayerRole.GOALKEEPER -> {
                 val keeping = (stats.savePercentage * 0.95) +
@@ -780,7 +1498,7 @@ class HandballRepository {
                     (stats.fastBreakPassPercentage * 0.15)
                 val penalties = (stats.twoMinPerGame * 2.5) +
                     ((stats.redCards + stats.blueCards) * 6.0 / stats.gamesAttended)
-                keeping - penalties
+                keeping + (plusMinusImpact * 0.6) - penalties
             }
             PlayerRole.COACH -> {
                 50.0 + (stats.totalTimeoutsTaken.toDouble() / stats.gamesAttended) * 10.0 - (stats.twoMinPerGame * 4.0)
@@ -802,6 +1520,8 @@ class HandballRepository {
                     yellowCards = if (entry.playerGame.yellowCard) 1 else 0,
                     redCards = if (entry.playerGame.redCard) 1 else 0,
                     blueCards = if (entry.playerGame.blueCard) 1 else 0,
+                    totalPlusMinus = entry.playerGame.plusMinus,
+                    totalSecondsPlayed = entry.playerGame.secondsPlayed,
                     totalGoals = fs.goalsScored,
                     totalShots = fs.goalesAttempted,
                     totalPenaltyGoals = fs.penaltiesScored,
@@ -821,6 +1541,8 @@ class HandballRepository {
                     yellowCards = if (entry.playerGame.yellowCard) 1 else 0,
                     redCards = if (entry.playerGame.redCard) 1 else 0,
                     blueCards = if (entry.playerGame.blueCard) 1 else 0,
+                    totalPlusMinus = entry.playerGame.plusMinus,
+                    totalSecondsPlayed = entry.playerGame.secondsPlayed,
                     totalSaves = ks.saves,
                     totalGoalsConceded = ks.goalesConceded,
                     totalPenaltiesSaved = ks.penaltiesSaved,
@@ -884,6 +1606,8 @@ class HandballRepository {
                 matchupTitle = entry.matchupTitle,
                 outcomeBadge = entry.outcomeBadge,
                 performanceScore = computeSingleGamePerformanceScore(player.role, entry),
+                plusMinus = entry.playerGame.plusMinus,
+                minutesPlayed = roundToOneDecimal(entry.playerGame.secondsPlayed / 60.0),
                 goals = goals,
                 shots = shots,
                 shotAccuracyPercent = shotAcc,
@@ -935,6 +1659,12 @@ class HandballRepository {
                 MetricSpec("perf_index", "Performance-Index", "Pkt", true) { p, s ->
                     computePerformanceScore(p.role, s)
                 },
+                MetricSpec("plus_minus_pg", "Plus/Minus (+/-) pro Spiel", "", true) { _, s ->
+                    roundToOneDecimal(s.plusMinusPerGame)
+                },
+                MetricSpec("minutes_pg", "Einsatzzeit pro Spiel", "Min", true) { _, s ->
+                    roundToOneDecimal(s.minutesPerGame)
+                },
                 MetricSpec("goals_pg", "Tore pro Spiel", "", true) { _, s ->
                     roundToOneDecimal(s.goalsPerGame)
                 },
@@ -964,6 +1694,12 @@ class HandballRepository {
             listOf(
                 MetricSpec("perf_index", "Performance-Index", "Pkt", true) { p, s ->
                     computePerformanceScore(p.role, s)
+                },
+                MetricSpec("plus_minus_pg", "Plus/Minus (+/-) pro Spiel", "", true) { _, s ->
+                    roundToOneDecimal(s.plusMinusPerGame)
+                },
+                MetricSpec("minutes_pg", "Einsatzzeit pro Spiel", "Min", true) { _, s ->
+                    roundToOneDecimal(s.minutesPerGame)
                 },
                 MetricSpec("saves_pg", "Paraden pro Spiel", "", true) { _, s ->
                     roundToOneDecimal(s.savesPerGame)
@@ -1041,13 +1777,18 @@ class HandballRepository {
             val acc = byKey["shot_acc"]
             val assists = byKey["assists_pg"]
             val defense = byKey["defense_pg"]
-            val penDrawn = byKey["pen_drawn_pg"]
+            val plusMinus = byKey["plus_minus_pg"]
             val mistakes = byKey["mistakes_pg"]
 
             val maxGoals = maxOf(10.0, (goals?.positionBest ?: 8.0) * 1.1)
             val maxAssists = maxOf(8.0, (assists?.positionBest ?: 6.0) * 1.1)
             val maxDefense = maxOf(5.0, (defense?.positionBest ?: 4.0) * 1.1)
-            val maxPen = maxOf(3.0, (penDrawn?.positionBest ?: 2.5) * 1.1)
+
+            fun normPlusMinus(v: Double): Float =
+                ((v + 6.0) / 14.0).coerceIn(0.08, 1.0).toFloat()
+
+            val pmPlayer = plusMinus?.playerValue ?: 0.0
+            val pmAvg = plusMinus?.positionAverage ?: 0.0
 
             listOf(
                 RadarMetricAxis(
@@ -1079,11 +1820,11 @@ class HandballRepository {
                     avgFormatted = "${defense?.positionAverage ?: 0.0}"
                 ),
                 RadarMetricAxis(
-                    label = "7m gezogen",
-                    playerNormalized = normHigher(penDrawn?.playerValue ?: 0.0, maxPen),
-                    positionAvgNormalized = normHigher(penDrawn?.positionAverage ?: 0.0, maxPen),
-                    playerFormatted = "${penDrawn?.playerValue ?: 0.0}",
-                    avgFormatted = "${penDrawn?.positionAverage ?: 0.0}"
+                    label = "Plus/Minus",
+                    playerNormalized = normPlusMinus(pmPlayer),
+                    positionAvgNormalized = normPlusMinus(pmAvg),
+                    playerFormatted = if (pmPlayer > 0) "+$pmPlayer" else "$pmPlayer",
+                    avgFormatted = if (pmAvg > 0) "+$pmAvg" else "$pmAvg"
                 ),
                 RadarMetricAxis(
                     label = "Ballkontrolle",
@@ -1152,7 +1893,7 @@ class HandballRepository {
 
     /**
      * Berechnet das Spieler-Ranking für Trainer (optional gefiltert nach Position, Rolle und Saison,
-     * sowie sortierbar nach Gesamt-Performance oder Einzelkriterien).
+     * sowie sortierbar nach Gesamt-Performance, Plus/Minus, Einsatzzeit oder Einzelkriterien).
      */
     fun computePlayerRankings(
         positionIdFilter: Int? = null,
@@ -1186,6 +1927,20 @@ class HandballRepository {
                     compareByDescending<PlayerRankingEntry> { it.performanceScore }
                         .thenByDescending { it.stats.totalGoals + it.stats.totalSaves }
                         .thenBy { it.player.lastName }
+                )
+            }
+            RankingSortCriterion.PLUS_MINUS -> {
+                rawEntries.sortedWith(
+                    compareByDescending<PlayerRankingEntry> { it.stats.plusMinusPerGame }
+                        .thenByDescending { it.stats.totalPlusMinus }
+                        .thenByDescending { it.performanceScore }
+                )
+            }
+            RankingSortCriterion.PLAYING_TIME -> {
+                rawEntries.sortedWith(
+                    compareByDescending<PlayerRankingEntry> { it.stats.minutesPerGame }
+                        .thenByDescending { it.stats.totalSecondsPlayed }
+                        .thenByDescending { it.performanceScore }
                 )
             }
             RankingSortCriterion.GOALS_OR_SAVES -> {

@@ -20,13 +20,6 @@ import androidx.compose.ui.unit.dp
 import com.handball.stattracker.model.DatabaseSnapshot
 import com.handball.stattracker.repository.HandballRepository
 
-/**
- * Tabelle-Ansicht (Liga-Replika):
- * - Zeigt die offizielle Handball-Ligatabelle (Spiele, S, U, N, Tore, Tordifferenz, Punkte 2:0/1:1/0:2)
- *   für die ausgewählte Saison.
- * - Erlaubt das direkte Zuweisen/Entfernen von Gegnern zur Saison (SEASON_OPPONENT)
- *   sowie das Anlegen neuer Gegner oder Liga-Paarungen.
- */
 @Composable
 fun StandingsScreen(
     repository: HandballRepository,
@@ -49,7 +42,6 @@ fun StandingsScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Kopfbereich: Saison-Wahl & Liga-Replika-Aktionen
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
@@ -72,40 +64,32 @@ fun StandingsScreen(
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary
                         )
-                        Column {
-                            Text(
-                                text = "Ligatabelle – ${activeSeason?.division ?: "Saison"}",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Offizielle Handball-Wertung (2:0 Punkte pro Sieg, 1:1 bei Unentschieden)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Text(
+                            text = activeSeason?.division ?: "Ligatabelle",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
                             Icon(Icons.Default.Groups, contentDescription = null)
                             Spacer(Modifier.width(6.dp))
-                            Text("Staffel-Teams zuweisen")
+                            Text("Mannschaften")
                         }
                         OutlinedButton(onClick = onOpenNewOpponentDialog) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(Modifier.width(4.dp))
-                            Text("Neuer Gegner")
+                            Text("Gegner")
                         }
                         Button(onClick = onOpenNewGameDialog) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(Modifier.width(4.dp))
-                            Text("Spiel eintragen")
+                            Text("Spiel")
                         }
                     }
                 }
 
-                // Saison-Auswahl-Chips
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     snapshot.seasons.forEach { season ->
                         FilterChip(
@@ -118,7 +102,6 @@ fun StandingsScreen(
             }
         }
 
-        // Optionales Panel zur Zuweisung bestehender Gegner zur aktiven Saison (SEASON_OPPONENT)
         if (showManageLeagueTeams && activeSeason != null) {
             Card(
                 shape = RoundedCornerShape(14.dp),
@@ -129,14 +112,9 @@ fun StandingsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Gegner-Zuweisung für '${activeSeason.division}' (Replika der Liga)",
+                        text = "Teilnehmende Vereine (${activeSeason.division})",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Wähle aus, welche Vereine aus OPPONENT_TEAMS in dieser Saison mitspielen:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -159,14 +137,12 @@ fun StandingsScreen(
             }
         }
 
-        // Handball-Ligatabelle
         Card(
             shape = RoundedCornerShape(16.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Tabellenkopf
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -206,7 +182,7 @@ fun StandingsScreen(
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (row.isOwnTeam) "${row.teamName} (Mein Verein)" else row.teamName,
+                                text = row.teamName,
                                 fontWeight = if (row.isOwnTeam) FontWeight.ExtraBold else FontWeight.SemiBold,
                                 color = if (row.isOwnTeam) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )

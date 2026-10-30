@@ -46,46 +46,40 @@ fun PlusCreationModalHost(
                 onDismissRequest = onDismiss,
                 title = {
                     Text(
-                        text = "Neu anlegen (+)",
+                        text = "Neu anlegen",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                 },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "Bitte wähle aus, was du neu erfassen möchtest:",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
                         PlusOptionCard(
-                            title = "Neues Spiel",
-                            subtitle = "Eigenes Spiel (inkl. Spieltagskader) oder Liga-Paarung anlegen",
+                            title = "Spiel",
+                            subtitle = "Spielbericht oder Ligapaarung",
                             icon = Icons.Default.SportsHandball,
                             onClick = { onSelectModal(CreationModalType.NEW_GAME) }
                         )
                         PlusOptionCard(
-                            title = "Neuen Spieler",
-                            subtitle = "Feldspieler oder Torwart mit Position & Heim-/Auswärtstrikot",
+                            title = "Spieler",
+                            subtitle = "Feldspieler oder Torwart",
                             icon = Icons.Default.PersonAdd,
                             onClick = { onSelectModal(CreationModalType.NEW_PLAYER) }
                         )
                         PlusOptionCard(
-                            title = "Neuen Gegner (mit Saison-Zuweisung)",
-                            subtitle = "Gegnerverein anlegen und Saisons zuweisen (Replika der Liga)",
+                            title = "Gegner",
+                            subtitle = "Verein anlegen & Staffel zuweisen",
                             icon = Icons.Default.Shield,
                             onClick = { onSelectModal(CreationModalType.NEW_OPPONENT) }
                         )
                         PlusOptionCard(
-                            title = "Neuer Trainer",
-                            subtitle = "Trainer / Co-Trainer im Kader erfassen",
+                            title = "Trainer",
+                            subtitle = "Trainerteam ergänzen",
                             icon = Icons.Default.Sports,
                             onClick = { onSelectModal(CreationModalType.NEW_TRAINER) }
                         )
                         PlusOptionCard(
-                            title = "Neue Saison",
-                            subtitle = "Neue Spielzeit / Staffel anlegen",
+                            title = "Saison",
+                            subtitle = "Spielzeit / Staffel anlegen",
                             icon = Icons.Default.CalendarMonth,
                             onClick = { onSelectModal(CreationModalType.NEW_SEASON) }
                         )
@@ -222,7 +216,7 @@ private fun NewPlayerModal(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Neuen Spieler anlegen", fontWeight = FontWeight.Bold) },
+        title = { Text("Neuer Spieler", fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -274,14 +268,14 @@ private fun NewPlayerModal(
                     OutlinedTextField(
                         value = jerseyHome,
                         onValueChange = { jerseyHome = it },
-                        label = { Text("Trikotnr. Heim") },
+                        label = { Text("Trikot Heim") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
                     OutlinedTextField(
                         value = jerseyAway,
                         onValueChange = { jerseyAway = it },
-                        label = { Text("Trikotnr. Auswärts") },
+                        label = { Text("Trikot Auswärts") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -292,7 +286,7 @@ private fun NewPlayerModal(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Position (POSITION):", fontWeight = FontWeight.SemiBold)
+                    Text("Position", fontWeight = FontWeight.SemiBold)
                     TextButton(onClick = { showAddPosition = !showAddPosition }) {
                         Text("+ Eigene Position")
                     }
@@ -306,7 +300,7 @@ private fun NewPlayerModal(
                         OutlinedTextField(
                             value = customPositionName,
                             onValueChange = { customPositionName = it },
-                            label = { Text("Neue Position (z.B. 'Abwehrspezialist')") },
+                            label = { Text("Positionsbezeichnung") },
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -325,7 +319,6 @@ private fun NewPlayerModal(
                     }
                 }
 
-                // Positionen zur Auswahl
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     snapshot.positions.forEach { pos ->
                         Row(
@@ -360,7 +353,7 @@ private fun NewPlayerModal(
                     onCreated(created)
                 }
             ) {
-                Text("Spieler speichern")
+                Text("Speichern")
             }
         },
         dismissButton = {
@@ -383,14 +376,9 @@ private fun NewTrainerModal(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Neuen Trainer anlegen", fontWeight = FontWeight.Bold) },
+        title = { Text("Neuer Trainer", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "Trainer werden im Datenmodell mit role='COACH' (ohne Pflicht-Trikotnummer/Position) geführt.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
                 OutlinedTextField(
                     value = firstName,
                     onValueChange = { firstName = it },
@@ -430,7 +418,7 @@ private fun NewTrainerModal(
                     onCreated(coach)
                 }
             ) {
-                Text("Trainer speichern")
+                Text("Speichern")
             }
         },
         dismissButton = {
@@ -454,30 +442,25 @@ private fun NewOpponentModal(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Neuen Gegner (mit Saison-Zuweisung)", fontWeight = FontWeight.Bold) },
+        title = { Text("Neuer Gegner", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "Lege einen neuen Gegnerverein an und weise ihn direkt einer oder mehreren Saisons zu, um die Liga nachzubauen (SEASON_OPPONENT).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
                 OutlinedTextField(
                     value = opponentName,
                     onValueChange = { opponentName = it },
-                    label = { Text("Name des Gegnervereins * (z.B. 'THW Kiel II')") },
+                    label = { Text("Vereinsname *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = opponentLocation,
                     onValueChange = { opponentLocation = it },
-                    label = { Text("Ort / Stadt * (z.B. 'Kiel')") },
+                    label = { Text("Ort *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("Saison-Zuweisung (Liga-Replika):", fontWeight = FontWeight.SemiBold)
+                Text("Staffel-Zuweisung", fontWeight = FontWeight.SemiBold)
                 snapshot.seasons.forEach { season ->
                     val checked = season.seasonId in selectedSeasonIds
                     Row(
@@ -519,7 +502,7 @@ private fun NewOpponentModal(
                     onDismiss()
                 }
             ) {
-                Text("Gegner speichern")
+                Text("Speichern")
             }
         },
         dismissButton = {
@@ -542,27 +525,27 @@ private fun NewSeasonModal(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Neue Saison anlegen", fontWeight = FontWeight.Bold) },
+        title = { Text("Neue Saison", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = division,
                     onValueChange = { division = it },
-                    label = { Text("Staffel / Liga-Bezeichnung * (z.B. 'Regionalliga 2027/28')") },
+                    label = { Text("Staffel / Liga *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = startOfSeason,
                     onValueChange = { startOfSeason = it },
-                    label = { Text("Saisonbeginn (YYYY-MM-DD)") },
+                    label = { Text("Beginn (YYYY-MM-DD)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = endOfSeason,
                     onValueChange = { endOfSeason = it },
-                    label = { Text("Saisonende (YYYY-MM-DD)") },
+                    label = { Text("Ende (YYYY-MM-DD)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -576,7 +559,7 @@ private fun NewSeasonModal(
                     onCreated(created)
                 }
             ) {
-                Text("Saison anlegen")
+                Text("Anlegen")
             }
         },
         dismissButton = {
@@ -620,28 +603,25 @@ private fun NewGameModal(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Neues Spiel anlegen", fontWeight = FontWeight.Bold) },
+        title = { Text("Neues Spiel", fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Spielmodus: Eigenes Spiel vs. Fremdpaarung der Liga
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = isOwnTeamMatch,
                         onClick = { isOwnTeamMatch = true },
-                        label = { Text("Eigenes Spiel (${snapshot.ownClubName})") }
+                        label = { Text("Eigenes Spiel") }
                     )
                     FilterChip(
                         selected = !isOwnTeamMatch,
                         onClick = { isOwnTeamMatch = false },
-                        label = { Text("Ligaspiel zweier Gegner") }
+                        label = { Text("Fremdpaarung") }
                     )
                 }
 
-                // Saison-Wahl
-                Text("Saison:", fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     snapshot.seasons.forEach { s ->
                         FilterChip(
@@ -675,7 +655,7 @@ private fun NewGameModal(
                 }
 
                 Text(
-                    text = if (isOwnTeamMatch) "Gegner wählen:" else "Heim-Team (Gegner 1) wählen:",
+                    text = if (isOwnTeamMatch) "Gegner" else "Heim",
                     fontWeight = FontWeight.SemiBold
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -696,7 +676,7 @@ private fun NewGameModal(
                 }
 
                 if (!isOwnTeamMatch) {
-                    Text("Gast-Team (Gegner 2) wählen:", fontWeight = FontWeight.SemiBold)
+                    Text("Gast", fontWeight = FontWeight.SemiBold)
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         snapshot.opponentTeams.forEach { opp ->
                             Row(
@@ -719,14 +699,14 @@ private fun NewGameModal(
                     OutlinedTextField(
                         value = gameDate,
                         onValueChange = { gameDate = it },
-                        label = { Text("Datum (YYYY-MM-DD)") },
+                        label = { Text("Datum") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
                     OutlinedTextField(
                         value = location,
                         onValueChange = { location = it },
-                        label = { Text("Halle / Spielort") },
+                        label = { Text("Spielort") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -735,7 +715,7 @@ private fun NewGameModal(
                 OutlinedTextField(
                     value = gameType,
                     onValueChange = { gameType = it },
-                    label = { Text("Spieltyp (z.B. Ligaspiel, Pokal, Testspiel)") },
+                    label = { Text("Wettbewerb") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -779,7 +759,7 @@ private fun NewGameModal(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Spieltagskader (${nominatedIds.size}/${snapshot.players.size})",
+                            text = "Kader (${nominatedIds.size}/${snapshot.players.size})",
                             fontWeight = FontWeight.Bold
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -835,7 +815,7 @@ private fun NewGameModal(
                     onCreated(created)
                 }
             ) {
-                Text("Spiel anlegen")
+                Text("Anlegen")
             }
         },
         dismissButton = {

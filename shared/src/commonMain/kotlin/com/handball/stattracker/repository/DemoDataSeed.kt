@@ -131,7 +131,7 @@ object DemoDataSeed {
                 jerseyNumberHomeKit = null,
                 jerseyNumberAwayKit = null
             ),
-            // Weitere Spieler je Position für aussagekräftige Positionsvergleiche & Rankings
+            // Weitere Spieler je Position für aussagekräftige Positionsvergleiche, Wechsel & Rankings
             Player(
                 playerId = 12,
                 positionId = 2, // LA
@@ -232,7 +232,8 @@ object DemoDataSeed {
                 homeTeamHalftimeScore = 16,
                 awayTeamHalftimeScore = 14,
                 homeTeamScore = 32,
-                awayTeamScore = 28
+                awayTeamScore = 28,
+                elapsedSeconds = 3600
             ),
             // Spiel 2: Eigenes Auswärtsspiel bei SG Flensburg-Handewitt II (Unentschieden 29:29)
             Game(
@@ -247,7 +248,8 @@ object DemoDataSeed {
                 homeTeamHalftimeScore = 15,
                 awayTeamHalftimeScore = 13,
                 homeTeamScore = 29,
-                awayTeamScore = 29
+                awayTeamScore = 29,
+                elapsedSeconds = 3600
             ),
             // Spiel 3: Eigenes Heimspiel gegen HSG Ostsee N/G (Sieg 34:26)
             Game(
@@ -262,7 +264,8 @@ object DemoDataSeed {
                 homeTeamHalftimeScore = 18,
                 awayTeamHalftimeScore = 12,
                 homeTeamScore = 34,
-                awayTeamScore = 26
+                awayTeamScore = 26,
+                elapsedSeconds = 3600
             ),
             // Spiel 4: Ligaspiel zwischen zwei Gegnern (MTV Lübeck vs HG Hamburg-Barmbek 27:30)
             Game(
@@ -277,56 +280,57 @@ object DemoDataSeed {
                 homeTeamHalftimeScore = 13,
                 awayTeamHalftimeScore = 15,
                 homeTeamScore = 27,
-                awayTeamScore = 30
+                awayTeamScore = 30,
+                elapsedSeconds = 3600
             )
         )
 
         val playerGames = listOf(
-            // Spiel 1 Kader
-            PlayerGame(1, gameId = 1, playerId = 1, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(2, gameId = 1, playerId = 2, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(3, gameId = 1, playerId = 3, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false),
-            PlayerGame(4, gameId = 1, playerId = 4, twoMinuteSuspensions = 2, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(5, gameId = 1, playerId = 5, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(6, gameId = 1, playerId = 6, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false),
-            PlayerGame(7, gameId = 1, playerId = 7, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(8, gameId = 1, playerId = 8, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(9, gameId = 1, playerId = 10, twoMinuteSuspensions = 0, yellowCard = true, redCard = false, blueCard = false),
-            // Spiel 2 Kader
-            PlayerGame(10, gameId = 2, playerId = 1, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(11, gameId = 2, playerId = 3, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(12, gameId = 2, playerId = 4, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false),
-            PlayerGame(13, gameId = 2, playerId = 5, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(14, gameId = 2, playerId = 6, twoMinuteSuspensions = 2, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(15, gameId = 2, playerId = 7, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(16, gameId = 2, playerId = 10, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            // Spiel 3 Kader
-            PlayerGame(17, gameId = 3, playerId = 1, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(18, gameId = 3, playerId = 2, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(19, gameId = 3, playerId = 3, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(20, gameId = 3, playerId = 5, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false),
-            PlayerGame(21, gameId = 3, playerId = 6, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(22, gameId = 3, playerId = 8, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(23, gameId = 3, playerId = 9, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(24, gameId = 3, playerId = 10, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            // Zusätzliche Einsätze für Positionsvergleich & Formkurven
-            PlayerGame(25, gameId = 1, playerId = 9, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(26, gameId = 2, playerId = 9, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(27, gameId = 1, playerId = 12, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(28, gameId = 2, playerId = 12, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(29, gameId = 3, playerId = 12, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(30, gameId = 1, playerId = 13, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(31, gameId = 2, playerId = 13, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(32, gameId = 3, playerId = 13, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(33, gameId = 1, playerId = 14, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(34, gameId = 2, playerId = 14, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(35, gameId = 3, playerId = 14, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(36, gameId = 1, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(37, gameId = 2, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(38, gameId = 3, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(39, gameId = 1, playerId = 16, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false),
-            PlayerGame(40, gameId = 2, playerId = 16, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false),
-            PlayerGame(41, gameId = 3, playerId = 16, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false)
+            // Spiel 1 Kader (7 Spieler aktiv auf dem Feld: #1, #15, #18, #7, #4, #22, #24)
+            PlayerGame(1, gameId = 1, playerId = 1, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 5, secondsPlayed = 2760),
+            PlayerGame(2, gameId = 1, playerId = 2, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -1, secondsPlayed = 840),
+            PlayerGame(3, gameId = 1, playerId = 3, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 6, secondsPlayed = 2640),
+            PlayerGame(4, gameId = 1, playerId = 4, twoMinuteSuspensions = 2, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 4, secondsPlayed = 2400),
+            PlayerGame(5, gameId = 1, playerId = 5, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 5, secondsPlayed = 2580),
+            PlayerGame(6, gameId = 1, playerId = 6, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 6, secondsPlayed = 2520),
+            PlayerGame(7, gameId = 1, playerId = 7, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 3, secondsPlayed = 2460),
+            PlayerGame(8, gameId = 1, playerId = 8, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 4, secondsPlayed = 2520),
+            PlayerGame(9, gameId = 1, playerId = 10, twoMinuteSuspensions = 0, yellowCard = true, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 0, secondsPlayed = 0),
+            // Spiel 2 Kader (7 Spieler aktiv auf dem Feld: #1, #15, #18, #7, #4, #22, #19)
+            PlayerGame(10, gameId = 2, playerId = 1, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 0, secondsPlayed = 3600),
+            PlayerGame(11, gameId = 2, playerId = 3, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 2, secondsPlayed = 2700),
+            PlayerGame(12, gameId = 2, playerId = 4, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 1, secondsPlayed = 2460),
+            PlayerGame(13, gameId = 2, playerId = 5, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 1, secondsPlayed = 2520),
+            PlayerGame(14, gameId = 2, playerId = 6, twoMinuteSuspensions = 2, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 2, secondsPlayed = 2340),
+            PlayerGame(15, gameId = 2, playerId = 7, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 0, secondsPlayed = 2400),
+            PlayerGame(16, gameId = 2, playerId = 10, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 0, secondsPlayed = 0),
+            // Spiel 3 Kader (7 Spieler aktiv auf dem Feld: #1, #15, #7, #4, #24, #9, #34)
+            PlayerGame(17, gameId = 3, playerId = 1, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 6, secondsPlayed = 2400),
+            PlayerGame(18, gameId = 3, playerId = 2, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 2, secondsPlayed = 1200),
+            PlayerGame(19, gameId = 3, playerId = 3, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 9, secondsPlayed = 2640),
+            PlayerGame(20, gameId = 3, playerId = 5, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 7, secondsPlayed = 2580),
+            PlayerGame(21, gameId = 3, playerId = 6, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 8, secondsPlayed = 2520),
+            PlayerGame(22, gameId = 3, playerId = 8, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 6, secondsPlayed = 2460),
+            PlayerGame(23, gameId = 3, playerId = 9, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 5, secondsPlayed = 2400),
+            PlayerGame(24, gameId = 3, playerId = 10, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 0, secondsPlayed = 0),
+            // Zusätzliche Einsätze (Bank / Wechselspieler) für Positionsvergleich & Formkurven
+            PlayerGame(25, gameId = 1, playerId = 9, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 0, secondsPlayed = 1200),
+            PlayerGame(26, gameId = 2, playerId = 9, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -1, secondsPlayed = 1140),
+            PlayerGame(27, gameId = 1, playerId = 12, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 1, secondsPlayed = 1140),
+            PlayerGame(28, gameId = 2, playerId = 12, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 0, secondsPlayed = 1200),
+            PlayerGame(29, gameId = 3, playerId = 12, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 8, secondsPlayed = 2520),
+            PlayerGame(30, gameId = 1, playerId = 13, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -2, secondsPlayed = 960),
+            PlayerGame(31, gameId = 2, playerId = 13, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -2, secondsPlayed = 900),
+            PlayerGame(32, gameId = 3, playerId = 13, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -1, secondsPlayed = 960),
+            PlayerGame(33, gameId = 1, playerId = 14, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -1, secondsPlayed = 1020),
+            PlayerGame(34, gameId = 2, playerId = 14, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -1, secondsPlayed = 1080),
+            PlayerGame(35, gameId = 3, playerId = 14, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 1, secondsPlayed = 1020),
+            PlayerGame(36, gameId = 1, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 0, secondsPlayed = 1080),
+            PlayerGame(37, gameId = 2, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = true, plusMinus = 0, secondsPlayed = 2400),
+            PlayerGame(38, gameId = 3, playerId = 15, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 2, secondsPlayed = 1140),
+            PlayerGame(39, gameId = 1, playerId = 16, twoMinuteSuspensions = 1, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -2, secondsPlayed = 1080),
+            PlayerGame(40, gameId = 2, playerId = 16, twoMinuteSuspensions = 1, yellowCard = true, redCard = false, blueCard = false, isOnCourt = false, plusMinus = -2, secondsPlayed = 1260),
+            PlayerGame(41, gameId = 3, playerId = 16, twoMinuteSuspensions = 0, yellowCard = false, redCard = false, blueCard = false, isOnCourt = false, plusMinus = 0, secondsPlayed = 1080)
         )
 
         val keeperStats = listOf(
@@ -393,6 +397,51 @@ object DemoDataSeed {
             CoachGameStats(5, playerGameId = 24, timeoutId = 5)
         )
 
+        val gameLogs = listOf(
+            // --- Spiel 1 Protokoll (Heimspiel vs. TSV Altenholz II, 32:28) ---
+            GameLogEntry(1, gameId = 1, gameSecond = 0, eventType = GameLogEventType.LINEUP_SET, primaryPlayerId = 1, homeScoreAtEvent = 0, awayScoreAtEvent = 0, description = "Startsieben aufgestellt (6 Feld + 1 TW): #1 Landin-Weber, #15 Knorr-Schmidt, #18 Köster-Lang, #7 Uscins-Hoffmann, #4 Golla-Richter, #22 Mertens-Klein, #24 Kastening-Wolf"),
+            GameLogEntry(2, gameId = 1, gameSecond = 75, eventType = GameLogEventType.GOAL, primaryPlayerId = 3, homeScoreAtEvent = 1, awayScoreAtEvent = 0, description = "Tor durch #15 Juri Knorr-Schmidt (Rückraum Mitte)"),
+            GameLogEntry(3, gameId = 1, gameSecond = 260, eventType = GameLogEventType.GOAL_CONCEDED, primaryPlayerId = 1, homeScoreAtEvent = 2, awayScoreAtEvent = 4, description = "Gegenstoß-Lauf der Gäste (Rückstand -2)"),
+            GameLogEntry(4, gameId = 1, gameSecond = 480, eventType = GameLogEventType.SEVEN_METER_GOAL, primaryPlayerId = 3, homeScoreAtEvent = 5, awayScoreAtEvent = 4, description = "7m-Tor durch #15 Juri Knorr-Schmidt zur Führung (+1)"),
+            GameLogEntry(5, gameId = 1, gameSecond = 720, eventType = GameLogEventType.GOAL, primaryPlayerId = 5, homeScoreAtEvent = 8, awayScoreAtEvent = 5, description = "Tor durch #7 Renars Uscins-Hoffmann (+3 Führung)"),
+            GameLogEntry(6, gameId = 1, gameSecond = 860, eventType = GameLogEventType.TWO_MINUTE_SUSPENSION, primaryPlayerId = 4, homeScoreAtEvent = 9, awayScoreAtEvent = 8, description = "2-Minuten-Strafe gegen #18 Julian Köster-Lang → automatisch auf die Bank"),
+            GameLogEntry(7, gameId = 1, gameSecond = 985, eventType = GameLogEventType.SUBSTITUTION, primaryPlayerId = 9, secondaryPlayerId = null, homeScoreAtEvent = 10, awayScoreAtEvent = 9, description = "Einwechslung nach Zeitstrafe: #9 Sebastian Heymann-Berg aufs Feld (6 Feld + 1 TW)"),
+            GameLogEntry(8, gameId = 1, gameSecond = 1080, eventType = GameLogEventType.TIMEOUT, primaryPlayerId = 10, homeScoreAtEvent = 10, awayScoreAtEvent = 10, description = "Auszeit (TTO) durch Trainer Alfred Gislason-Krause: Umstellung auf 5:1-Abwehr"),
+            GameLogEntry(9, gameId = 1, gameSecond = 1220, eventType = GameLogEventType.GOAL_CONCEDED, primaryPlayerId = 1, homeScoreAtEvent = 10, awayScoreAtEvent = 12, description = "Gegentore in Unterzahl (-2)"),
+            GameLogEntry(10, gameId = 1, gameSecond = 1320, eventType = GameLogEventType.SUBSTITUTION, primaryPlayerId = 13, secondaryPlayerId = 3, homeScoreAtEvent = 12, awayScoreAtEvent = 12, description = "Wechsel: #20 Luca Witzke-Hartmann rein für #15 Juri Knorr-Schmidt (6 Feld + 1 TW)"),
+            GameLogEntry(11, gameId = 1, gameSecond = 1800, eventType = GameLogEventType.SCORE_UPDATE, primaryPlayerId = null, homeScoreAtEvent = 16, awayScoreAtEvent = 14, description = "Halbzeitstand: 16:14 (+2)"),
+            GameLogEntry(12, gameId = 1, gameSecond = 2100, eventType = GameLogEventType.SUBSTITUTION, primaryPlayerId = 3, secondaryPlayerId = 13, homeScoreAtEvent = 17, awayScoreAtEvent = 18, description = "Wechsel: #15 Juri Knorr-Schmidt rein für #20 Luca Witzke-Hartmann (6 Feld + 1 TW)"),
+            GameLogEntry(13, gameId = 1, gameSecond = 2400, eventType = GameLogEventType.GOAL, primaryPlayerId = 6, homeScoreAtEvent = 21, awayScoreAtEvent = 21, description = "Ausgleich vom Kreis durch #4 Johannes Golla-Richter (21:21)"),
+            GameLogEntry(14, gameId = 1, gameSecond = 2640, eventType = GameLogEventType.SUBSTITUTION, primaryPlayerId = 2, secondaryPlayerId = 1, homeScoreAtEvent = 24, awayScoreAtEvent = 21, description = "Torwart-Wechsel: #33 Andreas Wolff-Bauer rein für #1 Niklas Landin-Weber (6 Feld + 1 TW)"),
+            GameLogEntry(15, gameId = 1, gameSecond = 2940, eventType = GameLogEventType.GOAL_CONCEDED, primaryPlayerId = 2, homeScoreAtEvent = 25, awayScoreAtEvent = 24, description = "Anschlusstreffer der Gäste (+1)"),
+            GameLogEntry(16, gameId = 1, gameSecond = 3120, eventType = GameLogEventType.TIMEOUT, primaryPlayerId = 10, homeScoreAtEvent = 28, awayScoreAtEvent = 25, description = "Auszeit (TTO): Spielzug 'Kreuz-Links' für Überzahl-Abschluss"),
+            GameLogEntry(17, gameId = 1, gameSecond = 3180, eventType = GameLogEventType.SUBSTITUTION, primaryPlayerId = 1, secondaryPlayerId = 2, homeScoreAtEvent = 29, awayScoreAtEvent = 27, description = "Torwart-Wechsel: #1 Niklas Landin-Weber rein für #33 Andreas Wolff-Bauer (6 Feld + 1 TW)"),
+            GameLogEntry(18, gameId = 1, gameSecond = 3540, eventType = GameLogEventType.GOAL, primaryPlayerId = 5, homeScoreAtEvent = 32, awayScoreAtEvent = 28, description = "Tor zum Endstand durch #7 Renars Uscins-Hoffmann (32:28)"),
+
+            // --- Spiel 2 Protokoll (Auswärts bei SG Flensburg-Handewitt II, 29:29) ---
+            GameLogEntry(19, gameId = 2, gameSecond = 0, eventType = GameLogEventType.LINEUP_SET, primaryPlayerId = 1, homeScoreAtEvent = 0, awayScoreAtEvent = 0, description = "Startsieben für Auswärtsspiel in Handewitt aufgestellt (6 Feld + 1 TW)"),
+            GameLogEntry(20, gameId = 2, gameSecond = 420, eventType = GameLogEventType.GOAL, primaryPlayerId = 3, homeScoreAtEvent = 2, awayScoreAtEvent = 5, description = "Auswärts-Führung (+3) durch #15 Juri Knorr-Schmidt"),
+            GameLogEntry(21, gameId = 2, gameSecond = 960, eventType = GameLogEventType.GOAL_CONCEDED, primaryPlayerId = 1, homeScoreAtEvent = 8, awayScoreAtEvent = 8, description = "Ausgleich der Gastgeber (8:8)"),
+            GameLogEntry(22, gameId = 2, gameSecond = 1440, eventType = GameLogEventType.TIMEOUT, primaryPlayerId = 10, homeScoreAtEvent = 12, awayScoreAtEvent = 10, description = "Auszeit (TTO): Gegenstoßverhalten und Rückzugsphase korrigieren"),
+            GameLogEntry(23, gameId = 2, gameSecond = 1800, eventType = GameLogEventType.SCORE_UPDATE, primaryPlayerId = null, homeScoreAtEvent = 15, awayScoreAtEvent = 13, description = "Halbzeitstand: 15:13"),
+            GameLogEntry(24, gameId = 2, gameSecond = 2100, eventType = GameLogEventType.GOAL, primaryPlayerId = 5, homeScoreAtEvent = 17, awayScoreAtEvent = 19, description = "Führung gedreht durch #7 Renars Uscins-Hoffmann"),
+            GameLogEntry(25, gameId = 2, gameSecond = 2280, eventType = GameLogEventType.TWO_MINUTE_SUSPENSION, primaryPlayerId = 6, homeScoreAtEvent = 20, awayScoreAtEvent = 19, description = "2-Minuten-Strafe gegen #4 Johannes Golla-Richter → automatisch auf die Bank"),
+            GameLogEntry(26, gameId = 2, gameSecond = 2405, eventType = GameLogEventType.SUBSTITUTION, primaryPlayerId = 16, secondaryPlayerId = null, homeScoreAtEvent = 21, awayScoreAtEvent = 20, description = "Einwechslung: #80 Jannik Kohlbacher-Schwarz aufs Feld (6 Feld + 1 TW)"),
+            GameLogEntry(27, gameId = 2, gameSecond = 3000, eventType = GameLogEventType.GOAL_CONCEDED, primaryPlayerId = 1, homeScoreAtEvent = 26, awayScoreAtEvent = 23, description = "3-Tore-Lauf der Gastgeber"),
+            GameLogEntry(28, gameId = 2, gameSecond = 3540, eventType = GameLogEventType.TIMEOUT, primaryPlayerId = 10, homeScoreAtEvent = 29, awayScoreAtEvent = 28, description = "Auszeit (TTO): Letzter Angriff 7-gegen-6 (7 Feldspieler) zum Ausgleich"),
+            GameLogEntry(29, gameId = 2, gameSecond = 3592, eventType = GameLogEventType.GOAL, primaryPlayerId = 3, homeScoreAtEvent = 29, awayScoreAtEvent = 29, description = "Ausgleichstor in letzter Sekunde durch #15 Juri Knorr-Schmidt (29:29)"),
+
+            // --- Spiel 3 Protokoll (Heimspiel vs. HSG Ostsee N/G, 34:26) ---
+            GameLogEntry(30, gameId = 3, gameSecond = 0, eventType = GameLogEventType.LINEUP_SET, primaryPlayerId = 1, homeScoreAtEvent = 0, awayScoreAtEvent = 0, description = "Startsieben aufgestellt (6 Feld + 1 TW)"),
+            GameLogEntry(31, gameId = 3, gameSecond = 360, eventType = GameLogEventType.GOAL_CONCEDED, primaryPlayerId = 1, homeScoreAtEvent = 2, awayScoreAtEvent = 4, description = "Früher Rückstand (-2)"),
+            GameLogEntry(32, gameId = 3, gameSecond = 900, eventType = GameLogEventType.GOAL, primaryPlayerId = 3, homeScoreAtEvent = 8, awayScoreAtEvent = 6, description = "Führung (+2) durch #15 Juri Knorr-Schmidt"),
+            GameLogEntry(33, gameId = 3, gameSecond = 1350, eventType = GameLogEventType.GOAL_CONCEDED, primaryPlayerId = 1, homeScoreAtEvent = 11, awayScoreAtEvent = 11, description = "Ausgleich zum 11:11"),
+            GameLogEntry(34, gameId = 3, gameSecond = 1800, eventType = GameLogEventType.SCORE_UPDATE, primaryPlayerId = null, homeScoreAtEvent = 18, awayScoreAtEvent = 12, description = "Halbzeitführung: 18:12"),
+            GameLogEntry(35, gameId = 3, gameSecond = 2460, eventType = GameLogEventType.TIMEOUT, primaryPlayerId = 10, homeScoreAtEvent = 24, awayScoreAtEvent = 18, description = "Auszeit (TTO): Wechsel im Rückraum und Fokus auf Kreisanspiele"),
+            GameLogEntry(36, gameId = 3, gameSecond = 2520, eventType = GameLogEventType.SUBSTITUTION, primaryPlayerId = 12, secondaryPlayerId = 7, homeScoreAtEvent = 25, awayScoreAtEvent = 18, description = "Wechsel: #34 Rune Dahmke-Vogel rein für #22 Lukas Mertens-Klein (6 Feld + 1 TW)"),
+            GameLogEntry(37, gameId = 3, gameSecond = 3550, eventType = GameLogEventType.GOAL, primaryPlayerId = 6, homeScoreAtEvent = 34, awayScoreAtEvent = 26, description = "Tor vom Kreis durch #4 Johannes Golla-Richter zum 34:26")
+        )
+
         return DatabaseSnapshot(
             ownClubName = "HC Handball Löwen",
             lastUpdatedEpochMillis = 1761298000000L,
@@ -406,7 +455,8 @@ object DemoDataSeed {
             fieldPlayerStats = fieldStats,
             goalKeeperStats = keeperStats,
             timeouts = timeouts,
-            coachStats = coachStats
+            coachStats = coachStats,
+            gameLogs = gameLogs
         )
     }
 }

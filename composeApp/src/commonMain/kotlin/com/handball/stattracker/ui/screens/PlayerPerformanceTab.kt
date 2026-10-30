@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.handball.stattracker.model.*
@@ -37,6 +36,7 @@ import kotlin.math.sin
 
 private enum class PerformanceGraphMetric(val label: String, val forGoalkeeper: Boolean?) {
     PERFORMANCE_INDEX("Performance-Index", null),
+    PLUS_MINUS_AND_TIME("Plus/Minus & Einsatzzeit", null),
     GOALS_AND_SHOTS("Tore & Würfe", false),
     SHOT_ACCURACY("Wurfquote (%)", false),
     ASSISTS_AND_DEFENSE("Assists & Abwehr", false),
@@ -194,7 +194,7 @@ private fun PerformanceSummaryHeroCard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Handball Performance-Index",
+                        text = "Performance-Index",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -222,7 +222,7 @@ private fun PerformanceSummaryHeroCard(
                                 }
                             )
                             Text(
-                                text = "Platz #$rankInPosition von $totalInPosition auf $positionName",
+                                text = "#$rankInPosition / $totalInPosition ($positionName)",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = if (rankInPosition == 1) {
@@ -235,34 +235,24 @@ private fun PerformanceSummaryHeroCard(
                     }
                 }
 
-                Text(
-                    text = if (player.role == PlayerRole.FIELD_PLAYER) {
-                        "Gewichteter Effizienz-Index aus Toren/Spiel, Wurfquote, Assists, Abwehraktionen (Steals/Blocks) und gezogenen 7m abzüglich technischer Fehler & Zeitstrafen."
-                    } else {
-                        "Gewichteter Torwart-Index aus Fangquote, Paraden pro Spiel, 7m-Abwehrquote und Gegenstoß-Passquote abzüglich Strafen."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(Modifier.height(4.dp))
-
-                // Kurz-KPIs pro Spiel
+                // Kurz-KPIs pro Spiel inkl. Plus/Minus & Einsatzzeit
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    MiniKpiPill("+/-", stats.plusMinusFormatted)
+                    MiniKpiPill("Ø Spielzeit", "${formatOneDecimal(stats.minutesPerGame)} Min")
                     if (player.role == PlayerRole.FIELD_PLAYER) {
-                        MiniKpiPill("Ø Tore/Spiel", formatOneDecimal(stats.goalsPerGame))
+                        MiniKpiPill("Ø Tore", formatOneDecimal(stats.goalsPerGame))
                         MiniKpiPill("Wurfquote", "${stats.shotAccuracyPercent}%")
-                        MiniKpiPill("Ø Assists/Spiel", formatOneDecimal(stats.assistsPerGame))
-                        MiniKpiPill("Ø Steals+Blocks", formatOneDecimal(stats.defensiveActionsPerGame))
-                        MiniKpiPill("Ø Techn. Fehler", formatOneDecimal(stats.technicalMistakesPerGame))
+                        MiniKpiPill("Ø Assists", formatOneDecimal(stats.assistsPerGame))
+                        MiniKpiPill("Ø Abwehr", formatOneDecimal(stats.defensiveActionsPerGame))
+                        MiniKpiPill("Ø TF", formatOneDecimal(stats.technicalMistakesPerGame))
                     } else {
-                        MiniKpiPill("Ø Paraden/Spiel", formatOneDecimal(stats.savesPerGame))
+                        MiniKpiPill("Ø Paraden", formatOneDecimal(stats.savesPerGame))
                         MiniKpiPill("Fangquote", "${stats.savePercentage}%")
                         MiniKpiPill("7m-Quote", "${stats.penaltySavePercentage}%")
-                        MiniKpiPill("Gegenstoß-Pass", "${stats.fastBreakPassPercentage}%")
+                        MiniKpiPill("TG-Pass", "${stats.fastBreakPassPercentage}%")
                         MiniKpiPill("Ø Gegentore", formatOneDecimal(stats.goalsConcededPerGame))
                     }
                 }
@@ -372,6 +362,7 @@ private fun GameProgressionChartCard(
     val posAvgReference: Double? = remember(selectedMetric, comparisons) {
         when (selectedMetric) {
             PerformanceGraphMetric.PERFORMANCE_INDEX -> comparisons.find { it.metricKey == "perf_index" }?.positionAverage
+            PerformanceGraphMetric.PLUS_MINUS_AND_TIME -> comparisons.find { it.metricKey == "plus_minus_pg" }?.positionAverage
             PerformanceGraphMetric.GOALS_AND_SHOTS -> comparisons.find { it.metricKey == "goals_pg" }?.positionAverage
             PerformanceGraphMetric.SHOT_ACCURACY -> comparisons.find { it.metricKey == "shot_acc" }?.positionAverage
             PerformanceGraphMetric.ASSISTS_AND_DEFENSE -> comparisons.find { it.metricKey == "assists_pg" }?.positionAverage
@@ -391,24 +382,11 @@ private fun GameProgressionChartCard(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Leistungsentwicklung pro Spiel",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Chronologischer Verlauf über ${series.size} Spiele im Vergleich zum Positions-Durchschnitt",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Text(
+                text = "Leistungsentwicklung (${series.size} Spiele)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
 
             // Metrik-Auswahl-Chips
             Row(
@@ -435,10 +413,10 @@ private fun GameProgressionChartCard(
                     )
                 }
             } else {
-                // Datenreihen extrahieren (Primärwert + optionaler Sekundärwert)
                 val primaryValues = series.map { pt ->
                     when (selectedMetric) {
                         PerformanceGraphMetric.PERFORMANCE_INDEX -> pt.performanceScore.toFloat()
+                        PerformanceGraphMetric.PLUS_MINUS_AND_TIME -> pt.plusMinus.toFloat().coerceAtLeast(0f)
                         PerformanceGraphMetric.GOALS_AND_SHOTS -> pt.goals.toFloat()
                         PerformanceGraphMetric.SHOT_ACCURACY -> pt.shotAccuracyPercent.toFloat()
                         PerformanceGraphMetric.ASSISTS_AND_DEFENSE -> pt.assists.toFloat()
@@ -449,6 +427,7 @@ private fun GameProgressionChartCard(
                     }
                 }
                 val secondaryValues: List<Float>? = when (selectedMetric) {
+                    PerformanceGraphMetric.PLUS_MINUS_AND_TIME -> series.map { it.minutesPlayed.toFloat() }
                     PerformanceGraphMetric.GOALS_AND_SHOTS -> series.map { it.shots.toFloat() }
                     PerformanceGraphMetric.ASSISTS_AND_DEFENSE -> series.map { it.defensiveActions.toFloat() }
                     PerformanceGraphMetric.MISTAKES_AND_PENALTIES -> series.map { it.twoMinuteSuspensions.toFloat() }
@@ -476,6 +455,7 @@ private fun GameProgressionChartCard(
                 ) {
                     val primaryLegend = when (selectedMetric) {
                         PerformanceGraphMetric.PERFORMANCE_INDEX -> "Performance-Index"
+                        PerformanceGraphMetric.PLUS_MINUS_AND_TIME -> "Plus/Minus (+/-)"
                         PerformanceGraphMetric.GOALS_AND_SHOTS -> "Tore"
                         PerformanceGraphMetric.SHOT_ACCURACY -> "Wurfquote %"
                         PerformanceGraphMetric.ASSISTS_AND_DEFENSE -> "Assists"
@@ -488,6 +468,7 @@ private fun GameProgressionChartCard(
 
                     if (secondaryValues != null) {
                         val secLegend = when (selectedMetric) {
+                            PerformanceGraphMetric.PLUS_MINUS_AND_TIME -> "Einsatzzeit (Min)"
                             PerformanceGraphMetric.GOALS_AND_SHOTS -> "Würfe gesamt"
                             PerformanceGraphMetric.ASSISTS_AND_DEFENSE -> "Steals + Blocks"
                             PerformanceGraphMetric.MISTAKES_AND_PENALTIES -> "2-Minuten-Strafen"
@@ -521,7 +502,6 @@ private fun GameProgressionChartCard(
                         val chartW = (size.width - leftPad - rightPad).coerceAtLeast(10f)
                         val chartH = (size.height - topPad - bottomPad).coerceAtLeast(10f)
 
-                        // 4 Horizontale Gitterlinien
                         for (i in 0..4) {
                             val ratio = i / 4f
                             val y = topPad + chartH * (1f - ratio)
@@ -533,7 +513,6 @@ private fun GameProgressionChartCard(
                             )
                         }
 
-                        // Gestrichelte Referenzlinie für den Positions-Durchschnitt
                         if (posAvgReference != null) {
                             val refRatio = (posAvgReference.toFloat() / maxY).coerceIn(0f, 1f)
                             val refY = topPad + chartH * (1f - refRatio)
@@ -550,7 +529,6 @@ private fun GameProgressionChartCard(
                         val stepX = chartW / count.toFloat()
 
                         if (secondaryValues != null) {
-                            // Gruppiertes Säulendiagramm für Primär- und Sekundärwert
                             val barWidth = (stepX * 0.28f).coerceIn(8.dp.toPx(), 26.dp.toPx())
                             for (i in 0 until count) {
                                 val centerX = leftPad + stepX * (i + 0.5f)
@@ -560,14 +538,12 @@ private fun GameProgressionChartCard(
                                 val pH = (chartH * pRatio).coerceAtLeast(4f)
                                 val sH = (chartH * sRatio).coerceAtLeast(4f)
 
-                                // Primär-Balken (links)
                                 drawRoundRect(
                                     color = primaryColor,
                                     topLeft = Offset(centerX - barWidth - 2.dp.toPx(), topPad + chartH - pH),
                                     size = Size(barWidth, pH),
                                     cornerRadius = CornerRadius(6f, 6f)
                                 )
-                                // Sekundär-Balken (rechts)
                                 drawRoundRect(
                                     color = secondaryColor.copy(alpha = 0.78f),
                                     topLeft = Offset(centerX + 2.dp.toPx(), topPad + chartH - sH),
@@ -576,7 +552,6 @@ private fun GameProgressionChartCard(
                                 )
                             }
                         } else {
-                            // Liniendiagramm mit Flächenfüllung und Datenpunkten
                             val points = (0 until count).map { i ->
                                 val x = leftPad + stepX * (i + 0.5f)
                                 val ratio = (primaryValues[i] / maxY).coerceIn(0f, 1f)
@@ -631,14 +606,16 @@ private fun GameProgressionChartCard(
                     }
                 }
 
-                // X-Achsen-Spiel-Karten unterhalb des Graphen mit exakten Zahlenwerten (klickbar zum Öffnen des Spiels)
+                // X-Achsen-Spiel-Karten unterhalb des Graphen
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    series.forEachIndexed { idx, pt ->
+                    series.forEach { pt ->
+                        val pmStr = if (pt.plusMinus > 0) "+${pt.plusMinus}" else "${pt.plusMinus}"
                         val valText = when (selectedMetric) {
                             PerformanceGraphMetric.PERFORMANCE_INDEX -> "${formatOneDecimal(pt.performanceScore)} Pkt"
+                            PerformanceGraphMetric.PLUS_MINUS_AND_TIME -> "+/- $pmStr (${formatOneDecimal(pt.minutesPlayed)}m)"
                             PerformanceGraphMetric.GOALS_AND_SHOTS -> "${pt.goals}/${pt.shots} Tore"
                             PerformanceGraphMetric.SHOT_ACCURACY -> "${pt.shotAccuracyPercent}%"
                             PerformanceGraphMetric.ASSISTS_AND_DEFENSE -> "${pt.assists} A / ${pt.defensiveActions} Abw"
@@ -722,14 +699,9 @@ private fun PositionRadarChartCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "Stärkenprofil vs. Position",
+                text = "Stärkenprofil",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "6-Achsen-Vergleich: $playerName ggü. Ø $positionName",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Row(
@@ -759,7 +731,6 @@ private fun PositionRadarChartCard(
                             )
                         }
 
-                        // Konzentrische Sechseck-Ringe (25%, 50%, 75%, 100%)
                         listOf(0.25f, 0.5f, 0.75f, 1.0f).forEach { level ->
                             val ringPath = Path().apply {
                                 for (i in 0 until n) {
@@ -775,7 +746,6 @@ private fun PositionRadarChartCard(
                             )
                         }
 
-                        // Speichen vom Zentrum zu den Ecken
                         for (i in 0 until n) {
                             val outer = pointAt(i, 1.0f)
                             drawLine(
@@ -786,7 +756,6 @@ private fun PositionRadarChartCard(
                             )
                         }
 
-                        // Polygon: Positions-Durchschnitt (gestrichelt)
                         val avgPath = Path().apply {
                             axes.forEachIndexed { i, axis ->
                                 val pt = pointAt(i, axis.positionAvgNormalized)
@@ -807,7 +776,6 @@ private fun PositionRadarChartCard(
                             )
                         )
 
-                        // Polygon: Ausgewählter Spieler (gefüllt)
                         val playerPath = Path().apply {
                             axes.forEachIndexed { i, axis ->
                                 val pt = pointAt(i, axis.playerNormalized)
@@ -836,7 +804,6 @@ private fun PositionRadarChartCard(
                     }
                 }
 
-                // Kompakte Achsen-Werte-Übersicht (2×3 Grid)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     axes.chunked(3).forEach { rowAxes ->
                         Row(
@@ -894,25 +861,11 @@ private fun PositionMetricsComparisonSection(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val peerCount = comparisons.firstOrNull()?.totalPlayersInPosition ?: 1
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Einzelwerte im Positionsvergleich ($positionName)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Jeder Wert von $playerName im direkten Vergleich mit allen $peerCount Spielern auf $positionName",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Text(
+                text = "Positionsvergleich ($positionName)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
 
             comparisons.forEach { comp ->
                 PositionMetricComparisonBarRow(comp)
@@ -975,14 +928,12 @@ private fun PositionMetricComparisonBarRow(comp: PositionMetricComparison) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Differenz zum Positions-Durchschnitt
                     Text(
                         text = "$diffSign${formatMetricValue(diff, comp.unit)}$unitSuffix ggü. Ø",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = statusColor
                     )
-                    // Rang-Badge auf der Position
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = statusColor.copy(alpha = 0.16f)
@@ -998,16 +949,15 @@ private fun PositionMetricComparisonBarRow(comp: PositionMetricComparison) {
                 }
             }
 
-            // Vergleichsbalken: Spieler vs. Ø Position vs. Bestwert Position
             val maxScale = maxOf(
-                comp.playerValue,
-                comp.positionAverage,
-                comp.positionBest,
+                comp.playerValue.coerceAtLeast(0.0),
+                comp.positionAverage.coerceAtLeast(0.0),
+                comp.positionBest.coerceAtLeast(0.0),
                 if (comp.unit == "%") 100.0 else 1.0
             ) * 1.05
 
-            val playerFraction = (comp.playerValue / maxScale).coerceIn(0.02, 1.0).toFloat()
-            val avgFraction = (comp.positionAverage / maxScale).coerceIn(0.02, 1.0).toFloat()
+            val playerFraction = (comp.playerValue.coerceAtLeast(0.0) / maxScale).coerceIn(0.02, 1.0).toFloat()
+            val avgFraction = (comp.positionAverage.coerceAtLeast(0.0) / maxScale).coerceIn(0.02, 1.0).toFloat()
             val trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
             val avgLineColor = MaterialTheme.colorScheme.onSurface
 
@@ -1016,19 +966,16 @@ private fun PositionMetricComparisonBarRow(comp: PositionMetricComparison) {
                 contentAlignment = Alignment.CenterStart
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    // Hintergrund-Track
                     drawRoundRect(
                         color = trackColor,
                         size = size,
                         cornerRadius = CornerRadius(8f, 8f)
                     )
-                    // Spieler-Balken
                     drawRoundRect(
                         color = statusColor,
                         size = Size(size.width * playerFraction, size.height),
                         cornerRadius = CornerRadius(8f, 8f)
                     )
-                    // Vertikale Markierung für den Positions-Durchschnitt
                     val avgX = size.width * avgFraction
                     drawLine(
                         color = avgLineColor,
@@ -1072,7 +1019,6 @@ fun CoachPlayerRankingDashboard(
     onSelectPlayer: (Int) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        // 1. Top-Performer pro Position (Alle 7 Handball-Positionen im Überblick für den Trainer)
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
@@ -1094,18 +1040,11 @@ fun CoachPlayerRankingDashboard(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary
                     )
-                    Column {
-                        Text(
-                            text = "Top-Spieler je Position (Startsieben-Empfehlung)",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Jeweils der #1 gerankte Spieler pro Position nach aktuellem Performance-Index",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "Startsieben-Empfehlung",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Row(
@@ -1149,7 +1088,7 @@ fun CoachPlayerRankingDashboard(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "Index: ${formatOneDecimal(topForPos.performanceScore)} Pkt",
+                                        text = "Index: ${formatOneDecimal(topForPos.performanceScore)} Pkt • +/- ${topForPos.stats.plusMinusFormatted}",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.tertiary,
                                         fontWeight = FontWeight.Bold
@@ -1162,7 +1101,6 @@ fun CoachPlayerRankingDashboard(
             }
         }
 
-        // 2. Interaktives Spieler-Ranking für den Trainer
         TrainerPlayerRankingSection(
             repository = repository,
             snapshot = snapshot,
@@ -1213,18 +1151,11 @@ fun TrainerPlayerRankingSection(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Column {
-                    Text(
-                        text = "Trainer-Ansicht: Spieler-Ranking nach Position",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Vergleiche und sortiere Spieler einer Position oder des gesamten Kaders nach Leistungs-Kriterien",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "Spieler-Ranking",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             // Positions-Filter
@@ -1233,11 +1164,6 @@ fun TrainerPlayerRankingSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Position:",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
                 FilterChip(
                     selected = selectedPositionId == null,
                     onClick = { selectedPositionId = null },
@@ -1258,11 +1184,6 @@ fun TrainerPlayerRankingSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Sortierung:",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
                 RankingSortCriterion.entries.forEach { crit ->
                     FilterChip(
                         selected = sortCriterion == crit,
@@ -1305,7 +1226,6 @@ fun TrainerPlayerRankingSection(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                // Rang-Badge (#1, #2, #3...)
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = when (entry.rank) {
@@ -1349,14 +1269,13 @@ fun TrainerPlayerRankingSection(
                                         }
                                     }
                                     Text(
-                                        text = "${entry.positionName} • ${entry.stats.gamesAttended} Spiele",
+                                        text = "${entry.positionName} • ${entry.stats.gamesAttended} Spiele • +/- ${entry.stats.plusMinusFormatted} • Ø ${formatOneDecimal(entry.stats.minutesPerGame)} Min/Sp.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
 
-                            // Performance-Index rechts
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     text = "${formatOneDecimal(entry.performanceScore)} Pkt",
@@ -1372,7 +1291,6 @@ fun TrainerPlayerRankingSection(
                             }
                         }
 
-                        // Fortschrittsbalken relativ zum Bestwert
                         LinearProgressIndicator(
                             progress = { (entry.performanceScore / maxScore).toFloat().coerceIn(0.05f, 1f) },
                             modifier = Modifier.fillMaxWidth().height(6.dp),
@@ -1380,11 +1298,10 @@ fun TrainerPlayerRankingSection(
                             trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                         )
 
-                        // Detail-Statistikzeile zum schnellen Vergleich
                         val detailLine = if (entry.player.role == PlayerRole.FIELD_PLAYER) {
-                            "Ø Tore: ${formatOneDecimal(entry.stats.goalsPerGame)} (${entry.stats.totalGoals}/${entry.stats.totalShots}) • Quote: ${entry.stats.shotAccuracyPercent}% • Ø Assists: ${formatOneDecimal(entry.stats.assistsPerGame)} • Ø Steals+Blocks: ${formatOneDecimal(entry.stats.defensiveActionsPerGame)} • Ø TF: ${formatOneDecimal(entry.stats.technicalMistakesPerGame)}"
+                            "+/-: ${entry.stats.plusMinusFormatted} • Ø Tore: ${formatOneDecimal(entry.stats.goalsPerGame)} (${entry.stats.totalGoals}/${entry.stats.totalShots}) • Quote: ${entry.stats.shotAccuracyPercent}% • Ø Assists: ${formatOneDecimal(entry.stats.assistsPerGame)} • Ø Steals+Blocks: ${formatOneDecimal(entry.stats.defensiveActionsPerGame)} • Ø TF: ${formatOneDecimal(entry.stats.technicalMistakesPerGame)}"
                         } else {
-                            "Ø Paraden: ${formatOneDecimal(entry.stats.savesPerGame)} (${entry.stats.totalSaves} ges.) • Fangquote: ${entry.stats.savePercentage}% • 7m-Quote: ${entry.stats.penaltySavePercentage}% • Gegenstoß: ${entry.stats.fastBreakPassPercentage}% • Ø Gegentore: ${formatOneDecimal(entry.stats.goalsConcededPerGame)}"
+                            "+/-: ${entry.stats.plusMinusFormatted} • Ø Paraden: ${formatOneDecimal(entry.stats.savesPerGame)} (${entry.stats.totalSaves} ges.) • Fangquote: ${entry.stats.savePercentage}% • 7m-Quote: ${entry.stats.penaltySavePercentage}% • Gegenstoß: ${entry.stats.fastBreakPassPercentage}% • Ø Gegentore: ${formatOneDecimal(entry.stats.goalsConcededPerGame)}"
                         }
                         Text(
                             text = detailLine,

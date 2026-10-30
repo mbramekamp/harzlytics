@@ -71,9 +71,23 @@ data class Game(
     val homeTeamHalftimeScore: Int = 0,
     val awayTeamHalftimeScore: Int = 0,
     val homeTeamScore: Int = 0,
-    val awayTeamScore: Int = 0
+    val awayTeamScore: Int = 0,
+    val elapsedSeconds: Int = 0        // Aktuelle Spieluhr in Sekunden (0..3600 für 00:00..60:00)
 ) {
     val isOwnTeamGame: Boolean get() = secondOpponentId == null
+
+    val elapsedFormatted: String
+        get() = formatGameClockSeconds(elapsedSeconds)
+
+    val currentMinute: Int
+        get() = ((elapsedSeconds / 60) + 1).coerceIn(1, 60)
+}
+
+fun formatGameClockSeconds(totalSeconds: Int): String {
+    val clamped = totalSeconds.coerceAtLeast(0)
+    val mins = (clamped / 60).toString().padStart(2, '0')
+    val secs = (clamped % 60).toString().padStart(2, '0')
+    return "$mins:$secs"
 }
 
 @Serializable
@@ -84,8 +98,76 @@ data class PlayerGame(
     val twoMinuteSuspensions: Int = 0,
     val yellowCard: Boolean = false,
     val redCard: Boolean = false,
-    val blueCard: Boolean = false
-)
+    val blueCard: Boolean = false,
+    val isOnCourt: Boolean = false,
+    val plusMinus: Int = 0,
+    val secondsPlayed: Int = 0,
+    val activeSuspensionUntilSeconds: Int? = null
+) {
+    val isDisqualified: Boolean
+        get() = redCard || blueCard || twoMinuteSuspensions >= 3
+
+    val plusMinusFormatted: String
+        get() = when {
+            plusMinus > 0 -> "+$plusMinus"
+            else -> "$plusMinus"
+        }
+
+    val playingTimeFormatted: String
+        get() = formatGameClockSeconds(secondsPlayed)
+
+    fun remainingSuspensionSeconds(currentGameSeconds: Int): Int {
+        val until = activeSuspensionUntilSeconds ?: return 0
+        return (until - currentGameSeconds).coerceAtLeast(0)
+    }
+
+    fun hasActiveSuspension(currentGameSeconds: Int): Boolean =
+        remainingSuspensionSeconds(currentGameSeconds) > 0
+}
+
+@Serializable
+enum class GameLogEventType(val label: String) {
+    SUBSTITUTION("Wechsel"),
+    LINEUP_SET("Startsieben"),
+    GOAL("Tor"),
+    SEVEN_METER_GOAL("7m-Tor"),
+    MISSED_SHOT("Fehlwurf"),
+    GOALKEEPER_SAVE("Parade"),
+    GOAL_CONCEDED("Gegentor"),
+    TWO_MINUTE_SUSPENSION("2-Minuten"),
+    YELLOW_CARD("Gelbe Karte"),
+    RED_CARD("Rote Karte"),
+    BLUE_CARD("Blaue Karte"),
+    TIMEOUT("Auszeit (TTO)"),
+    SCORE_UPDATE("Spielstand")
+}
+
+/**
+ * Eintrag im chronologischen Spielprotokoll (Game Log / Live-Ticker):
+ * Erfasst Spielerwechsel (Ein-/Auswechslung), Tore, Paraden, Zeitstrafen/Karten und Auszeiten
+ * inklusive Spieluhrzeit und aktuellem Spielstand.
+ */
+@Serializable
+data class GameLogEntry(
+    val logId: Int,
+    val gameId: Int,
+    val gameSecond: Int,
+    val eventType: GameLogEventType,
+    val primaryPlayerId: Int? = null,
+    val secondaryPlayerId: Int? = null,
+    val homeScoreAtEvent: Int = 0,
+    val awayScoreAtEvent: Int = 0,
+    val description: String
+) {
+    val timeFormatted: String
+        get() = formatGameClockSeconds(gameSecond)
+
+    val minuteLabel: String
+        get() = "${((gameSecond / 60) + 1).coerceAtLeast(1)}."
+
+    val scoreFormatted: String
+        get() = "$homeScoreAtEvent:$awayScoreAtEvent"
+}
 
 @Serializable
 data class FieldPlayerGameStats(
@@ -144,7 +226,8 @@ data class DatabaseSnapshot(
     val fieldPlayerStats: List<FieldPlayerGameStats> = emptyList(),
     val goalKeeperStats: List<GoalKeeperGameStats> = emptyList(),
     val timeouts: List<Timeout> = emptyList(),
-    val coachStats: List<CoachGameStats> = emptyList()
+    val coachStats: List<CoachGameStats> = emptyList(),
+    val gameLogs: List<GameLogEntry> = emptyList()
 )
 
 /**
@@ -193,6 +276,8 @@ data class PlayerAggregatedStats(
     val yellowCards: Int = 0,
     val redCards: Int = 0,
     val blueCards: Int = 0,
+    val totalPlusMinus: Int = 0,
+    val totalSecondsPlayed: Int = 0,
     // Feldspieler
     val totalGoals: Int = 0,
     val totalShots: Int = 0,
@@ -235,6 +320,18 @@ data class PlayerAggregatedStats(
         get() = if (totalFastBreakPassesAttempted > 0) {
             ((totalFastBreakPassesSuccess * 100.0) / totalFastBreakPassesAttempted).toInt()
         } else 0
+
+    val plusMinusFormatted: String
+        get() = if (totalPlusMinus > 0) "+$totalPlusMinus" else "$totalPlusMinus"
+
+    val totalPlayingTimeFormatted: String
+        get() = "${totalSecondsPlayed / 60}:${(totalSecondsPlayed % 60).toString().padStart(2, '0')} Min"
+
+    val plusMinusPerGame: Double
+        get() = if (gamesAttended > 0) totalPlusMinus.toDouble() / gamesAttended else 0.0
+
+    val minutesPerGame: Double
+        get() = if (gamesAttended > 0) (totalSecondsPlayed / 60.0) / gamesAttended else 0.0
 
     val goalsPerGame: Double
         get() = if (gamesAttended > 0) totalGoals.toDouble() / gamesAttended else 0.0
@@ -280,6 +377,8 @@ data class PlayerGamePerformancePoint(
     val matchupTitle: String,
     val outcomeBadge: String,
     val performanceScore: Double,
+    val plusMinus: Int = 0,
+    val minutesPlayed: Double = 0.0,
     // Feldspieler-Metriken
     val goals: Int = 0,
     val shots: Int = 0,
@@ -323,6 +422,8 @@ data class PositionMetricComparison(
  */
 enum class RankingSortCriterion(val label: String) {
     PERFORMANCE_INDEX("Performance-Index"),
+    PLUS_MINUS("Plus/Minus (+/-)"),
+    PLAYING_TIME("Einsatzzeit"),
     GOALS_OR_SAVES("Tore / Paraden"),
     ACCURACY_OR_SAVE_RATE("Quote (%)"),
     ASSISTS_OR_FASTBREAK("Assists / Gegenstoß"),
@@ -351,4 +452,3 @@ data class RadarMetricAxis(
     val playerFormatted: String,
     val avgFormatted: String
 )
-

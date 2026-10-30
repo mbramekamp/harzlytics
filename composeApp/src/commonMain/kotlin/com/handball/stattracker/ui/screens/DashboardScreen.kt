@@ -41,7 +41,6 @@ fun DashboardScreen(
     }
     val ownStanding = standings.find { it.isOwnTeam }
 
-    // Top-Torschützen der aktuellen Saison berechnen
     val topScorers = remember(snapshot, activeSeason) {
         snapshot.players
             .filter { it.role == PlayerRole.FIELD_PLAYER }
@@ -52,7 +51,6 @@ fun DashboardScreen(
             .take(5)
     }
 
-    // Torhüter-Quoten der aktuellen Saison berechnen
     val topKeepers = remember(snapshot, activeSeason) {
         snapshot.players
             .filter { it.role == PlayerRole.GOALKEEPER }
@@ -91,11 +89,6 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "VEREINS-DASHBOARD (HOME)",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
-                        )
                         if (editingClubName) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -106,7 +99,7 @@ fun DashboardScreen(
                                     value = clubNameDraft,
                                     onValueChange = { clubNameDraft = it },
                                     singleLine = true,
-                                    label = { Text("Eigener Vereinsname") },
+                                    label = { Text("Vereinsname") },
                                     modifier = Modifier.weight(1f)
                                 )
                                 Button(onClick = {
@@ -141,7 +134,7 @@ fun DashboardScreen(
                     FilledTonalButton(onClick = onOpenPlusMenu) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("Schnell-Aktion (+)")
+                        Text("Neu")
                     }
                 }
 
@@ -151,11 +144,6 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Aktive Saison:",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
                         snapshot.seasons.forEach { season ->
                             FilterChip(
                                 selected = season.seasonId == activeSeason?.seasonId,
@@ -168,7 +156,7 @@ fun DashboardScreen(
             }
         }
 
-        // Kennzahlen-Reihe (Tabellenplatz, Punkte, Kadergröße, Spiele)
+        // Kennzahlen-Reihe (Tabellenplatz, Punkte, Kadergröße)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -187,7 +175,7 @@ fun DashboardScreen(
             )
             KpiStatCard(
                 modifier = Modifier.weight(1f),
-                title = "Kader & Trainer",
+                title = "Kader",
                 value = "${snapshot.players.count { it.role != PlayerRole.COACH }} Spieler",
                 subtitle = "${snapshot.players.count { it.role == PlayerRole.COACH }} Trainer"
             )
@@ -198,7 +186,6 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Letzte Spiele der Saison
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(16.dp),
@@ -209,12 +196,12 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Letzte Spiele (${activeSeason?.division ?: ""})",
+                        text = "Letzte Spiele",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     if (recentGames.isEmpty()) {
-                        Text("Noch keine Spiele in dieser Saison eingetragen.")
+                        Text("Noch keine Spiele eingetragen.")
                     } else {
                         recentGames.forEach { game ->
                             Surface(
@@ -260,7 +247,6 @@ fun DashboardScreen(
                 }
             }
 
-            // Top-Scorer & Torhüter
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(16.dp),
@@ -271,7 +257,7 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Top-Scorer & Rückhalt",
+                        text = "Top-Scorer",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -313,7 +299,7 @@ fun DashboardScreen(
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Text(
-                        text = "Torhüter-Fangquoten",
+                        text = "Torhüter",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -337,7 +323,7 @@ fun DashboardScreen(
             }
         }
 
-        // Offline-First Backend Synchronisation & Demo-Reset
+        // Synchronisation & Demo-Reset
         Card(
             shape = RoundedCornerShape(16.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
@@ -346,16 +332,22 @@ fun DashboardScreen(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "Offline-First Speicherung & Ktor-Backend Sync",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Status: $syncStatus",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Synchronisation",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = syncStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -364,7 +356,7 @@ fun DashboardScreen(
                     OutlinedTextField(
                         value = serverUrlDraft,
                         onValueChange = { serverUrlDraft = it },
-                        label = { Text("Ktor Backend URL") },
+                        label = { Text("Server-URL") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -377,12 +369,12 @@ fun DashboardScreen(
                     ) {
                         Icon(Icons.Default.Sync, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("Jetzt synchronisieren")
+                        Text("Synchronisieren")
                     }
                     OutlinedButton(onClick = { repository.resetToDemoData() }) {
                         Icon(Icons.Default.Refresh, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("Demo-Daten laden")
+                        Text("Demo-Daten")
                     }
                 }
             }

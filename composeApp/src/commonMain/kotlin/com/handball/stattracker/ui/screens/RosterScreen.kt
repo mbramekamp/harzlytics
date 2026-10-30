@@ -25,7 +25,7 @@ import com.handball.stattracker.repository.HandballRepository
  * - Gruppiert nach Rolle/Position (Torhüter, Feldspieler, Trainer)
  * - In der Kader-Ansicht sind Spieler/Trainer auswählbar
  * - Nach dem Auswählen wird das Spieler-/Trainerprofil mit Gesamtstatistiken
- *   und einer Historie an Spielen (inkl. Einzelstatistiken) angezeigt.
+ *   (inkl. Plus/Minus & Einsatzzeit) und einer Historie an Spielen angezeigt.
  * - Master-Detail auf breiten Screens, Vollbild-Profil mit Zurück-Button auf Mobile.
  */
 enum class PlayerProfileTab(val label: String) {
@@ -103,13 +103,9 @@ fun RosterScreen(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Bitte links einen Spieler oder Trainer aus dem Kader auswählen",
+                                text = "Spieler oder Trainer auswählen",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Das Spielerprofil zeigt Karrierewerte, Spielhistorie sowie im Reiter 'Performance' Graphen, Positionsvergleiche und das Spieler-Ranking.",
-                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -286,7 +282,6 @@ private fun RosterPersonRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Trikotnummer-Badge (oder TR für Trainer)
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.primary
@@ -311,8 +306,8 @@ private fun RosterPersonRow(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                val kitInfo = if (player.role != PlayerRole.COACH) {
-                    " • Heim #${player.jerseyNumberHomeKit ?: "-"} / Ausw. #${player.jerseyNumberAwayKit ?: "-"}"
+                val kitInfo = if (player.role != PlayerRole.COACH && player.jerseyNumberAwayKit != null) {
+                    " • Ausw. #${player.jerseyNumberAwayKit}"
                 } else ""
                 Text(
                     text = "$positionName$kitInfo",
@@ -417,19 +412,23 @@ private fun PlayerProfileDetailPanel(
                     }
                 }
 
-                // Stammdaten-Zeile (Trikots & E-Mail)
+                // Stammdaten-Zeile (Trikots, Plus/Minus, Einsatzzeit & E-Mail)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (player.role != PlayerRole.COACH) {
                         AssistChip(
                             onClick = {},
-                            label = { Text("Heimtrikot: #${player.jerseyNumberHomeKit ?: "-"}") }
+                            label = { Text("Heim: #${player.jerseyNumberHomeKit ?: "-"} / Ausw.: #${player.jerseyNumberAwayKit ?: "-"}") }
                         )
                         AssistChip(
                             onClick = {},
-                            label = { Text("Auswärtstrikot: #${player.jerseyNumberAwayKit ?: "-"}") }
+                            label = { Text("Gesamt +/-: ${stats.plusMinusFormatted}") }
+                        )
+                        AssistChip(
+                            onClick = {},
+                            label = { Text("Einsatzzeit: ${stats.totalPlayingTimeFormatted}") }
                         )
                     }
                     if (player.email.isNotBlank()) {
@@ -490,20 +489,15 @@ private fun PlayerProfileDetailPanel(
             }
         }
 
-        // Saison-Filter für Statistik, Historie, Performance-Graphen & Positions-Ranking
+        // Saison-Filter
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Zeitraum:",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
-            )
             FilterChip(
                 selected = seasonFilterId == null,
                 onClick = { seasonFilterId = null },
-                label = { Text("Gesamte Historie") }
+                label = { Text("Gesamt") }
             )
             snapshot.seasons.forEach { season ->
                 FilterChip(
@@ -527,7 +521,7 @@ private fun PlayerProfileDetailPanel(
         } else {
             // Rollenspezifische Statistik-Übersicht
             Text(
-                text = "Statistik-Zusammenfassung (${stats.gamesAttended} Spiele)",
+                text = "Übersicht (${stats.gamesAttended} Spiele)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -542,25 +536,25 @@ private fun PlayerProfileDetailPanel(
                             modifier = Modifier.weight(1f),
                             label = "Tore / Würfe",
                             value = "${stats.totalGoals} / ${stats.totalShots}",
-                            sub = "Wurfquote: ${stats.shotAccuracyPercent}%"
+                            sub = "Quote: ${stats.shotAccuracyPercent}%"
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
+                            label = "+/- & Spielzeit",
+                            value = stats.plusMinusFormatted,
+                            sub = stats.totalPlayingTimeFormatted
                         )
                         ProfileStatBox(
                             modifier = Modifier.weight(1f),
                             label = "7-Meter",
                             value = "${stats.totalPenaltyGoals} / ${stats.totalPenaltyAttempts}",
-                            sub = "Quote: ${stats.penaltyAccuracyPercent}% (${stats.totalPenaltiesDrawn} gezogen)"
+                            sub = "${stats.penaltyAccuracyPercent}% (${stats.totalPenaltiesDrawn} gez.)"
                         )
                         ProfileStatBox(
                             modifier = Modifier.weight(1f),
-                            label = "Assists & Steals",
-                            value = "${stats.totalAssists} / ${stats.totalSteals}",
-                            sub = "${stats.totalBlocks} Blocks • ${stats.totalTechnicalMistakes} TF"
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Strafen",
-                            value = "${stats.totalTwoMin}× 2Min",
-                            sub = "Gelb: ${stats.yellowCards} • Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
+                            label = "Assists & Abwehr",
+                            value = "${stats.totalAssists} A / ${stats.totalSteals + stats.totalBlocks} Abw",
+                            sub = "${stats.totalTechnicalMistakes} TF • ${stats.totalTwoMin}× 2Min"
                         )
                     }
                 }
@@ -578,21 +572,21 @@ private fun PlayerProfileDetailPanel(
                         )
                         ProfileStatBox(
                             modifier = Modifier.weight(1f),
+                            label = "+/- & Spielzeit",
+                            value = stats.plusMinusFormatted,
+                            sub = stats.totalPlayingTimeFormatted
+                        )
+                        ProfileStatBox(
+                            modifier = Modifier.weight(1f),
                             label = "7m-Paraden",
                             value = "${stats.totalPenaltiesSaved} / ${stats.totalPenaltiesSaved + stats.totalPenaltiesConceded}",
-                            sub = "7m-Quote: ${stats.penaltySavePercentage}%"
+                            sub = "Quote: ${stats.penaltySavePercentage}%"
                         )
                         ProfileStatBox(
                             modifier = Modifier.weight(1f),
                             label = "Gegenstoßpässe",
                             value = "${stats.totalFastBreakPassesSuccess} / ${stats.totalFastBreakPassesAttempted}",
-                            sub = "Passquote: ${stats.fastBreakPassPercentage}%"
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Strafen",
-                            value = "${stats.totalTwoMin}× 2Min",
-                            sub = "Gelb: ${stats.yellowCards} • Rot: ${stats.redCards}"
+                            sub = "Quote: ${stats.fastBreakPassPercentage}%"
                         )
                     }
                 }
@@ -604,19 +598,19 @@ private fun PlayerProfileDetailPanel(
                     ) {
                         ProfileStatBox(
                             modifier = Modifier.weight(1f),
-                            label = "Betreute Spiele",
+                            label = "Spiele",
                             value = "${stats.gamesAttended}",
-                            sub = "Als verantwortlicher Trainer"
+                            sub = "Trainerbank"
                         )
                         ProfileStatBox(
                             modifier = Modifier.weight(1f),
-                            label = "Genommene Auszeiten",
-                            value = "${stats.totalTimeoutsTaken} TTOs",
-                            sub = "Team-Timeouts mit Coaching-Grund"
+                            label = "Auszeiten",
+                            value = "${stats.totalTimeoutsTaken}",
+                            sub = "Team-Timeouts"
                         )
                         ProfileStatBox(
                             modifier = Modifier.weight(1f),
-                            label = "Bank-Strafen",
+                            label = "Strafen",
                             value = "${stats.yellowCards} Gelb / ${stats.totalTwoMin}× 2Min",
                             sub = "Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
                         )
@@ -624,9 +618,9 @@ private fun PlayerProfileDetailPanel(
                 }
             }
 
-            // Spiel-Historie (laut UI-Konzept: "mit den Spielen einer Historie an spielen")
+            // Spiel-Historie
             Text(
-                text = "Historie an Spielen (${gameHistory.size})",
+                text = "Spiele (${gameHistory.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -729,6 +723,20 @@ private fun PlayerGameHistoryCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (role != PlayerRole.COACH) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = "+/- ${entry.playerGame.plusMinusFormatted} • ${entry.playerGame.playingTimeFormatted}",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = when (entry.outcomeBadge) {
