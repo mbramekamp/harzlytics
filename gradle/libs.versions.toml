@@ -8,10 +8,10 @@ ktor = "3.6.0"
 sqldelight = "2.4.1"
 sqlite-jdbc = "3.47.1.0"
 logback = "1.5.12"
-agp = "8.7.3"
-android-compileSdk = "35"
+agp = "9.2.1"
+android-compileSdk = "37"
 android-minSdk = "24"
-android-targetSdk = "35"
+android-targetSdk = "37"
 androidx-activityCompose = "1.9.3"
 
 [libraries]

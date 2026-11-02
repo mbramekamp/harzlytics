@@ -67,4 +67,30 @@ actual object PlatformStorage {
     }
 
     actual fun platformName(): String = "Desktop (JVM + SQLite)"
+
+    actual fun readEnvVar(key: String): String? {
+        val candidateFiles = listOf(
+            File(".env"),
+            File("../.env"),
+            File(System.getProperty("user.dir", "."), ".env"),
+            File(System.getProperty("user.dir", "."), "../.env")
+        )
+        for (file in candidateFiles) {
+            if (file.exists() && file.isFile) {
+                val found = runCatching {
+                    file.readLines(Charsets.UTF_8)
+                        .map { it.trim() }
+                        .firstOrNull { it.isNotEmpty() && !it.startsWith("#") && it.substringBefore('=').trim() == key }
+                        ?.substringAfter('=')
+                        ?.trim()
+                        ?.removeSurrounding("\"")
+                        ?.removeSurrounding("'")
+                }.getOrNull()
+                if (!found.isNullOrBlank()) {
+                    return found
+                }
+            }
+        }
+        return System.getenv(key)?.takeIf { it.isNotBlank() }
+    }
 }

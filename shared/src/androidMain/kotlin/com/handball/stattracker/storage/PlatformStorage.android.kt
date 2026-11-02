@@ -31,4 +31,6 @@ actual object PlatformStorage {
     }
 
     actual fun platformName(): String = "Android (App Storage)"
+
+    actual fun readEnvVar(key: String): String? = System.getenv(key)?.takeIf { it.isNotBlank() }
 }

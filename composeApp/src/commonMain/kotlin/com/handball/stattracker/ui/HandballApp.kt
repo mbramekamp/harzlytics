@@ -3,16 +3,20 @@ package com.handball.stattracker.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.handball.stattracker.config.SupabaseConfig
 import com.handball.stattracker.model.DatabaseSnapshot
 import com.handball.stattracker.repository.HandballRepository
 import com.handball.stattracker.ui.screens.*
@@ -27,18 +31,21 @@ enum class MainNavScreen(val label: String) {
 
 @Composable
 fun HandballApp(
-    repository: HandballRepository = remember { HandballRepository() }
+    repository: HandballRepository = remember { HandballRepository(autoSync = true) }
 ) {
+    LaunchedEffect(repository) {
+        if (SupabaseConfig.hasConfiguredKeys() && SupabaseConfig.resolvedProjectUrl().isNotBlank()) {
+            repository.syncWithBackend()
+        }
+    }
     var darkTheme by remember { mutableStateOf(false) }
     val snapshot by repository.snapshot.collectAsState()
 
-    var currentScreen by remember { mutableStateOf(MainNavScreen.ROSTER) }
+    var currentScreen by remember { mutableStateOf(MainNavScreen.HOME_DASHBOARD) }
     var selectedSeasonId by remember(snapshot.seasons) {
         mutableStateOf(snapshot.seasons.firstOrNull()?.seasonId ?: 1)
     }
-    var selectedPlayerId by remember {
-        mutableStateOf<Int?>(snapshot.players.firstOrNull()?.playerId)
-    }
+    var selectedPlayerId by remember { mutableStateOf<Int?>(null) }
     var selectedGameId by remember { mutableStateOf<Int?>(null) }
     var creationModal by remember { mutableStateOf(CreationModalType.NONE) }
 
@@ -60,6 +67,13 @@ fun HandballApp(
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val isWideScreen = maxWidth >= 700.dp
+
+                // Auf Desktop/Tablet: Falls kein Spieler gewählt ist, ersten vorwählen für Master-Detail
+                LaunchedEffect(isWideScreen, snapshot.players) {
+                    if (isWideScreen && selectedPlayerId == null && snapshot.players.isNotEmpty()) {
+                        selectedPlayerId = snapshot.players.firstOrNull()?.playerId
+                    }
+                }
 
                 if (isWideScreen) {
                     Row(
@@ -121,21 +135,29 @@ fun HandballApp(
                         }
                     }
                 } else {
+                    // Mobile Ansicht: Native App Bar mit Status-Bar Insets & ergonomische Bottom Navigation
+                    val showMobileBack = (currentScreen == MainNavScreen.ROSTER && selectedPlayerId != null) ||
+                            (currentScreen == MainNavScreen.SEASON && selectedGameId != null)
+
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        StaticTopHeaderBox(
+                        MobileTopHeaderBar(
                             title = staticHeaderTitle,
-                            subtitle = snapshot.ownClubName
+                            subtitle = snapshot.ownClubName,
+                            showBackButton = showMobileBack,
+                            onBack = {
+                                if (currentScreen == MainNavScreen.ROSTER) selectedPlayerId = null
+                                if (currentScreen == MainNavScreen.SEASON) selectedGameId = null
+                            },
+                            darkTheme = darkTheme,
+                            onToggleDarkTheme = { darkTheme = !darkTheme }
                         )
 
-                        Surface(
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                            tonalElevation = 1.dp
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
                         ) {
                             MainContentRouter(
                                 currentScreen = currentScreen,
@@ -163,15 +185,13 @@ fun HandballApp(
 
                         BottomMobileNavbar(
                             currentScreen = currentScreen,
-                            darkTheme = darkTheme,
                             onSelectScreen = { screen ->
                                 currentScreen = screen
                                 if (screen != MainNavScreen.SEASON) {
                                     selectedGameId = null
                                 }
                             },
-                            onOpenPlusMenu = { creationModal = CreationModalType.CHOOSER },
-                            onToggleDarkTheme = { darkTheme = !darkTheme }
+                            onOpenPlusMenu = { creationModal = CreationModalType.CHOOSER }
                         )
                     }
                 }
@@ -223,7 +243,7 @@ private fun computeHeaderTitle(
                 val nr = player.jerseyNumberHomeKit?.let { "#$it • " } ?: ""
                 "$nr${player.fullName} ($pos)"
             } else {
-                "Kader"
+                "Kader (${snapshot.players.size})"
             }
         }
         MainNavScreen.SEASON -> {
@@ -236,6 +256,86 @@ private fun computeHeaderTitle(
         }
         MainNavScreen.STANDINGS -> {
             "Tabelle • ${activeSeason?.division ?: "Liga"}"
+        }
+    }
+}
+
+@Composable
+private fun MobileTopHeaderBar(
+    title: String,
+    subtitle: String,
+    showBackButton: Boolean,
+    onBack: () -> Unit,
+    darkTheme: Boolean,
+    onToggleDarkTheme: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (showBackButton) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Zurück",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .padding(start = 4.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "H",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            IconButton(onClick = onToggleDarkTheme) {
+                Icon(
+                    imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                    contentDescription = "Theme wechseln",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -425,91 +525,62 @@ private fun NavbarIconItem(
 @Composable
 private fun BottomMobileNavbar(
     currentScreen: MainNavScreen,
-    darkTheme: Boolean,
     onSelectScreen: (MainNavScreen) -> Unit,
-    onOpenPlusMenu: () -> Unit,
-    onToggleDarkTheme: () -> Unit
+    onOpenPlusMenu: () -> Unit
 ) {
-    Surface(
+    NavigationBar(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+        NavigationBarItem(
+            selected = currentScreen == MainNavScreen.HOME_DASHBOARD,
+            onClick = { onSelectScreen(MainNavScreen.HOME_DASHBOARD) },
+            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+            label = { Text("Home") }
+        )
+        NavigationBarItem(
+            selected = currentScreen == MainNavScreen.ROSTER,
+            onClick = { onSelectScreen(MainNavScreen.ROSTER) },
+            icon = { Icon(Icons.Default.Groups, contentDescription = "Kader") },
+            label = { Text("Kader") }
+        )
+
+        // Prominenter Plus-Button
+        Box(
+            modifier = Modifier
+                .weight(0.9f)
+                .wrapContentHeight(Alignment.CenterVertically),
+            contentAlignment = Alignment.Center
         ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (currentScreen == MainNavScreen.HOME_DASHBOARD) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.primaryContainer
-                },
-                modifier = Modifier
-                    .size(44.dp)
-                    .clickable { onSelectScreen(MainNavScreen.HOME_DASHBOARD) }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "H",
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (currentScreen == MainNavScreen.HOME_DASHBOARD) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        }
-                    )
-                }
-            }
-
-            IconButton(onClick = { onSelectScreen(MainNavScreen.ROSTER) }) {
-                Icon(
-                    imageVector = Icons.Default.Groups,
-                    contentDescription = "Kader",
-                    tint = if (currentScreen == MainNavScreen.ROSTER) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            IconButton(onClick = { onSelectScreen(MainNavScreen.SEASON) }) {
-                Icon(
-                    imageVector = Icons.Default.SportsHandball,
-                    contentDescription = "Saison",
-                    tint = if (currentScreen == MainNavScreen.SEASON) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            IconButton(onClick = { onSelectScreen(MainNavScreen.STANDINGS) }) {
-                Icon(
-                    imageVector = Icons.Default.FormatListNumbered,
-                    contentDescription = "Tabelle",
-                    tint = if (currentScreen == MainNavScreen.STANDINGS) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            FilledIconButton(
+            FloatingActionButton(
                 onClick = onOpenPlusMenu,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
-                )
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary,
+                elevation = FloatingActionButtonDefaults.elevation(2.dp),
+                modifier = Modifier.size(46.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Plus Menü",
-                    tint = MaterialTheme.colorScheme.onSecondary
-                )
-            }
-
-            IconButton(onClick = onToggleDarkTheme) {
-                Icon(
-                    imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                    contentDescription = "Theme"
+                    contentDescription = "Neu anlegen",
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
+
+        NavigationBarItem(
+            selected = currentScreen == MainNavScreen.SEASON,
+            onClick = { onSelectScreen(MainNavScreen.SEASON) },
+            icon = { Icon(Icons.Default.SportsHandball, contentDescription = "Saison") },
+            label = { Text("Saison") }
+        )
+        NavigationBarItem(
+            selected = currentScreen == MainNavScreen.STANDINGS,
+            onClick = { onSelectScreen(MainNavScreen.STANDINGS) },
+            icon = { Icon(Icons.Default.FormatListNumbered, contentDescription = "Tabelle") },
+            label = { Text("Tabelle") }
+        )
     }
 }
 
@@ -533,6 +604,7 @@ private fun MainContentRouter(
             DashboardScreen(
                 repository = repository,
                 snapshot = snapshot,
+                isWideScreen = isWideScreen,
                 selectedSeasonId = selectedSeasonId,
                 onSelectSeason = onSelectSeason,
                 onNavigateToPlayer = { onSelectPlayer(it) },
@@ -561,6 +633,7 @@ private fun MainContentRouter(
                 snapshot = snapshot,
                 selectedSeasonId = selectedSeasonId,
                 selectedGameId = selectedGameId,
+                isWideScreen = isWideScreen,
                 onSelectSeason = onSelectSeason,
                 onSelectGame = onSelectGame,
                 onNavigateToPlayer = { onSelectPlayer(it) },
@@ -573,6 +646,7 @@ private fun MainContentRouter(
             StandingsScreen(
                 repository = repository,
                 snapshot = snapshot,
+                isWideScreen = isWideScreen,
                 selectedSeasonId = selectedSeasonId,
                 onSelectSeason = onSelectSeason,
                 onOpenNewOpponentDialog = { onOpenModal(CreationModalType.NEW_OPPONENT) },

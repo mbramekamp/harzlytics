@@ -1,6 +1,7 @@
 package com.handball.stattracker.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,7 +53,10 @@ fun PlusCreationModalHost(
                     )
                 },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         PlusOptionCard(
                             title = "Spiel",
                             subtitle = "Spielbericht oder Ligapaarung",
@@ -378,7 +382,10 @@ private fun NewTrainerModal(
         onDismissRequest = onDismiss,
         title = { Text("Neuer Trainer", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = firstName,
                     onValueChange = { firstName = it },
@@ -444,7 +451,10 @@ private fun NewOpponentModal(
         onDismissRequest = onDismiss,
         title = { Text("Neuer Gegner", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = opponentName,
                     onValueChange = { opponentName = it },
@@ -527,7 +537,10 @@ private fun NewSeasonModal(
         onDismissRequest = onDismiss,
         title = { Text("Neue Saison", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = division,
                     onValueChange = { division = it },
@@ -622,7 +635,10 @@ private fun NewGameModal(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     snapshot.seasons.forEach { s ->
                         FilterChip(
                             selected = seasonId == s.seasonId,

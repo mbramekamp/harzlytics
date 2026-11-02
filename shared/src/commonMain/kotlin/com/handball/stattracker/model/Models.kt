@@ -230,6 +230,11 @@ data class DatabaseSnapshot(
     val gameLogs: List<GameLogEntry> = emptyList()
 )
 
+@Serializable
+data class SupabaseSyncRpcRequest(
+    val incoming_snapshot: DatabaseSnapshot
+)
+
 /**
  * Berechnete Zeile der Handball-Ligatabelle (2-Punkte-Regel).
  */

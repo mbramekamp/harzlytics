@@ -27,4 +27,6 @@ actual object PlatformStorage {
     }
 
     actual fun platformName(): String = "Web (Browser LocalStorage)"
+
+    actual fun readEnvVar(key: String): String? = null
 }

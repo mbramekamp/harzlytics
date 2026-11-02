@@ -3,6 +3,7 @@ package com.handball.stattracker.storage
 import com.handball.stattracker.model.DatabaseSnapshot
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import platform.Foundation.NSProcessInfo
 import platform.Foundation.NSUserDefaults
 
 actual object PlatformStorage {
@@ -30,4 +31,8 @@ actual object PlatformStorage {
     }
 
     actual fun platformName(): String = "iOS (Native)"
+
+    actual fun readEnvVar(key: String): String? {
+        return (NSProcessInfo.processInfo.environment[key] as? String)?.takeIf { it.isNotBlank() }
+    }
 }

@@ -1,9 +1,11 @@
 package com.handball.stattracker
 
+import com.handball.stattracker.config.SupabaseConfig
 import com.handball.stattracker.model.GameLogEventType
 import com.handball.stattracker.model.PlayerRole
 import com.handball.stattracker.model.RankingSortCriterion
 import com.handball.stattracker.repository.HandballRepository
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -196,5 +198,23 @@ class HandballRepositoryTest {
             repo.canSubstituteOrEnterCourt(gameId = 1, playerInId = 2, playerOutId = null),
             "Auch bei < 7 Spielern auf dem Feld darf kein 2. Torwart direkt aufs Feld"
         )
+    }
+
+    @Test
+    fun testSupabaseEnvConfigAndLiveSync() = runBlocking {
+        val repo = HandballRepository()
+        repo.resetToDemoData()
+
+        if (SupabaseConfig.hasConfiguredKeys() && SupabaseConfig.resolvedProjectUrl().isNotBlank()) {
+            assertTrue(
+                SupabaseConfig.resolvedApiKey().startsWith("sb_publishable_"),
+                "Client muss den sicheren sb_publishable_ Key bevorzugen"
+            )
+            repo.syncWithBackend()
+            assertTrue(
+                repo.syncStatus.value.startsWith("Sync erfolgreich"),
+                "Supabase Sync sollte erfolgreich sein, Status war: ${repo.syncStatus.value}"
+            )
+        }
     }
 }

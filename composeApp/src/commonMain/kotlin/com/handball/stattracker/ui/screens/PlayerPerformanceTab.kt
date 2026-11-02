@@ -102,7 +102,8 @@ fun PlayerPerformanceTabContent(
             performanceScore = performanceScore,
             rankInPosition = myRankInPosition,
             totalInPosition = totalInPosition,
-            stats = stats
+            stats = stats,
+            isWideScreen = isWideScreen
         )
 
         // 2. Graphen: Chronologische Formkurve + 6-Achsen-Radar-Diagramm
@@ -145,7 +146,8 @@ fun PlayerPerformanceTabContent(
         PositionMetricsComparisonSection(
             playerName = player.fullName,
             positionName = positionName,
-            comparisons = comparisons
+            comparisons = comparisons,
+            isWideScreen = isWideScreen
         )
 
         // 4. Trainer-Spieler-Ranking (Standardmäßig auf die Position des Spielers gefiltert, umschaltbar auf alle Positionen)
@@ -167,7 +169,8 @@ private fun PerformanceSummaryHeroCard(
     performanceScore: Double,
     rankInPosition: Int,
     totalInPosition: Int,
-    stats: PlayerAggregatedStats
+    stats: PlayerAggregatedStats,
+    isWideScreen: Boolean = true
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -177,68 +180,152 @@ private fun PerformanceSummaryHeroCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // Kreisförmiger Performance-Index-Tacho
-            PerformanceScoreGauge(score = performanceScore)
+        if (isWideScreen) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Kreisförmiger Performance-Index-Tacho
+                PerformanceScoreGauge(score = performanceScore)
 
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Performance-Index",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (rankInPosition == 1) {
+                                MaterialTheme.colorScheme.tertiaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (rankInPosition == 1) Icons.Default.EmojiEvents else Icons.Default.Leaderboard,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (rankInPosition == 1) {
+                                        MaterialTheme.colorScheme.onTertiaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    }
+                                )
+                                Text(
+                                    text = "#$rankInPosition / $totalInPosition ($positionName)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (rankInPosition == 1) {
+                                        MaterialTheme.colorScheme.onTertiaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Kurz-KPIs pro Spiel inkl. Plus/Minus & Einsatzzeit
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        MiniKpiPill("+/-", stats.plusMinusFormatted)
+                        MiniKpiPill("Ø Spielzeit", "${formatOneDecimal(stats.minutesPerGame)} Min")
+                        if (player.role == PlayerRole.FIELD_PLAYER) {
+                            MiniKpiPill("Ø Tore", formatOneDecimal(stats.goalsPerGame))
+                            MiniKpiPill("Wurfquote", "${stats.shotAccuracyPercent}%")
+                            MiniKpiPill("Ø Assists", formatOneDecimal(stats.assistsPerGame))
+                            MiniKpiPill("Ø Abwehr", formatOneDecimal(stats.defensiveActionsPerGame))
+                            MiniKpiPill("Ø TF", formatOneDecimal(stats.technicalMistakesPerGame))
+                        } else {
+                            MiniKpiPill("Ø Paraden", formatOneDecimal(stats.savesPerGame))
+                            MiniKpiPill("Fangquote", "${stats.savePercentage}%")
+                            MiniKpiPill("7m-Quote", "${stats.penaltySavePercentage}%")
+                            MiniKpiPill("TG-Pass", "${stats.fastBreakPassPercentage}%")
+                            MiniKpiPill("Ø Gegentore", formatOneDecimal(stats.goalsConcededPerGame))
+                        }
+                    }
+                }
+            }
+        } else {
+            // Optimierte Mobil-Ansicht
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text(
-                        text = "Performance-Index",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (rankInPosition == 1) {
-                            MaterialTheme.colorScheme.tertiaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        }
+                    PerformanceScoreGauge(score = performanceScore)
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        Text(
+                            text = "Performance-Index",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (rankInPosition == 1) {
+                                MaterialTheme.colorScheme.tertiaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            }
                         ) {
-                            Icon(
-                                imageVector = if (rankInPosition == 1) Icons.Default.EmojiEvents else Icons.Default.Leaderboard,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = if (rankInPosition == 1) {
-                                    MaterialTheme.colorScheme.onTertiaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                }
-                            )
-                            Text(
-                                text = "#$rankInPosition / $totalInPosition ($positionName)",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (rankInPosition == 1) {
-                                    MaterialTheme.colorScheme.onTertiaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                }
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (rankInPosition == 1) Icons.Default.EmojiEvents else Icons.Default.Leaderboard,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = if (rankInPosition == 1) {
+                                        MaterialTheme.colorScheme.onTertiaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    }
+                                )
+                                Text(
+                                    text = "#$rankInPosition / $totalInPosition ($positionName)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (rankInPosition == 1) {
+                                        MaterialTheme.colorScheme.onTertiaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    }
+                                )
+                            }
                         }
                     }
                 }
 
-                // Kurz-KPIs pro Spiel inkl. Plus/Minus & Einsatzzeit
+                // Kurz-KPIs horizontal scrollbar
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     MiniKpiPill("+/-", stats.plusMinusFormatted)
                     MiniKpiPill("Ø Spielzeit", "${formatOneDecimal(stats.minutesPerGame)} Min")
@@ -447,10 +534,12 @@ private fun GameProgressionChartCard(
                     else -> max(rawMax * 1.2f, 5f)
                 }
 
-                // Legende
+                // Legende (horizontal scrollbar bei vielen Items oder schmalen Displays)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val primaryLegend = when (selectedMetric) {
@@ -606,9 +695,11 @@ private fun GameProgressionChartCard(
                     }
                 }
 
-                // X-Achsen-Spiel-Karten unterhalb des Graphen
+                // X-Achsen-Spiel-Karten unterhalb des Graphen (horizontal scrollbar, damit sie auf Smartphones nicht horizontal gequetscht werden)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     series.forEach { pt ->
@@ -626,7 +717,7 @@ private fun GameProgressionChartCard(
                         }
                         Surface(
                             modifier = Modifier
-                                .weight(1f)
+                                .widthIn(min = 100.dp)
                                 .clickable { onNavigateToGame(pt.gameId) },
                             shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -850,7 +941,8 @@ private fun PositionRadarChartCard(
 private fun PositionMetricsComparisonSection(
     playerName: String,
     positionName: String,
-    comparisons: List<PositionMetricComparison>
+    comparisons: List<PositionMetricComparison>,
+    isWideScreen: Boolean = true
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -868,14 +960,17 @@ private fun PositionMetricsComparisonSection(
             )
 
             comparisons.forEach { comp ->
-                PositionMetricComparisonBarRow(comp)
+                PositionMetricComparisonBarRow(comp, isWideScreen)
             }
         }
     }
 }
 
 @Composable
-private fun PositionMetricComparisonBarRow(comp: PositionMetricComparison) {
+private fun PositionMetricComparisonBarRow(
+    comp: PositionMetricComparison,
+    isWideScreen: Boolean = true
+) {
     val isBetterOrEqualAvg = if (comp.higherIsBetter) {
         comp.playerValue >= comp.positionAverage
     } else {
@@ -901,38 +996,65 @@ private fun PositionMetricComparisonBarRow(comp: PositionMetricComparison) {
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            if (isWideScreen) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = comp.metricLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (!comp.higherIsBetter) {
+                            Text(
+                                text = "(niedriger = besser)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "$diffSign${formatMetricValue(diff, comp.unit)}$unitSuffix ggü. Ø",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = statusColor.copy(alpha = 0.16f)
+                        ) {
+                            Text(
+                                text = "Platz #${comp.rankInPosition}/${comp.totalPlayersInPosition}",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Auf Mobile: 2 Zeilen Header, damit Text & Badges niemals kollidieren
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = comp.metricLabel,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    if (!comp.higherIsBetter) {
-                        Text(
-                            text = "(niedriger = besser)",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "$diffSign${formatMetricValue(diff, comp.unit)}$unitSuffix ggü. Ø",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = statusColor
+                        fontWeight = FontWeight.Bold
                     )
                     Surface(
                         shape = RoundedCornerShape(6.dp),
@@ -946,6 +1068,28 @@ private fun PositionMetricComparisonBarRow(comp: PositionMetricComparison) {
                             color = statusColor
                         )
                     }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (!comp.higherIsBetter) {
+                        Text(
+                            text = "(niedriger = besser)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Spacer(Modifier.width(1.dp))
+                    }
+                    Text(
+                        text = "$diffSign${formatMetricValue(diff, comp.unit)}$unitSuffix ggü. Ø",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor
+                    )
                 }
             }
 
@@ -987,8 +1131,10 @@ private fun PositionMetricComparisonBarRow(comp: PositionMetricComparison) {
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = "Spieler: ${formatMetricValue(comp.playerValue, comp.unit)}$unitSuffix",
@@ -1223,6 +1369,7 @@ fun TrainerPlayerRankingSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
+                                modifier = Modifier.weight(1f).padding(end = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
@@ -1237,14 +1384,14 @@ fun TrainerPlayerRankingSection(
                                 ) {
                                     Text(
                                         text = "#${entry.rank}",
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Color.White
                                     )
                                 }
 
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1252,7 +1399,9 @@ fun TrainerPlayerRankingSection(
                                         Text(
                                             text = "#${entry.player.jerseyNumberHomeKit ?: "-"} ${entry.player.fullName}",
                                             style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         if (isHighlighted) {
                                             Surface(
@@ -1260,8 +1409,8 @@ fun TrainerPlayerRankingSection(
                                                 color = MaterialTheme.colorScheme.primary
                                             ) {
                                                 Text(
-                                                    text = "Aktuell geöffnet",
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    text = "Aktuell",
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onPrimary
                                                 )
@@ -1269,9 +1418,11 @@ fun TrainerPlayerRankingSection(
                                         }
                                     }
                                     Text(
-                                        text = "${entry.positionName} • ${entry.stats.gamesAttended} Spiele • +/- ${entry.stats.plusMinusFormatted} • Ø ${formatOneDecimal(entry.stats.minutesPerGame)} Min/Sp.",
+                                        text = "${entry.positionName} • ${entry.stats.gamesAttended} Sp. • +/- ${entry.stats.plusMinusFormatted}",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -1284,7 +1435,7 @@ fun TrainerPlayerRankingSection(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "Performance-Index",
+                                    text = "Index",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

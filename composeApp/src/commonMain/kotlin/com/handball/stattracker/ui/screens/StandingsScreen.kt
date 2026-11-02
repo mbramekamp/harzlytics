@@ -2,6 +2,7 @@ package com.handball.stattracker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,7 @@ import com.handball.stattracker.repository.HandballRepository
 fun StandingsScreen(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
+    isWideScreen: Boolean = true,
     selectedSeasonId: Int,
     onSelectSeason: (Int) -> Unit,
     onOpenNewOpponentDialog: () -> Unit,
@@ -39,7 +41,7 @@ fun StandingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(if (isWideScreen) 20.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
@@ -50,11 +52,48 @@ fun StandingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                if (isWideScreen) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = activeSeason?.division ?: "Ligatabelle",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
+                                Icon(Icons.Default.Groups, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Mannschaften")
+                            }
+                            OutlinedButton(onClick = onOpenNewOpponentDialog) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Gegner")
+                            }
+                            Button(onClick = onOpenNewGameDialog) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Spiel")
+                            }
+                        }
+                    }
+                } else {
+                    // Mobile: Titel oben, Aktionen darunter in ergonomischer Leiste
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -66,15 +105,21 @@ fun StandingsScreen(
                         )
                         Text(
                             text = activeSeason?.division ?: "Ligatabelle",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
                             Icon(Icons.Default.Groups, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(4.dp))
                             Text("Mannschaften")
                         }
                         OutlinedButton(onClick = onOpenNewOpponentDialog) {
@@ -90,7 +135,11 @@ fun StandingsScreen(
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Saison-Filter Chips
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     snapshot.seasons.forEach { season ->
                         FilterChip(
                             selected = season.seasonId == activeSeason?.seasonId,
@@ -117,7 +166,7 @@ fun StandingsScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         snapshot.opponentTeams.forEach { opp ->
@@ -137,79 +186,88 @@ fun StandingsScreen(
             }
         }
 
+        // Ligatabelle: Auf Smartphone horizontal scrollbar für saubere, ungeschnittene Spalten
         Card(
             shape = RoundedCornerShape(16.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Pl.", modifier = Modifier.width(42.dp), fontWeight = FontWeight.Bold)
-                    Text("Mannschaft", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
-                    Text("Sp.", modifier = Modifier.width(46.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-                    Text("S", modifier = Modifier.width(40.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-                    Text("U", modifier = Modifier.width(40.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-                    Text("N", modifier = Modifier.width(40.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-                    Text("Tore", modifier = Modifier.width(84.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-                    Text("Diff.", modifier = Modifier.width(64.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-                    Text("Punkte", modifier = Modifier.width(76.dp), textAlign = TextAlign.End, fontWeight = FontWeight.Bold)
-                }
-
-                standings.forEach { row ->
-                    val rowBg = if (row.isOwnTeam) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    }
-
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+            ) {
+                Column(modifier = Modifier.widthIn(min = 620.dp)) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(rowBg)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${row.rank}.",
-                            modifier = Modifier.width(42.dp),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
+                        Text("Pl.", modifier = Modifier.width(38.dp), fontWeight = FontWeight.Bold)
+                        Text("Mannschaft", modifier = Modifier.width(180.dp), fontWeight = FontWeight.Bold)
+                        Text("Sp.", modifier = Modifier.width(42.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                        Text("S", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                        Text("U", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                        Text("N", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                        Text("Tore", modifier = Modifier.width(80.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                        Text("Diff.", modifier = Modifier.width(56.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                        Text("Punkte", modifier = Modifier.width(70.dp), textAlign = TextAlign.End, fontWeight = FontWeight.Bold)
+                    }
+
+                    standings.forEach { row ->
+                        val rowBg = if (row.isOwnTeam) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(rowBg)
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = row.teamName,
-                                fontWeight = if (row.isOwnTeam) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                color = if (row.isOwnTeam) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                text = "${row.rank}.",
+                                modifier = Modifier.width(38.dp),
+                                fontWeight = FontWeight.Bold
                             )
+                            Column(modifier = Modifier.width(180.dp)) {
+                                Text(
+                                    text = row.teamName,
+                                    fontWeight = if (row.isOwnTeam) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                    color = if (row.isOwnTeam) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = row.location,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text("${row.gamesPlayed}", modifier = Modifier.width(42.dp), textAlign = TextAlign.Center)
+                            Text("${row.wins}", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
+                            Text("${row.draws}", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
+                            Text("${row.losses}", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
+                            Text(row.goalsFormatted, modifier = Modifier.width(80.dp), textAlign = TextAlign.Center)
+                            val diffStr = if (row.goalDifference > 0) "+${row.goalDifference}" else "${row.goalDifference}"
+                            Text(diffStr, modifier = Modifier.width(56.dp), textAlign = TextAlign.Center)
                             Text(
-                                text = row.location,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = row.pointsFormatted,
+                                modifier = Modifier.width(70.dp),
+                                textAlign = TextAlign.End,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        Text("${row.gamesPlayed}", modifier = Modifier.width(46.dp), textAlign = TextAlign.Center)
-                        Text("${row.wins}", modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                        Text("${row.draws}", modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                        Text("${row.losses}", modifier = Modifier.width(40.dp), textAlign = TextAlign.Center)
-                        Text(row.goalsFormatted, modifier = Modifier.width(84.dp), textAlign = TextAlign.Center)
-                        val diffStr = if (row.goalDifference > 0) "+${row.goalDifference}" else "${row.goalDifference}"
-                        Text(diffStr, modifier = Modifier.width(64.dp), textAlign = TextAlign.Center)
-                        Text(
-                            text = row.pointsFormatted,
-                            modifier = Modifier.width(76.dp),
-                            textAlign = TextAlign.End,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
     }
 }

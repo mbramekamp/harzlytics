@@ -2,6 +2,7 @@ package com.handball.stattracker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.handball.stattracker.model.*
 import com.handball.stattracker.repository.HandballRepository
@@ -245,6 +247,8 @@ private fun RosterListPanel(
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -347,7 +351,7 @@ private fun PlayerProfileDetailPanel(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(if (isWideScreen) 20.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Profil-Kopfbereich
@@ -365,8 +369,9 @@ private fun PlayerProfileDetailPanel(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         if (showBackButton) {
                             IconButton(onClick = onBack) {
@@ -374,48 +379,69 @@ private fun PlayerProfileDetailPanel(
                             }
                         }
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.primary
                         ) {
                             Text(
-                                text = if (player.role == PlayerRole.COACH) "COACH" else "#${player.jerseyNumberHomeKit ?: "-"}",
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                text = if (player.role == PlayerRole.COACH) "TR" else "#${player.jerseyNumberHomeKit ?: "-"}",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
                         }
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = player.fullName,
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = if (isWideScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = "${player.role.label} • $positionName",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            repository.deletePlayer(player.playerId)
-                            onDeleted()
+                    if (isWideScreen) {
+                        OutlinedButton(
+                            onClick = {
+                                repository.deletePlayer(player.playerId)
+                                onDeleted()
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Entfernen")
                         }
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = null)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Entfernen")
+                    } else {
+                        IconButton(
+                            onClick = {
+                                repository.deletePlayer(player.playerId)
+                                onDeleted()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Spieler entfernen",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
 
                 // Stammdaten-Zeile (Trikots, Plus/Minus, Einsatzzeit & E-Mail)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (player.role != PlayerRole.COACH) {
                         AssistChip(
@@ -454,9 +480,11 @@ private fun PlayerProfileDetailPanel(
                 PlayerProfileTab.entries.forEach { tab ->
                     val isSelected = activeTab == tab
                     val tabLabel = if (tab == PlayerProfileTab.PERFORMANCE && player.role == PlayerRole.COACH) {
-                        "Performance & Spieler-Ranking"
+                        if (isWideScreen) "Performance & Spieler-Ranking" else "Ranking"
+                    } else if (tab == PlayerProfileTab.PERFORMANCE) {
+                        if (isWideScreen) "Performance & Ranking" else "Performance"
                     } else {
-                        tab.label
+                        if (isWideScreen) "Übersicht & Spiele" else "Übersicht"
                     }
                     Surface(
                         modifier = Modifier
@@ -466,7 +494,7 @@ private fun PlayerProfileDetailPanel(
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0f)
                     ) {
                         Row(
-                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -476,12 +504,14 @@ private fun PlayerProfileDetailPanel(
                                 modifier = Modifier.size(18.dp),
                                 tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(6.dp))
                             Text(
                                 text = tabLabel,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -491,6 +521,9 @@ private fun PlayerProfileDetailPanel(
 
         // Saison-Filter
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -528,92 +561,198 @@ private fun PlayerProfileDetailPanel(
 
             when (player.role) {
                 PlayerRole.FIELD_PLAYER -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Tore / Würfe",
-                            value = "${stats.totalGoals} / ${stats.totalShots}",
-                            sub = "Quote: ${stats.shotAccuracyPercent}%"
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "+/- & Spielzeit",
-                            value = stats.plusMinusFormatted,
-                            sub = stats.totalPlayingTimeFormatted
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "7-Meter",
-                            value = "${stats.totalPenaltyGoals} / ${stats.totalPenaltyAttempts}",
-                            sub = "${stats.penaltyAccuracyPercent}% (${stats.totalPenaltiesDrawn} gez.)"
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Assists & Abwehr",
-                            value = "${stats.totalAssists} A / ${stats.totalSteals + stats.totalBlocks} Abw",
-                            sub = "${stats.totalTechnicalMistakes} TF • ${stats.totalTwoMin}× 2Min"
-                        )
+                    if (isWideScreen) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Tore / Würfe",
+                                value = "${stats.totalGoals} / ${stats.totalShots}",
+                                sub = "Quote: ${stats.shotAccuracyPercent}%"
+                            )
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "+/- & Spielzeit",
+                                value = stats.plusMinusFormatted,
+                                sub = stats.totalPlayingTimeFormatted
+                            )
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "7-Meter",
+                                value = "${stats.totalPenaltyGoals} / ${stats.totalPenaltyAttempts}",
+                                sub = "${stats.penaltyAccuracyPercent}% (${stats.totalPenaltiesDrawn} gez.)"
+                            )
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Assists & Abwehr",
+                                value = "${stats.totalAssists} A / ${stats.totalSteals + stats.totalBlocks} Abw",
+                                sub = "${stats.totalTechnicalMistakes} TF • ${stats.totalTwoMin}× 2Min"
+                            )
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "Tore / Würfe",
+                                    value = "${stats.totalGoals} / ${stats.totalShots}",
+                                    sub = "Quote: ${stats.shotAccuracyPercent}%"
+                                )
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "+/- & Spielzeit",
+                                    value = stats.plusMinusFormatted,
+                                    sub = stats.totalPlayingTimeFormatted
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "7-Meter",
+                                    value = "${stats.totalPenaltyGoals} / ${stats.totalPenaltyAttempts}",
+                                    sub = "${stats.penaltyAccuracyPercent}% (${stats.totalPenaltiesDrawn} gez.)"
+                                )
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "Assists & Abwehr",
+                                    value = "${stats.totalAssists} A / ${stats.totalSteals + stats.totalBlocks} Abw",
+                                    sub = "${stats.totalTechnicalMistakes} TF • ${stats.totalTwoMin}× 2Min"
+                                )
+                            }
+                        }
                     }
                 }
 
                 PlayerRole.GOALKEEPER -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Paraden / Gegentore",
-                            value = "${stats.totalSaves} / ${stats.totalGoalsConceded}",
-                            sub = "Fangquote: ${stats.savePercentage}%"
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "+/- & Spielzeit",
-                            value = stats.plusMinusFormatted,
-                            sub = stats.totalPlayingTimeFormatted
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "7m-Paraden",
-                            value = "${stats.totalPenaltiesSaved} / ${stats.totalPenaltiesSaved + stats.totalPenaltiesConceded}",
-                            sub = "Quote: ${stats.penaltySavePercentage}%"
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Gegenstoßpässe",
-                            value = "${stats.totalFastBreakPassesSuccess} / ${stats.totalFastBreakPassesAttempted}",
-                            sub = "Quote: ${stats.fastBreakPassPercentage}%"
-                        )
+                    if (isWideScreen) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Paraden / Gegentore",
+                                value = "${stats.totalSaves} / ${stats.totalGoalsConceded}",
+                                sub = "Fangquote: ${stats.savePercentage}%"
+                            )
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "+/- & Spielzeit",
+                                value = stats.plusMinusFormatted,
+                                sub = stats.totalPlayingTimeFormatted
+                            )
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "7m-Paraden",
+                                value = "${stats.totalPenaltiesSaved} / ${stats.totalPenaltiesSaved + stats.totalPenaltiesConceded}",
+                                sub = "Quote: ${stats.penaltySavePercentage}%"
+                            )
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Gegenstoßpässe",
+                                value = "${stats.totalFastBreakPassesSuccess} / ${stats.totalFastBreakPassesAttempted}",
+                                sub = "Quote: ${stats.fastBreakPassPercentage}%"
+                            )
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "Paraden / Gegentore",
+                                    value = "${stats.totalSaves} / ${stats.totalGoalsConceded}",
+                                    sub = "Fangquote: ${stats.savePercentage}%"
+                                )
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "+/- & Spielzeit",
+                                    value = stats.plusMinusFormatted,
+                                    sub = stats.totalPlayingTimeFormatted
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "7m-Paraden",
+                                    value = "${stats.totalPenaltiesSaved} / ${stats.totalPenaltiesSaved + stats.totalPenaltiesConceded}",
+                                    sub = "Quote: ${stats.penaltySavePercentage}%"
+                                )
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "Gegenstoßpässe",
+                                    value = "${stats.totalFastBreakPassesSuccess} / ${stats.totalFastBreakPassesAttempted}",
+                                    sub = "Quote: ${stats.fastBreakPassPercentage}%"
+                                )
+                            }
+                        }
                     }
                 }
 
                 PlayerRole.COACH -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Spiele",
-                            value = "${stats.gamesAttended}",
-                            sub = "Trainerbank"
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Auszeiten",
-                            value = "${stats.totalTimeoutsTaken}",
-                            sub = "Team-Timeouts"
-                        )
-                        ProfileStatBox(
-                            modifier = Modifier.weight(1f),
-                            label = "Strafen",
-                            value = "${stats.yellowCards} Gelb / ${stats.totalTwoMin}× 2Min",
-                            sub = "Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
-                        )
+                    if (isWideScreen) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Spiele",
+                                value = "${stats.gamesAttended}",
+                                sub = "Trainerbank"
+                            )
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Auszeiten",
+                                value = "${stats.totalTimeoutsTaken}",
+                                sub = "Team-Timeouts"
+                            )
+                            ProfileStatBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Strafen",
+                                value = "${stats.yellowCards} Gelb / ${stats.totalTwoMin}× 2Min",
+                                sub = "Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
+                            )
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "Spiele",
+                                    value = "${stats.gamesAttended}",
+                                    sub = "Trainerbank"
+                                )
+                                ProfileStatBox(
+                                    modifier = Modifier.weight(1f),
+                                    label = "Auszeiten",
+                                    value = "${stats.totalTimeoutsTaken}",
+                                    sub = "Team-Timeouts"
+                                )
+                            }
+                            ProfileStatBox(
+                                modifier = Modifier.fillMaxWidth(),
+                                label = "Strafen",
+                                value = "${stats.yellowCards} Gelb / ${stats.totalTwoMin}× 2Min",
+                                sub = "Rot: ${stats.redCards} • Blau: ${stats.blueCards}"
+                            )
+                        }
                     }
                 }
             }
@@ -642,11 +781,14 @@ private fun PlayerProfileDetailPanel(
                     PlayerGameHistoryCard(
                         entry = entry,
                         role = player.role,
+                        isWideScreen = isWideScreen,
                         onClick = { onNavigateToGame(entry.game.gameId) }
                     )
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -690,6 +832,7 @@ private fun ProfileStatBox(
 private fun PlayerGameHistoryCard(
     entry: PlayerGameHistoryEntry,
     role: PlayerRole,
+    isWideScreen: Boolean,
     onClick: () -> Unit
 ) {
     Card(
@@ -701,62 +844,132 @@ private fun PlayerGameHistoryCard(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = entry.matchupTitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${entry.game.gameDate} • ${entry.seasonName} • ${entry.game.location}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
+            if (isWideScreen) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (role != PlayerRole.COACH) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = entry.matchupTitle,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${entry.game.gameDate} • ${entry.seasonName} • ${entry.game.location}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (role != PlayerRole.COACH) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = "+/- ${entry.playerGame.plusMinusFormatted} • ${entry.playerGame.playingTimeFormatted}",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
+                            shape = RoundedCornerShape(8.dp),
+                            color = when (entry.outcomeBadge) {
+                                "S" -> MaterialTheme.colorScheme.tertiaryContainer
+                                "U" -> MaterialTheme.colorScheme.secondaryContainer
+                                else -> MaterialTheme.colorScheme.errorContainer
+                            }
                         ) {
                             Text(
-                                text = "+/- ${entry.playerGame.plusMinusFormatted} • ${entry.playerGame.playingTimeFormatted}",
+                                text = entry.outcomeBadge,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = when (entry.outcomeBadge) {
-                            "S" -> MaterialTheme.colorScheme.tertiaryContainer
-                            "U" -> MaterialTheme.colorScheme.secondaryContainer
-                            else -> MaterialTheme.colorScheme.errorContainer
-                        }
-                    ) {
                         Text(
-                            text = entry.outcomeBadge,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelMedium,
+                            text = entry.resultFormatted,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Text(
-                        text = entry.resultFormatted,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = entry.matchupTitle,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = when (entry.outcomeBadge) {
+                                    "S" -> MaterialTheme.colorScheme.tertiaryContainer
+                                    "U" -> MaterialTheme.colorScheme.secondaryContainer
+                                    else -> MaterialTheme.colorScheme.errorContainer
+                                }
+                            ) {
+                                Text(
+                                    text = entry.outcomeBadge,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = entry.resultFormatted,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${entry.game.gameDate} • ${entry.game.location}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (role != PlayerRole.COACH) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = "+/- ${entry.playerGame.plusMinusFormatted} • ${entry.playerGame.playingTimeFormatted}",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

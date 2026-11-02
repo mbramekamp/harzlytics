@@ -50,6 +50,7 @@ fun SeasonScreen(
     snapshot: DatabaseSnapshot,
     selectedSeasonId: Int,
     selectedGameId: Int?,
+    isWideScreen: Boolean = true,
     onSelectSeason: (Int) -> Unit,
     onSelectGame: (Int?) -> Unit,
     onNavigateToPlayer: (Int) -> Unit,
@@ -62,6 +63,7 @@ fun SeasonScreen(
             repository = repository,
             snapshot = snapshot,
             game = activeGame,
+            isWideScreen = isWideScreen,
             onBack = { onSelectGame(null) },
             onNavigateToPlayer = onNavigateToPlayer
         )
@@ -88,7 +90,7 @@ fun SeasonScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(if (isWideScreen) 20.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Saison-Auswahlleiste + Neue Saison / Neues Spiel Buttons
@@ -97,45 +99,86 @@ fun SeasonScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(if (isWideScreen) 16.dp else 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = activeSeason?.division ?: "Saison-Übersicht",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (activeSeason != null) {
+                if (isWideScreen) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
                             Text(
-                                text = "${activeSeason.startOfSeason} – ${activeSeason.endOfSeason}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = activeSeason?.division ?: "Saison-Übersicht",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
                             )
+                            if (activeSeason != null) {
+                                Text(
+                                    text = "${activeSeason.startOfSeason} – ${activeSeason.endOfSeason}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = onOpenNewSeasonDialog) {
+                                Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Saison")
+                            }
+                            Button(onClick = onOpenNewGameDialog) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Spiel")
+                            }
                         }
                     }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onOpenNewSeasonDialog) {
-                            Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Saison")
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column {
+                            Text(
+                                text = activeSeason?.division ?: "Saison-Übersicht",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (activeSeason != null) {
+                                Text(
+                                    text = "${activeSeason.startOfSeason} – ${activeSeason.endOfSeason}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                        Button(onClick = onOpenNewGameDialog) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Spiel")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                modifier = Modifier.weight(1f),
+                                onClick = onOpenNewSeasonDialog
+                            ) {
+                                Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Saison")
+                            }
+                            Button(
+                                modifier = Modifier.weight(1f),
+                                onClick = onOpenNewGameDialog
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Spiel")
+                            }
                         }
                     }
                 }
 
                 // Saison-Chips
                 Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -149,7 +192,10 @@ fun SeasonScreen(
                 }
 
                 // Spiel-Filter
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     FilterChip(
                         selected = filterMode == 0,
                         onClick = { filterMode = 0 },
@@ -279,6 +325,8 @@ fun SeasonScreen(
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -299,6 +347,7 @@ private fun GameInteractiveDashboard(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
     game: Game,
+    isWideScreen: Boolean,
     onBack: () -> Unit,
     onNavigateToPlayer: (Int) -> Unit
 ) {
@@ -386,7 +435,7 @@ private fun GameInteractiveDashboard(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(18.dp),
+                .padding(if (isWideScreen) 18.dp else 10.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // 1. Scoreboard + Match Clock Card
@@ -394,6 +443,7 @@ private fun GameInteractiveDashboard(
                 repository = repository,
                 snapshot = snapshot,
                 game = game,
+                isWideScreen = isWideScreen,
                 isEditMode = isEditMode,
                 isClockRunning = isClockRunning,
                 autoSyncScore = autoSyncScore,
@@ -423,28 +473,58 @@ private fun GameInteractiveDashboard(
             } else {
                 // 2. Tab-Auswahl
                 val maxTabIdx = if (isEditMode) 3 else 2
-                SecondaryTabRow(selectedTabIndex = activeTab.coerceIn(0, maxTabIdx)) {
-                    Tab(
-                        selected = activeTab == 0,
-                        onClick = { activeTab = 0 },
-                        text = { Text("Aufstellung (${onCourtParticipants.size}/7)") }
-                    )
-                    Tab(
-                        selected = activeTab == 1,
-                        onClick = { activeTab = 1 },
-                        text = { Text("Verlauf & Protokoll (${gameLogs.size})") }
-                    )
-                    Tab(
-                        selected = activeTab == 2,
-                        onClick = { activeTab = 2 },
-                        text = { Text("Trainer & Auszeiten (${coachParticipants.size})") }
-                    )
-                    if (isEditMode) {
+                if (isWideScreen) {
+                    SecondaryTabRow(selectedTabIndex = activeTab.coerceIn(0, maxTabIdx)) {
                         Tab(
-                            selected = activeTab == 3,
-                            onClick = { activeTab = 3 },
-                            text = { Text("Kader (${gamePlayerGames.size})") }
+                            selected = activeTab == 0,
+                            onClick = { activeTab = 0 },
+                            text = { Text("Aufstellung (${onCourtParticipants.size}/7)") }
                         )
+                        Tab(
+                            selected = activeTab == 1,
+                            onClick = { activeTab = 1 },
+                            text = { Text("Verlauf & Protokoll (${gameLogs.size})") }
+                        )
+                        Tab(
+                            selected = activeTab == 2,
+                            onClick = { activeTab = 2 },
+                            text = { Text("Trainer & Auszeiten (${coachParticipants.size})") }
+                        )
+                        if (isEditMode) {
+                            Tab(
+                                selected = activeTab == 3,
+                                onClick = { activeTab = 3 },
+                                text = { Text("Kader (${gamePlayerGames.size})") }
+                            )
+                        }
+                    }
+                } else {
+                    ScrollableTabRow(
+                        selectedTabIndex = activeTab.coerceIn(0, maxTabIdx),
+                        edgePadding = 8.dp
+                    ) {
+                        Tab(
+                            selected = activeTab == 0,
+                            onClick = { activeTab = 0 },
+                            text = { Text("Aufstellung (${onCourtParticipants.size}/7)") }
+                        )
+                        Tab(
+                            selected = activeTab == 1,
+                            onClick = { activeTab = 1 },
+                            text = { Text("Verlauf & Protokoll (${gameLogs.size})") }
+                        )
+                        Tab(
+                            selected = activeTab == 2,
+                            onClick = { activeTab = 2 },
+                            text = { Text("Trainer & Auszeiten (${coachParticipants.size})") }
+                        )
+                        if (isEditMode) {
+                            Tab(
+                                selected = activeTab == 3,
+                                onClick = { activeTab = 3 },
+                                text = { Text("Kader (${gamePlayerGames.size})") }
+                            )
+                        }
                     }
                 }
 
@@ -536,6 +616,8 @@ private fun GameInteractiveDashboard(
                         )
                     }
                 }
+
+                Spacer(Modifier.height(24.dp))
             }
         }
     }
@@ -557,6 +639,7 @@ private fun ScoreboardAndMatchClockCard(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
     game: Game,
+    isWideScreen: Boolean,
     isEditMode: Boolean,
     isClockRunning: Boolean,
     autoSyncScore: Boolean,
@@ -580,60 +663,138 @@ private fun ScoreboardAndMatchClockCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Obere Aktionsleiste
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Zurück")
-                }
+            if (isWideScreen) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Zurück")
+                    }
 
-                Text(
-                    text = "${game.gameDate} • ${game.location} • ${game.gameType}",
-                    style = MaterialTheme.typography.labelLarge
-                )
+                    Text(
+                        text = "${game.gameDate} • ${game.location} • ${game.gameType}",
+                        style = MaterialTheme.typography.labelLarge
+                    )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (isEditMode) {
-                        if (game.isOwnTeamGame) {
-                            OutlinedButton(onClick = onApplyStartingSeven) {
-                                Icon(Icons.Default.Groups, contentDescription = null)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (isEditMode) {
+                            if (game.isOwnTeamGame) {
+                                OutlinedButton(onClick = onApplyStartingSeven) {
+                                    Icon(Icons.Default.Groups, contentDescription = null)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Startsieben")
+                                }
+                            }
+                            OutlinedButton(onClick = onOpenDirectScoreDialog) {
+                                Icon(Icons.Default.EditNote, contentDescription = null)
                                 Spacer(Modifier.width(4.dp))
-                                Text("Startsieben")
+                                Text("Spielstand")
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    repository.deleteGame(game.gameId)
+                                    onBack()
+                                }
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Spiel löschen")
+                            }
+                            Button(
+                                onClick = onToggleEditMode,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiary,
+                                    contentColor = MaterialTheme.colorScheme.onTertiary
+                                )
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Fertig")
+                            }
+                        } else {
+                            Button(onClick = onToggleEditMode) {
+                                Icon(Icons.Default.Edit, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Bearbeiten")
                             }
                         }
-                        OutlinedButton(onClick = onOpenDirectScoreDialog) {
-                            Icon(Icons.Default.EditNote, contentDescription = null)
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                             Spacer(Modifier.width(4.dp))
-                            Text("Spielstand")
+                            Text("Zurück")
                         }
-                        OutlinedButton(
-                            onClick = {
-                                repository.deleteGame(game.gameId)
-                                onBack()
+
+                        if (isEditMode) {
+                            Button(
+                                onClick = onToggleEditMode,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiary,
+                                    contentColor = MaterialTheme.colorScheme.onTertiary
+                                )
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Fertig")
                             }
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Spiel löschen")
+                        } else {
+                            Button(onClick = onToggleEditMode) {
+                                Icon(Icons.Default.Edit, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Bearbeiten")
+                            }
                         }
-                        Button(
-                            onClick = onToggleEditMode,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiary,
-                                contentColor = MaterialTheme.colorScheme.onTertiary
-                            )
+                    }
+
+                    Text(
+                        text = "${game.gameDate} • ${game.location} • ${game.gameType}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+
+                    if (isEditMode) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Check, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Fertig")
-                        }
-                    } else {
-                        Button(onClick = onToggleEditMode) {
-                            Icon(Icons.Default.Edit, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Bearbeiten")
+                            if (game.isOwnTeamGame) {
+                                OutlinedButton(onClick = onApplyStartingSeven) {
+                                    Icon(Icons.Default.Groups, contentDescription = null)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Startsieben")
+                                }
+                            }
+                            OutlinedButton(onClick = onOpenDirectScoreDialog) {
+                                Icon(Icons.Default.EditNote, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Spielstand")
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    repository.deleteGame(game.gameId)
+                                    onBack()
+                                }
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Spiel löschen")
+                                Spacer(Modifier.width(4.dp))
+                                Text("Löschen")
+                            }
                         }
                     }
                 }
@@ -649,94 +810,210 @@ private fun ScoreboardAndMatchClockCard(
                 if (game.isHomeGame) opp1Name else snapshot.ownClubName
             } else opp2Name
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Heim-Team
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text("HEIM", style = MaterialTheme.typography.labelSmall)
-                    Text(homeName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(top = 6.dp)
-                    ) {
-                        if (isEditMode) {
-                            FilledTonalIconButton(
-                                onClick = {
-                                    repository.updateGameScores(
-                                        game.gameId,
-                                        game.homeTeamScore - 1,
-                                        game.awayTeamScore,
-                                        game.homeTeamHalftimeScore,
-                                        game.awayTeamHalftimeScore
-                                    )
+            if (isWideScreen) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Heim-Team
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text("HEIM", style = MaterialTheme.typography.labelSmall)
+                        Text(homeName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 6.dp)
+                        ) {
+                            if (isEditMode) {
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        repository.updateGameScores(
+                                            game.gameId,
+                                            game.homeTeamScore - 1,
+                                            game.awayTeamScore,
+                                            game.homeTeamHalftimeScore,
+                                            game.awayTeamHalftimeScore
+                                        )
+                                    }
+                                ) {
+                                    Text("-1", fontWeight = FontWeight.Bold)
                                 }
-                            ) {
-                                Text("-1", fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                text = "${game.homeTeamScore}",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            if (isEditMode) {
+                                FilledIconButton(
+                                    onClick = {
+                                        repository.updateGameScores(
+                                            game.gameId,
+                                            game.homeTeamScore + 1,
+                                            game.awayTeamScore,
+                                            game.homeTeamHalftimeScore,
+                                            game.awayTeamHalftimeScore
+                                        )
+                                    }
+                                ) {
+                                    Text("+1", fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
-                        Text(
-                            text = "${game.homeTeamScore}",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        if (isEditMode) {
-                            FilledIconButton(
-                                onClick = {
-                                    repository.updateGameScores(
-                                        game.gameId,
-                                        game.homeTeamScore + 1,
-                                        game.awayTeamScore,
-                                        game.homeTeamHalftimeScore,
-                                        game.awayTeamHalftimeScore
+                    }
+
+                    // Spieluhr (00:00 - 60:00) + Halbzeitstand in der Mitte
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = game.elapsedFormatted,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "${game.currentMinute}. Min",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                            ) {
-                                Text("+1", fontWeight = FontWeight.Bold)
+                                if (isEditMode) {
+                                    FilledIconButton(
+                                        onClick = onToggleClockRunning,
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = if (isClockRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isClockRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            contentDescription = if (isClockRunning) "Uhr pausieren" else "Uhr starten",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = "HZ ${game.homeTeamHalftimeScore} : ${game.awayTeamHalftimeScore}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    // Gast-Team
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text("GAST", style = MaterialTheme.typography.labelSmall)
+                        Text(awayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 6.dp)
+                        ) {
+                            if (isEditMode) {
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        repository.updateGameScores(
+                                            game.gameId,
+                                            game.homeTeamScore,
+                                            game.awayTeamScore - 1,
+                                            game.homeTeamHalftimeScore,
+                                            game.awayTeamHalftimeScore
+                                        )
+                                    }
+                                ) {
+                                    Text("-1", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Text(
+                                text = "${game.awayTeamScore}",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            if (isEditMode) {
+                                FilledIconButton(
+                                    onClick = {
+                                        repository.updateGameScores(
+                                            game.gameId,
+                                            game.homeTeamScore,
+                                            game.awayTeamScore + 1,
+                                            game.homeTeamHalftimeScore,
+                                            game.awayTeamHalftimeScore
+                                        )
+                                    }
+                                ) {
+                                    Text("+1", fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
                 }
-
-                // Spieluhr (00:00 - 60:00) + Halbzeitstand in der Mitte
+            } else {
+                // Mobile: Spieluhr & Halbzeit oben zentriert, darunter Heim & Gast nebeneinander
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Timer,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                                 Text(
                                     text = game.elapsedFormatted,
-                                    style = MaterialTheme.typography.headlineSmall,
+                                    style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "${game.currentMinute}. Min",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    text = "(${game.currentMinute}. Min)",
+                                    style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            Text(
+                                text = "HZ ${game.homeTeamHalftimeScore} : ${game.awayTeamHalftimeScore}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
                             if (isEditMode) {
                                 FilledIconButton(
                                     onClick = onToggleClockRunning,
+                                    modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.filledIconButtonColors(
                                         containerColor = if (isClockRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
                                     )
@@ -744,91 +1021,176 @@ private fun ScoreboardAndMatchClockCard(
                                     Icon(
                                         imageVector = if (isClockRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
                                         contentDescription = if (isClockRunning) "Uhr pausieren" else "Uhr starten",
-                                        tint = Color.White
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
                         }
                     }
 
-                    Text(
-                        text = "HZ ${game.homeTeamHalftimeScore} : ${game.awayTeamHalftimeScore}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    if (isEditMode) {
-                        // Schnell-Steuerung für die Spieluhr (-1m, -10s, +10s, +1m, HZ 30:00)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Heim-Team Panel
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                         ) {
-                            AssistChip(onClick = { onAdjustClock(-60) }, label = { Text("-1m") })
-                            AssistChip(onClick = { onAdjustClock(-10) }, label = { Text("-10s") })
-                            AssistChip(onClick = { onAdjustClock(10) }, label = { Text("+10s") })
-                            AssistChip(onClick = { onAdjustClock(60) }, label = { Text("+1m") })
-                            AssistChip(onClick = { onSetClock(1800) }, label = { Text("HZ 30:00") })
-                            AssistChip(
-                                onClick = {
-                                    repository.updateGameScores(
-                                        game.gameId,
-                                        game.homeTeamScore,
-                                        game.awayTeamScore,
-                                        game.homeTeamScore,
-                                        game.awayTeamScore
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("HEIM", style = MaterialTheme.typography.labelSmall)
+                                Text(
+                                    text = homeName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (isEditMode) {
+                                        FilledTonalIconButton(
+                                            onClick = {
+                                                repository.updateGameScores(
+                                                    game.gameId,
+                                                    game.homeTeamScore - 1,
+                                                    game.awayTeamScore,
+                                                    game.homeTeamHalftimeScore,
+                                                    game.awayTeamHalftimeScore
+                                                )
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Text("-1", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                    Text(
+                                        text = "${game.homeTeamScore}",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.ExtraBold
                                     )
-                                },
-                                label = { Text("Stand -> HZ") }
-                            )
+                                    if (isEditMode) {
+                                        FilledIconButton(
+                                            onClick = {
+                                                repository.updateGameScores(
+                                                    game.gameId,
+                                                    game.homeTeamScore + 1,
+                                                    game.awayTeamScore,
+                                                    game.homeTeamHalftimeScore,
+                                                    game.awayTeamHalftimeScore
+                                                )
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Text("+1", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Gast-Team Panel
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("GAST", style = MaterialTheme.typography.labelSmall)
+                                Text(
+                                    text = awayName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (isEditMode) {
+                                        FilledTonalIconButton(
+                                            onClick = {
+                                                repository.updateGameScores(
+                                                    game.gameId,
+                                                    game.homeTeamScore,
+                                                    game.awayTeamScore - 1,
+                                                    game.homeTeamHalftimeScore,
+                                                    game.awayTeamHalftimeScore
+                                                )
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Text("-1", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                    Text(
+                                        text = "${game.awayTeamScore}",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                    if (isEditMode) {
+                                        FilledIconButton(
+                                            onClick = {
+                                                repository.updateGameScores(
+                                                    game.gameId,
+                                                    game.homeTeamScore,
+                                                    game.awayTeamScore + 1,
+                                                    game.homeTeamHalftimeScore,
+                                                    game.awayTeamHalftimeScore
+                                                )
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Text("+1", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+            }
 
-                // Gast-Team
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text("GAST", style = MaterialTheme.typography.labelSmall)
-                    Text(awayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(top = 6.dp)
-                    ) {
-                        if (isEditMode) {
-                            FilledTonalIconButton(
-                                onClick = {
-                                    repository.updateGameScores(
-                                        game.gameId,
-                                        game.homeTeamScore,
-                                        game.awayTeamScore - 1,
-                                        game.homeTeamHalftimeScore,
-                                        game.awayTeamHalftimeScore
-                                    )
-                                }
-                            ) {
-                                Text("-1", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        Text(
-                            text = "${game.awayTeamScore}",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        if (isEditMode) {
-                            FilledIconButton(
-                                onClick = {
-                                    repository.updateGameScores(
-                                        game.gameId,
-                                        game.homeTeamScore,
-                                        game.awayTeamScore + 1,
-                                        game.homeTeamHalftimeScore,
-                                        game.awayTeamHalftimeScore
-                                    )
-                                }
-                            ) {
-                                Text("+1", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
+            // Schnell-Steuerung für die Spieluhr (-1m, -10s, +10s, +1m, HZ 30:00, Stand -> HZ)
+            if (isEditMode) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AssistChip(onClick = { onAdjustClock(-60) }, label = { Text("-1m") })
+                    AssistChip(onClick = { onAdjustClock(-10) }, label = { Text("-10s") })
+                    AssistChip(onClick = { onAdjustClock(10) }, label = { Text("+10s") })
+                    AssistChip(onClick = { onAdjustClock(60) }, label = { Text("+1m") })
+                    AssistChip(onClick = { onSetClock(1800) }, label = { Text("HZ 30:00") })
+                    AssistChip(
+                        onClick = {
+                            repository.updateGameScores(
+                                game.gameId,
+                                game.homeTeamScore,
+                                game.awayTeamScore,
+                                game.homeTeamScore,
+                                game.awayTeamScore
+                            )
+                        },
+                        label = { Text("Stand -> HZ") }
+                    )
                 }
             }
 
@@ -1015,56 +1377,124 @@ private fun SideBySideLineupAndBenchSection(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                if (isSideBySide) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.SportsHandball,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "AUF DEM FELD (${onCourtParticipants.size}/7)",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (activeFieldCount == 7 && activeKeeperCount == 0) {
-                                MaterialTheme.colorScheme.tertiary
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                text = "$activeFieldCount Feld + $activeKeeperCount TW",
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
+                            Icon(
+                                imageVector = Icons.Default.SportsHandball,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
                             )
+                            Text(
+                                text = "AUF DEM FELD (${onCourtParticipants.size}/7)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (activeFieldCount == 7 && activeKeeperCount == 0) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                }
+                            ) {
+                                Text(
+                                    text = "$activeFieldCount Feld + $activeKeeperCount TW",
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        if (isEditMode) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                FilledTonalButton(
+                                    onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = false) }
+                                ) {
+                                    Text("6+1")
+                                }
+                                OutlinedButton(
+                                    onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = true) }
+                                ) {
+                                    Text("7 Feld")
+                                }
+                            }
                         }
                     }
-
-                    if (isEditMode) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilledTonalButton(
-                                onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = false) }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("6+1")
+                                Icon(
+                                    imageVector = Icons.Default.SportsHandball,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "AUF DEM FELD (${onCourtParticipants.size}/7)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
-                            OutlinedButton(
-                                onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = true) }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (activeFieldCount == 7 && activeKeeperCount == 0) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                }
                             ) {
-                                Text("7 Feld")
+                                Text(
+                                    text = "$activeFieldCount Feld + $activeKeeperCount TW",
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        if (isEditMode) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                FilledTonalButton(
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                                    onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = false) }
+                                ) {
+                                    Text("6+1 Startsieben", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                OutlinedButton(
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                                    onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = true) }
+                                ) {
+                                    Text("7 Feldspieler", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
                     }
@@ -1105,6 +1535,7 @@ private fun SideBySideLineupAndBenchSection(
                             playerGame = pg,
                             stats = stats,
                             gameElapsedSeconds = game.elapsedSeconds,
+                            isWideScreen = isSideBySide,
                             isEditMode = isEditMode,
                             pendingSubInPlayer = pendingSubInPair?.second,
                             canSwapWithPending = canSwapWithPending,
@@ -1140,6 +1571,7 @@ private fun SideBySideLineupAndBenchSection(
                             playerGame = pg,
                             stats = stats,
                             gameElapsedSeconds = game.elapsedSeconds,
+                            isWideScreen = isSideBySide,
                             isEditMode = isEditMode,
                             pendingSubInPlayer = pendingSubInPair?.second,
                             canSwapWithPending = canSwapWithPending,
@@ -1240,6 +1672,7 @@ private fun SideBySideLineupAndBenchSection(
                             playerGame = pg,
                             stats = stats,
                             gameElapsedSeconds = game.elapsedSeconds,
+                            isWideScreen = isSideBySide,
                             isEditMode = isEditMode,
                             pendingSubInPlayer = null,
                             canSwapWithPending = false,
@@ -1263,6 +1696,7 @@ private fun SideBySideLineupAndBenchSection(
                             playerGame = pg,
                             stats = stats,
                             gameElapsedSeconds = game.elapsedSeconds,
+                            isWideScreen = isSideBySide,
                             isEditMode = isEditMode,
                             pendingSubInPlayer = null,
                             canSwapWithPending = false,
@@ -1861,6 +2295,7 @@ private fun FieldPlayerStatTrackerCard(
     playerGame: PlayerGame,
     stats: FieldPlayerGameStats,
     gameElapsedSeconds: Int,
+    isWideScreen: Boolean = true,
     isEditMode: Boolean,
     pendingSubInPlayer: Player?,
     canSwapWithPending: Boolean,
@@ -2104,118 +2539,253 @@ private fun FieldPlayerStatTrackerCard(
             }
 
             // Statistik-Werte (nur für aktive Spieler AUF DEM FELD sind +/- Buttons freigeschaltet)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "Tore",
-                    value = stats.goalsScored,
-                    isEditMode = canEditStats,
-                    onIncrement = {
-                        onUpdateStats {
-                            it.copy(
-                                goalsScored = it.goalsScored + 1,
-                                goalesAttempted = it.goalesAttempted + 1
-                            )
+            if (isWideScreen) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "Tore",
+                        value = stats.goalsScored,
+                        isEditMode = canEditStats,
+                        onIncrement = {
+                            onUpdateStats {
+                                it.copy(
+                                    goalsScored = it.goalsScored + 1,
+                                    goalesAttempted = it.goalesAttempted + 1
+                                )
+                            }
+                        },
+                        onDecrement = {
+                            onUpdateStats {
+                                it.copy(
+                                    goalsScored = (it.goalsScored - 1).coerceAtLeast(0),
+                                    goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(0)
+                                )
+                            }
                         }
-                    },
-                    onDecrement = {
-                        onUpdateStats {
-                            it.copy(
-                                goalsScored = (it.goalsScored - 1).coerceAtLeast(0),
-                                goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(0)
-                            )
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "Würfe",
+                        value = stats.goalesAttempted,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(goalesAttempted = it.goalesAttempted + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(it.goalsScored)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "7m-Tore",
+                        value = stats.penaltiesScored,
+                        isEditMode = canEditStats,
+                        onIncrement = {
+                            onUpdateStats {
+                                it.copy(
+                                    penaltiesScored = it.penaltiesScored + 1,
+                                    penaltiesAttempted = it.penaltiesAttempted + 1,
+                                    goalsScored = it.goalsScored + 1,
+                                    goalesAttempted = it.goalesAttempted + 1
+                                )
+                            }
+                        },
+                        onDecrement = {
+                            onUpdateStats {
+                                it.copy(
+                                    penaltiesScored = (it.penaltiesScored - 1).coerceAtLeast(0),
+                                    penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(0)
+                                )
+                            }
                         }
-                    }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "Würfe",
-                    value = stats.goalesAttempted,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(goalesAttempted = it.goalesAttempted + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(it.goalsScored)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "7m-Tore",
-                    value = stats.penaltiesScored,
-                    isEditMode = canEditStats,
-                    onIncrement = {
-                        onUpdateStats {
-                            it.copy(
-                                penaltiesScored = it.penaltiesScored + 1,
-                                penaltiesAttempted = it.penaltiesAttempted + 1,
-                                goalsScored = it.goalsScored + 1,
-                                goalesAttempted = it.goalesAttempted + 1
-                            )
-                        }
-                    },
-                    onDecrement = {
-                        onUpdateStats {
-                            it.copy(
-                                penaltiesScored = (it.penaltiesScored - 1).coerceAtLeast(0),
-                                penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(0)
-                            )
-                        }
-                    }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "7m-Vers.",
-                    value = stats.penaltiesAttempted,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(penaltiesAttempted = it.penaltiesAttempted + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(it.penaltiesScored)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "7m gez.",
-                    value = stats.penaltiesDrawn,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(penaltiesDrawn = it.penaltiesDrawn + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(penaltiesDrawn = (it.penaltiesDrawn - 1).coerceAtLeast(0)) } }
-                )
-            }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "7m-Vers.",
+                        value = stats.penaltiesAttempted,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(penaltiesAttempted = it.penaltiesAttempted + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(it.penaltiesScored)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "7m gez.",
+                        value = stats.penaltiesDrawn,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(penaltiesDrawn = it.penaltiesDrawn + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(penaltiesDrawn = (it.penaltiesDrawn - 1).coerceAtLeast(0)) } }
+                    )
+                }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "Assists",
-                    value = stats.assists,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(assists = it.assists + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(assists = (it.assists - 1).coerceAtLeast(0)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "Steals",
-                    value = stats.steals,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(steals = it.steals + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(steals = (it.steals - 1).coerceAtLeast(0)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "Blocks",
-                    value = stats.blocks,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(blocks = it.blocks + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(blocks = (it.blocks - 1).coerceAtLeast(0)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "Tech. Fehler",
-                    value = stats.technicalMistakes,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(technicalMistakes = it.technicalMistakes + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(technicalMistakes = (it.technicalMistakes - 1).coerceAtLeast(0)) } }
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "Assists",
+                        value = stats.assists,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(assists = it.assists + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(assists = (it.assists - 1).coerceAtLeast(0)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "Steals",
+                        value = stats.steals,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(steals = it.steals + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(steals = (it.steals - 1).coerceAtLeast(0)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "Blocks",
+                        value = stats.blocks,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(blocks = it.blocks + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(blocks = (it.blocks - 1).coerceAtLeast(0)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "Tech. Fehler",
+                        value = stats.technicalMistakes,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(technicalMistakes = it.technicalMistakes + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(technicalMistakes = (it.technicalMistakes - 1).coerceAtLeast(0)) } }
+                    )
+                }
+            } else {
+                // Mobile übersichtliche Anordnung
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Tore & Würfe
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Tore",
+                            value = stats.goalsScored,
+                            isEditMode = canEditStats,
+                            onIncrement = {
+                                onUpdateStats {
+                                    it.copy(
+                                        goalsScored = it.goalsScored + 1,
+                                        goalesAttempted = it.goalesAttempted + 1
+                                    )
+                                }
+                            },
+                            onDecrement = {
+                                onUpdateStats {
+                                    it.copy(
+                                        goalsScored = (it.goalsScored - 1).coerceAtLeast(0),
+                                        goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(0)
+                                    )
+                                }
+                            }
+                        )
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Würfe",
+                            value = stats.goalesAttempted,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(goalesAttempted = it.goalesAttempted + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(it.goalsScored)) } }
+                        )
+                    }
+
+                    // 7-Meter
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "7m-Tore",
+                            value = stats.penaltiesScored,
+                            isEditMode = canEditStats,
+                            onIncrement = {
+                                onUpdateStats {
+                                    it.copy(
+                                        penaltiesScored = it.penaltiesScored + 1,
+                                        penaltiesAttempted = it.penaltiesAttempted + 1,
+                                        goalsScored = it.goalsScored + 1,
+                                        goalesAttempted = it.goalesAttempted + 1
+                                    )
+                                }
+                            },
+                            onDecrement = {
+                                onUpdateStats {
+                                    it.copy(
+                                        penaltiesScored = (it.penaltiesScored - 1).coerceAtLeast(0),
+                                        penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(0)
+                                    )
+                                }
+                            }
+                        )
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "7m-Vers.",
+                            value = stats.penaltiesAttempted,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(penaltiesAttempted = it.penaltiesAttempted + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(it.penaltiesScored)) } }
+                        )
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "7m gez.",
+                            value = stats.penaltiesDrawn,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(penaltiesDrawn = it.penaltiesDrawn + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(penaltiesDrawn = (it.penaltiesDrawn - 1).coerceAtLeast(0)) } }
+                        )
+                    }
+
+                    // Spielgestaltung
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Assists",
+                            value = stats.assists,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(assists = it.assists + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(assists = (it.assists - 1).coerceAtLeast(0)) } }
+                        )
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Tech. Fehler",
+                            value = stats.technicalMistakes,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(technicalMistakes = it.technicalMistakes + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(technicalMistakes = (it.technicalMistakes - 1).coerceAtLeast(0)) } }
+                        )
+                    }
+
+                    // Abwehr
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Steals",
+                            value = stats.steals,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(steals = it.steals + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(steals = (it.steals - 1).coerceAtLeast(0)) } }
+                        )
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Blocks",
+                            value = stats.blocks,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(blocks = it.blocks + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(blocks = (it.blocks - 1).coerceAtLeast(0)) } }
+                        )
+                    }
+                }
             }
 
             if (canEditStats && showDirectEdit) {
@@ -2291,6 +2861,7 @@ private fun GoalKeeperStatTrackerCard(
     playerGame: PlayerGame,
     stats: GoalKeeperGameStats,
     gameElapsedSeconds: Int,
+    isWideScreen: Boolean = true,
     isEditMode: Boolean,
     pendingSubInPlayer: Player?,
     canSwapWithPending: Boolean,
@@ -2497,73 +3068,156 @@ private fun GoalKeeperStatTrackerCard(
             }
 
             // Alle 6 Felder aus GOAL_KEEPER_GAMESTATS (nur im aktiven Feld-Zustand editierbar)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "Paraden",
-                    value = stats.saves,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(saves = it.saves + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(saves = (it.saves - 1).coerceAtLeast(0)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "Gegentore",
-                    value = stats.goalesConceded,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(goalesConceded = it.goalesConceded + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(goalesConceded = (it.goalesConceded - 1).coerceAtLeast(0)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "7m geh.",
-                    value = stats.penaltiesSaved,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(penaltiesSaved = it.penaltiesSaved + 1, saves = it.saves + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(penaltiesSaved = (it.penaltiesSaved - 1).coerceAtLeast(0)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "7m-GT",
-                    value = stats.penaltiesConceded,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(penaltiesConceded = it.penaltiesConceded + 1, goalesConceded = it.goalesConceded + 1) } },
-                    onDecrement = { onUpdateStats { it.copy(penaltiesConceded = (it.penaltiesConceded - 1).coerceAtLeast(0)) } }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "TG-Pass",
-                    value = stats.sucessfulFastBreakPasses,
-                    isEditMode = canEditStats,
-                    onIncrement = {
-                        onUpdateStats {
-                            it.copy(
-                                sucessfulFastBreakPasses = it.sucessfulFastBreakPasses + 1,
-                                attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1
-                            )
+            if (isWideScreen) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "Paraden",
+                        value = stats.saves,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(saves = it.saves + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(saves = (it.saves - 1).coerceAtLeast(0)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "Gegentore",
+                        value = stats.goalesConceded,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(goalesConceded = it.goalesConceded + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(goalesConceded = (it.goalesConceded - 1).coerceAtLeast(0)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "7m geh.",
+                        value = stats.penaltiesSaved,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(penaltiesSaved = it.penaltiesSaved + 1, saves = it.saves + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(penaltiesSaved = (it.penaltiesSaved - 1).coerceAtLeast(0)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "7m-GT",
+                        value = stats.penaltiesConceded,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(penaltiesConceded = it.penaltiesConceded + 1, goalesConceded = it.goalesConceded + 1) } },
+                        onDecrement = { onUpdateStats { it.copy(penaltiesConceded = (it.penaltiesConceded - 1).coerceAtLeast(0)) } }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "TG-Pass",
+                        value = stats.sucessfulFastBreakPasses,
+                        isEditMode = canEditStats,
+                        onIncrement = {
+                            onUpdateStats {
+                                it.copy(
+                                    sucessfulFastBreakPasses = it.sucessfulFastBreakPasses + 1,
+                                    attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1
+                                )
+                            }
+                        },
+                        onDecrement = {
+                            onUpdateStats {
+                                it.copy(sucessfulFastBreakPasses = (it.sucessfulFastBreakPasses - 1).coerceAtLeast(0))
+                            }
                         }
-                    },
-                    onDecrement = {
-                        onUpdateStats {
-                            it.copy(sucessfulFastBreakPasses = (it.sucessfulFastBreakPasses - 1).coerceAtLeast(0))
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "TG-Vers.",
+                        value = stats.attemptedFastBreakPasses,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1) } },
+                        onDecrement = {
+                            onUpdateStats {
+                                it.copy(attemptedFastBreakPasses = (it.attemptedFastBreakPasses - 1).coerceAtLeast(it.sucessfulFastBreakPasses))
+                            }
                         }
+                    )
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Paraden",
+                            value = stats.saves,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(saves = it.saves + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(saves = (it.saves - 1).coerceAtLeast(0)) } }
+                        )
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "Gegentore",
+                            value = stats.goalesConceded,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(goalesConceded = it.goalesConceded + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(goalesConceded = (it.goalesConceded - 1).coerceAtLeast(0)) } }
+                        )
                     }
-                )
-                StatStepperBox(
-                    modifier = Modifier.weight(1f),
-                    label = "TG-Vers.",
-                    value = stats.attemptedFastBreakPasses,
-                    isEditMode = canEditStats,
-                    onIncrement = { onUpdateStats { it.copy(attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1) } },
-                    onDecrement = {
-                        onUpdateStats {
-                            it.copy(attemptedFastBreakPasses = (it.attemptedFastBreakPasses - 1).coerceAtLeast(it.sucessfulFastBreakPasses))
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "7m geh.",
+                            value = stats.penaltiesSaved,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(penaltiesSaved = it.penaltiesSaved + 1, saves = it.saves + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(penaltiesSaved = (it.penaltiesSaved - 1).coerceAtLeast(0)) } }
+                        )
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "7m-GT",
+                            value = stats.penaltiesConceded,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(penaltiesConceded = it.penaltiesConceded + 1, goalesConceded = it.goalesConceded + 1) } },
+                            onDecrement = { onUpdateStats { it.copy(penaltiesConceded = (it.penaltiesConceded - 1).coerceAtLeast(0)) } }
+                        )
                     }
-                )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "TG-Pass",
+                            value = stats.sucessfulFastBreakPasses,
+                            isEditMode = canEditStats,
+                            onIncrement = {
+                                onUpdateStats {
+                                    it.copy(
+                                        sucessfulFastBreakPasses = it.sucessfulFastBreakPasses + 1,
+                                        attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1
+                                    )
+                                }
+                            },
+                            onDecrement = {
+                                onUpdateStats {
+                                    it.copy(sucessfulFastBreakPasses = (it.sucessfulFastBreakPasses - 1).coerceAtLeast(0))
+                                }
+                            }
+                        )
+                        StatStepperBox(
+                            modifier = Modifier.weight(1f),
+                            label = "TG-Vers.",
+                            value = stats.attemptedFastBreakPasses,
+                            isEditMode = canEditStats,
+                            onIncrement = { onUpdateStats { it.copy(attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1) } },
+                            onDecrement = {
+                                onUpdateStats {
+                                    it.copy(attemptedFastBreakPasses = (it.attemptedFastBreakPasses - 1).coerceAtLeast(it.sucessfulFastBreakPasses))
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -2860,9 +3514,9 @@ private fun StatStepperBox(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
     ) {
         Column(
-            modifier = Modifier.padding(6.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = label,
@@ -2876,32 +3530,37 @@ private fun StatStepperBox(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.clickable(onClick = onDecrement)
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(6.dp))
+                            .clickable(onClick = onDecrement),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = " - ",
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                            text = "−",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Text(
                         text = "$value",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 2.dp)
                     )
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onIncrement)
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
+                            .clickable(onClick = onIncrement),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = " + ",
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold
+                            text = "+",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
@@ -2932,7 +3591,10 @@ private fun DirectScoreEditDialog(
         onDismissRequest = onDismiss,
         title = { Text("Spielstand direkt bearbeiten") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = homeScore,

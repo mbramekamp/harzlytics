@@ -57,6 +57,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 ## 3. Modul- und Dateistruktur
 
 - **`gradle/libs.versions.toml`**: Version Catalog (`Kotlin 2.4.21`, `Compose Multiplatform 1.12.2`, `SQLDelight 2.4.1`, `Ktor 3.6.0`, `Gradle 9.8.2`).
+- **`USER_FEATURE.md`**: Vollständiges Feature-Design für rollenbasierte Benutzeranbindung & Zugriffsberechtigung (RBAC: Spieler, Trainer, Admin), Supabase GoTrue Auth, PostgreSQL RLS Policies, Snapshot-Sync Absicherung & KMP Compose UI Integration.
 - **`:shared`**:
   - `shared/src/commonMain/sqldelight/com/handball/stattracker/db/HandballDatabase.sq` – SQLDelight-Tabellen & Queries (inkl. `GAME_LOG` & Aufstellungs-/Plus-Minus-Feldern)
   - `shared/src/commonMain/kotlin/com/handball/stattracker/model/Models.kt` – Alle Entitäten, `DatabaseSnapshot`, `GameLogEntry`, `GameLogEventType`, `StandingsRow`, `PlayerAggregatedStats`, `PlayerGameHistoryEntry`, `PlayerGamePerformancePoint`, `PositionMetricComparison`, `PlayerRankingEntry`, `RadarMetricAxis`
@@ -103,8 +104,27 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 ### Nächste geplante Features (Priorität)
 1. [ ] **Performance-basierte Start 7 (Starting Seven Feature)**:
    - Dedizierte Funktion & Ansicht, die auf Grundlage der bisherigen Spieler-Performance (Performance-Index, Wurf-/Fangquoten, Plus/Minus, Formkurve der letzten Spiele) automatisch die beste **Start 7** (`TW`, `LA`, `RL`, `RM`, `RR`, `RA`, `KM` bzw. `7-Feldspieler`-Variante) zusammenstellt, begründet/vergleichbar macht und vor oder im Spiel direkt als Startaufstellung übernimmt.
-2. [ ] **User-Login, Authentifizierung & Benutzer-/Rollenverwaltung**:
-   - Einführung eines Login-/Registrierungs-Flows (Client & Ktor-Server `:server`), Session-/Token-Handling sowie Zuordnung von Benutzern zu Rollen (z. B. Trainer, Co-Trainer/Scout, Spieler) und Vereinen/Teams.
+2. [ ] **User-Login, Authentifizierung & Benutzer-/Rollenverwaltung (RBAC)** – *gemäß [`USER_FEATURE.md`](file:///C:/Users/matsb/harzlytics/USER_FEATURE.md)*:
+   - [ ] **Phase 1 (Supabase Backend & PostgreSQL RLS)**:
+     - `public.user_profiles`-Tabelle (`id`, `email`, `role`, `player_id`, `status`) und `public.club_invitations` im Supabase SQL Editor anlegen.
+     - Auth Trigger `handle_new_user()` für automatische Profilerstellung & Profil-Claiming via E-Mail aktivieren.
+     - Granulare Row Level Security (RLS) Policies für Rollen `SPIELER`, `TRAINER`, `ADMIN` auf allen Tabellen einrichten.
+     - RPC-Funktion `sync_handball_snapshot` absichern (Spieler erhalten Read-Sync; nur Trainer/Admin dürfen Server-Snapshot überschreiben).
+   - [ ] **Phase 2 (KMP Shared Modul `:shared`)**:
+     - Auth-Datenmodelle (`UserRole`, `UserProfile`, `AuthTokens`, `AuthState`) in `model/AuthModels.kt` anlegen.
+     - `SupabaseAuthService` mit Ktor Client (`/auth/v1/signup`, `/auth/v1/token`, `/auth/v1/logout`) implementieren.
+     - `AuthRepository` mit `StateFlow<AuthState>` und automatischer Session-Wiederherstellung aufbauen.
+     - Multiplatform Token Storage in `PlatformStorage` absichern (Desktop Keyring/File, Web localStorage, Android EncryptedSharedPreferences, iOS Keychain).
+     - `SupabaseSyncService` mit dynamischem `Authorization: Bearer <access_token>` Header ausstatten.
+   - [ ] **Phase 3 (Compose Multiplatform UI `:composeApp`)**:
+     - Auth Screens (`LoginScreen.kt`, `RegisterScreen.kt`, `ForgotPasswordDialog.kt`) entwickeln.
+     - Profil-Claiming-Dialog zur Verknüpfung von Spieler-Accounts mit vorhandenen Kadereinträgen implementieren.
+     - Wiederverwendbaren `RoleGuard(allowedRoles = ...)` Composable zur deklarativen Absicherung von Aktionen und UI-Elementen bereitstellen.
+     - Side-by-Side Live-Ticker (`SeasonScreen.kt`), Kader-Bearbeitung (`RosterScreen.kt`) und `+`-Erstellungsmenü (`PlusCreationDialogs.kt`) rollenspezifisch schützen (Read-Only für Spieler, Full-Access für Trainer/Admin).
+   - [ ] **Phase 4 (Navigation & Header-Integration)**:
+     - Aktives Benutzerprofil samt Rollen-Badge (`[Spieler]`, `[Trainer]`, `[Admin]`) im `StaticTopHeaderBox` (`HandballApp.kt`) anzeigen.
+     - Account-Menü mit Logout & Profilverwaltung integrieren.
+     - Navigation dynamisch an die Rolle anpassen.
 3. [ ] **Weitere Analyse-Erweiterungen (Optional)**:
    - Interaktives Wurfbild & 9-Zonen-Tor-Matrix (*Shot Map & Goal Sectors*) für Feldspieler und Torhüter.
    - Gegner-Scouting-Profile & Team-Splits (1. vs. 2. Halbzeit, Heim vs. Auswärts).

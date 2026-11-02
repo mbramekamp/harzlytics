@@ -10,4 +10,5 @@ expect object PlatformStorage {
     fun loadSnapshot(): DatabaseSnapshot?
     fun saveSnapshot(snapshot: DatabaseSnapshot)
     fun platformName(): String
+    fun readEnvVar(key: String): String?
 }
