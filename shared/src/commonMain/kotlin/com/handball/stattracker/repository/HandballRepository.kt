@@ -672,61 +672,195 @@ class HandballRepository(
     }
 
     /**
-     * Besetzt das Spielfeld automatisch mit der empfohlenen Startsieben:
-     * - [useSeventhFieldPlayer] == false (Standard): **6 Feldspieler + 1 Torwart** (nach bestem Performance-Index je Position).
-     * - [useSeventhFieldPlayer] == true: **7 Feldspieler + 0 Torwart** (Empty Net / 7. Feldspieler).
+     * Kurzname einer Position für die Startsieben-Anzeige ("LA - Linksaußen" → "LA").
      */
-    fun applyRecommendedStartingSevenToGame(gameId: Int, useSeventhFieldPlayer: Boolean = false) {
+    fun positionShortName(position: Position?): String {
+        val name = position?.positionName?.trim().orEmpty()
+        if (name.isEmpty()) return "Feld"
+        return name.substringBefore(" - ").trim().ifEmpty { name }
+    }
+
+    private fun isGoalkeeperPosition(position: Position, state: DatabaseSnapshot): Boolean =
+        position.positionName.trim().uppercase().startsWith("TW") ||
+            state.players.any { it.role == PlayerRole.GOALKEEPER && it.positionId == position.positionId }
+
+    /**
+     * Bewertet einen Spieler für die Startsieben von [game]:
+     * Saison-Performance-Index, Formkurve der letzten [StartingSevenWeights.RECENT_GAMES] Spiele
+     * (bis einschließlich Spieltag, das Zielspiel selbst nur wenn es bereits läuft) und Plus/Minus.
+     */
+    fun computeStartingSevenBreakdown(
+        player: Player,
+        game: Game,
+        state: DatabaseSnapshot = _snapshot.value
+    ): StartingSevenScoreBreakdown {
+        // Ein noch nicht angepfiffenes Zielspiel (nur Nullwerte) darf Saison und Form nicht verfälschen.
+        val statsState = if (game.elapsedSeconds > 0) {
+            state
+        } else {
+            state.copy(playerGames = state.playerGames.filterNot { it.gameId == game.gameId })
+        }
+
+        val seasonStats = computePlayerAggregatedStats(player.playerId, game.seasonId, statsState)
+        val seasonScore = computePerformanceScore(player.role, seasonStats)
+
+        val recent = getPlayerPerformanceSeries(player.playerId, seasonIdFilter = null, state = statsState)
+            .filter { it.gameDate <= game.gameDate || it.gameId == game.gameId }
+            .takeLast(StartingSevenWeights.RECENT_GAMES)
+        val formScore = if (recent.isEmpty()) seasonScore else recent.map { it.performanceScore }.average()
+
+        val pmPerGame = seasonStats.plusMinusPerGame
+        val pmScore = StartingSevenWeights.plusMinusToScore(pmPerGame)
+
+        val weighted = seasonScore * StartingSevenWeights.SEASON_PERFORMANCE +
+            formScore * StartingSevenWeights.RECENT_FORM +
+            pmScore * StartingSevenWeights.PLUS_MINUS
+
+        return StartingSevenScoreBreakdown(
+            seasonPerformanceScore = roundToOneDecimal(seasonScore),
+            recentFormScore = roundToOneDecimal(formScore),
+            recentGamesCount = recent.size,
+            plusMinusPerGame = roundToOneDecimal(pmPerGame),
+            plusMinusScore = roundToOneDecimal(pmScore),
+            weightedScore = roundToOneDecimal(weighted)
+        )
+    }
+
+    /**
+     * Ermittelt die performance-basierte Startsieben für ein Spiel, ohne den Zustand zu verändern.
+     * - [useSeventhFieldPlayer] == false: **TW + 6 Feldpositionen** (LA, RL, RM, RR, RA, KM).
+     * - [useSeventhFieldPlayer] == true: **7 Feldspieler + 0 TW** (6 Feldpositionen + 1 zusätzlicher Feldspieler).
+     * Gesperrte (Disqualifikation) und aktuell zeitbestrafte Spieler werden nicht berücksichtigt.
+     * Ist eine Position nicht besetzbar, springt der beste freie Feldspieler einer anderen Position ein.
+     */
+    fun recommendStartingSeven(
+        gameId: Int,
+        useSeventhFieldPlayer: Boolean = false,
+        state: DatabaseSnapshot = _snapshot.value
+    ): StartingSevenRecommendation {
+        val empty = StartingSevenRecommendation(gameId, useSeventhFieldPlayer, emptyList())
+        val game = state.games.find { it.gameId == gameId } ?: return empty
+
+        val eligiblePlayers = state.playerGames
+            .filter { it.gameId == gameId && !it.isDisqualified && !it.hasActiveSuspension(game.elapsedSeconds) }
+            .mapNotNull { pg -> state.players.find { it.playerId == pg.playerId && it.role != PlayerRole.COACH } }
+            .distinctBy { it.playerId }
+
+        val byScore = compareByDescending<StartingSevenCandidate> { it.breakdown.weightedScore }
+            .thenByDescending { it.breakdown.recentFormScore }
+            .thenBy { it.player.lastName }
+            .thenBy { it.player.playerId }
+
+        val candidates = eligiblePlayers.map { player ->
+            StartingSevenCandidate(
+                player = player,
+                positionShortName = positionShortName(state.positions.find { it.positionId == player.positionId }),
+                breakdown = computeStartingSevenBreakdown(player, game, state)
+            )
+        }
+        val keeperCandidates = candidates.filter { it.player.role == PlayerRole.GOALKEEPER }.sortedWith(byScore)
+        val fieldCandidates = candidates.filter { it.player.role == PlayerRole.FIELD_PLAYER }.sortedWith(byScore)
+
+        // Feldpositionen (ohne TW); bei mehr als 6 eigenen Positionen haben besetzbare Positionen Vorrang.
+        val fieldPositions = state.positions
+            .filterNot { isGoalkeeperPosition(it, state) }
+            .sortedWith(
+                compareByDescending<Position> { pos -> fieldCandidates.any { it.player.positionId == pos.positionId } }
+                    .thenBy { it.positionId }
+            )
+            .take(6)
+            .sortedBy { it.positionId }
+
+        data class SlotSpec(val label: String, val positionId: Int?, val type: StartingSevenSlotType)
+
+        val specs = buildList {
+            if (!useSeventhFieldPlayer) add(SlotSpec("TW", null, StartingSevenSlotType.GOALKEEPER))
+            fieldPositions.forEach { add(SlotSpec(positionShortName(it), it.positionId, StartingSevenSlotType.POSITION)) }
+            val targetField = if (useSeventhFieldPlayer) 7 else 6
+            repeat((targetField - fieldPositions.size).coerceAtLeast(0)) { idx ->
+                val label = if (useSeventhFieldPlayer && idx == targetField - fieldPositions.size - 1) "7. Feld" else "Feld"
+                add(SlotSpec(label, null, StartingSevenSlotType.EXTRA_FIELD_PLAYER))
+            }
+        }
+
+        val chosen = arrayOfNulls<StartingSevenCandidate>(specs.size)
+        val usedIds = mutableSetOf<Int>()
+        fun pick(idx: Int, candidate: StartingSevenCandidate?) {
+            if (candidate == null) return
+            chosen[idx] = candidate
+            usedIds += candidate.player.playerId
+        }
+
+        // 1. Torwart & Stammpositionen
+        specs.forEachIndexed { idx, spec ->
+            when (spec.type) {
+                StartingSevenSlotType.GOALKEEPER -> pick(idx, keeperCandidates.firstOrNull { it.player.playerId !in usedIds })
+                StartingSevenSlotType.POSITION -> pick(
+                    idx,
+                    fieldCandidates.firstOrNull { it.player.positionId == spec.positionId && it.player.playerId !in usedIds }
+                )
+                StartingSevenSlotType.EXTRA_FIELD_PLAYER -> Unit
+            }
+        }
+        // 2. Unbesetzte Positionen & Zusatz-Feldspieler mit den besten freien Feldspielern auffüllen
+        specs.forEachIndexed { idx, spec ->
+            if (chosen[idx] == null && spec.type != StartingSevenSlotType.GOALKEEPER) {
+                pick(idx, fieldCandidates.firstOrNull { it.player.playerId !in usedIds })
+            }
+        }
+
+        // 3. Zweitplatzierte je Platz (bevorzugt gleiche Position)
+        val slots = specs.mapIndexed { idx, spec ->
+            val runnerUp = when (spec.type) {
+                StartingSevenSlotType.GOALKEEPER -> keeperCandidates.firstOrNull { it.player.playerId !in usedIds }
+                StartingSevenSlotType.POSITION ->
+                    fieldCandidates.firstOrNull { it.player.positionId == spec.positionId && it.player.playerId !in usedIds }
+                        ?: fieldCandidates.firstOrNull { it.player.playerId !in usedIds }
+                StartingSevenSlotType.EXTRA_FIELD_PLAYER -> fieldCandidates.firstOrNull { it.player.playerId !in usedIds }
+            }
+            StartingSevenSlot(
+                slotLabel = spec.label,
+                positionId = spec.positionId,
+                type = spec.type,
+                chosen = chosen[idx],
+                runnerUp = runnerUp
+            )
+        }
+
+        return StartingSevenRecommendation(gameId, useSeventhFieldPlayer, slots)
+    }
+
+    /**
+     * Stellt genau die Spieler [playerIds] aufs Feld (alle anderen Spieler des Spiels auf die Bank),
+     * sofern sie spielberechtigt sind und die Formation der 6+1 / 7+0 Regel ([isValidActiveCourtLineup]) entspricht.
+     * Protokolliert die Aufstellung im Spielprotokoll (GAME_LOG).
+     */
+    fun applyStartingSevenLineup(gameId: Int, playerIds: List<Int>): Boolean {
+        var success = false
         mutate { state ->
             val game = state.games.find { it.gameId == gameId } ?: return@mutate state
             val gamePgs = state.playerGames.filter { it.gameId == gameId }
-            val eligiblePgs = gamePgs.filter { pg ->
-                val p = state.players.find { it.playerId == pg.playerId }
-                p != null && p.role != PlayerRole.COACH && !pg.isDisqualified && !pg.hasActiveSuspension(game.elapsedSeconds)
+
+            val chosen = playerIds.distinct().mapNotNull { pid ->
+                val pg = gamePgs.find { it.playerId == pid } ?: return@mapNotNull null
+                val p = state.players.find { it.playerId == pid } ?: return@mapNotNull null
+                if (p.role == PlayerRole.COACH || pg.isDisqualified || pg.hasActiveSuspension(game.elapsedSeconds)) {
+                    null
+                } else pg to p
             }
-            if (eligiblePgs.isEmpty()) return@mutate state
+            if (chosen.isEmpty()) return@mutate state
 
-            val rankings = computePlayerRankings(seasonIdFilter = game.seasonId, state = state)
-                .associateBy { it.player.playerId }
+            val fieldCount = chosen.count { it.second.role == PlayerRole.FIELD_PLAYER }
+            val keeperCount = chosen.count { it.second.role == PlayerRole.GOALKEEPER }
+            if (!isValidActiveCourtLineup(fieldCount, keeperCount)) return@mutate state
 
-            val keeperPg = if (useSeventhFieldPlayer) {
-                null
-            } else {
-                eligiblePgs
-                    .filter { pg -> state.players.find { it.playerId == pg.playerId }?.role == PlayerRole.GOALKEEPER }
-                    .maxByOrNull { pg -> rankings[pg.playerId]?.performanceScore ?: 0.0 }
-            }
-
-            val targetFieldCount = if (keeperPg != null) 6 else 7
-
-            val fieldPgs = eligiblePgs
-                .filter { pg -> state.players.find { it.playerId == pg.playerId }?.role == PlayerRole.FIELD_PLAYER }
-                .sortedByDescending { pg -> rankings[pg.playerId]?.performanceScore ?: 0.0 }
-
-            val selectedFieldByPos = fieldPgs
-                .distinctBy { pg -> state.players.find { it.playerId == pg.playerId }?.positionId ?: pg.playerId }
-                .take(targetFieldCount)
-
-            val finalField = if (selectedFieldByPos.size >= targetFieldCount) {
-                selectedFieldByPos
-            } else {
-                (selectedFieldByPos + fieldPgs.filterNot { it in selectedFieldByPos }).take(targetFieldCount)
-            }
-
-            val chosenPgIds = (listOfNotNull(keeperPg) + finalField).take(7).map { it.playerGameId }.toSet()
-
+            val chosenPgIds = chosen.map { it.first.playerGameId }.toSet()
             val updatedPgs = state.playerGames.map { pg ->
-                if (pg.gameId == gameId) {
-                    pg.copy(isOnCourt = pg.playerGameId in chosenPgIds)
-                } else pg
+                if (pg.gameId == gameId) pg.copy(isOnCourt = pg.playerGameId in chosenPgIds) else pg
             }
 
-            val chosenNames = chosenPgIds.mapNotNull { pgId ->
-                val pid = gamePgs.find { it.playerGameId == pgId }?.playerId
-                state.players.find { it.playerId == pid }
-            }.joinToString(", ") { "#${it.jerseyNumberHomeKit ?: "-"} ${it.lastName}" }
-
-            val formationText = if (keeperPg != null) "${finalField.size} Feld + 1 TW" else "${finalField.size} Feld + 0 TW"
+            val chosenNames = chosen.joinToString(", ") { (_, p) -> "#${p.jerseyNumberHomeKit ?: "-"} ${p.lastName}" }
+            val formationText = "$fieldCount Feld + $keeperCount TW"
             val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
             val logEntry = GameLogEntry(
                 logId = nextLogId,
@@ -738,12 +872,23 @@ class HandballRepository(
                 awayScoreAtEvent = game.awayTeamScore,
                 description = "Aufstellung gesetzt ($formationText): $chosenNames"
             )
-
+            success = true
             state.copy(
                 playerGames = updatedPgs,
                 gameLogs = state.gameLogs + logEntry
             )
         }
+        return success
+    }
+
+    /**
+     * Besetzt das Spielfeld automatisch mit der empfohlenen Startsieben ([recommendStartingSeven]):
+     * - [useSeventhFieldPlayer] == false (Standard): **6 Feldspieler + 1 Torwart**.
+     * - [useSeventhFieldPlayer] == true: **7 Feldspieler + 0 Torwart** (Empty Net / 7. Feldspieler).
+     */
+    fun applyRecommendedStartingSevenToGame(gameId: Int, useSeventhFieldPlayer: Boolean = false): Boolean {
+        val recommendation = recommendStartingSeven(gameId, useSeventhFieldPlayer)
+        return applyStartingSevenLineup(gameId, recommendation.chosenPlayerIds)
     }
 
     fun adjustPlayerPlusMinus(playerGameId: Int, delta: Int) {

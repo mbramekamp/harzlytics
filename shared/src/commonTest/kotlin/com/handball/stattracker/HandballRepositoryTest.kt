@@ -2,9 +2,19 @@ package com.handball.stattracker
 
 import com.handball.stattracker.config.SupabaseAuthSession
 import com.handball.stattracker.config.SupabaseConfig
+import com.handball.stattracker.model.DatabaseSnapshot
+import com.handball.stattracker.model.FieldPlayerGameStats
+import com.handball.stattracker.model.Game
 import com.handball.stattracker.model.GameLogEventType
+import com.handball.stattracker.model.OpponentTeam
+import com.handball.stattracker.model.Player
+import com.handball.stattracker.model.PlayerGame
 import com.handball.stattracker.model.PlayerRole
 import com.handball.stattracker.model.RankingSortCriterion
+import com.handball.stattracker.model.Season
+import com.handball.stattracker.model.StartingSevenSlotType
+import com.handball.stattracker.model.StartingSevenWeights
+import com.handball.stattracker.repository.DemoDataSeed
 import com.handball.stattracker.repository.HandballRepository
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -199,6 +209,204 @@ class HandballRepositoryTest {
             repo.canSubstituteOrEnterCourt(gameId = 1, playerInId = 2, playerOutId = null),
             "Auch bei < 7 Spielern auf dem Feld darf kein 2. Torwart direkt aufs Feld"
         )
+    }
+
+    // --- PERFORMANCE-BASIERTE STARTSIEBEN ---
+
+    private fun onCourtRoles(repo: HandballRepository, gameId: Int): List<PlayerRole> {
+        val state = repo.snapshot.value
+        return state.playerGames
+            .filter { it.gameId == gameId && it.isOnCourt }
+            .mapNotNull { pg -> state.players.find { it.playerId == pg.playerId }?.role }
+    }
+
+    @Test
+    fun testStartingSevenNeverTwoGoalkeepers() {
+        val repo = HandballRepository()
+        repo.resetToDemoData()
+
+        // Spiel 1 hat zwei nominierte Torhüter (playerId 1 und 2)
+        val rec = repo.recommendStartingSeven(gameId = 1, useSeventhFieldPlayer = false)
+        assertEquals(1, rec.goalKeeperCount, "Genau 1 Torwart in der 6+1 Startsieben")
+        assertEquals(6, rec.fieldPlayerCount)
+        assertEquals(7, rec.chosenPlayerIds.toSet().size, "Keine doppelten Spieler")
+        assertEquals("TW", rec.slots.first().slotLabel)
+        assertEquals(PlayerRole.GOALKEEPER, rec.slots.first().runnerUp?.player?.role, "Zweiter Torwart als Alternative")
+        assertEquals(
+            listOf("TW", "LA", "RL", "RM", "RR", "RA", "KM"),
+            rec.slots.map { it.slotLabel }
+        )
+
+        // Auch nach dem Tausch auf den Ersatz-TW bleibt es bei genau 1 Torwart
+        val swapped = rec.swapWithRunnerUp(0)
+        assertEquals(1, swapped.goalKeeperCount)
+        assertEquals(rec.slots.first().runnerUp?.player?.playerId, swapped.slots.first().chosen?.player?.playerId)
+
+        val logsBefore = repo.getGameLogs(1).size
+        assertTrue(repo.applyRecommendedStartingSevenToGame(gameId = 1, useSeventhFieldPlayer = false))
+        val roles = onCourtRoles(repo, 1)
+        assertEquals(1, roles.count { it == PlayerRole.GOALKEEPER })
+        assertEquals(6, roles.count { it == PlayerRole.FIELD_PLAYER })
+        assertEquals(logsBefore + 1, repo.getGameLogs(1).size)
+        assertEquals(GameLogEventType.LINEUP_SET, repo.getGameLogs(1).first().eventType)
+
+        // Eine manuelle Aufstellung mit 2 Torhütern wird abgelehnt
+        val invalid = listOf(1, 2) + rec.chosenPlayerIds.filter { it != 1 && it != 2 }.take(5)
+        assertFalse(repo.applyStartingSevenLineup(gameId = 1, playerIds = invalid), "2 Torhüter dürfen nicht übernommen werden")
+    }
+
+    @Test
+    fun testStartingSevenSeventhFieldPlayerVariantHasNoGoalkeeper() {
+        val repo = HandballRepository()
+        repo.resetToDemoData()
+
+        val rec = repo.recommendStartingSeven(gameId = 1, useSeventhFieldPlayer = true)
+        assertEquals(0, rec.goalKeeperCount, "7+0 Variante hat keinen Torwart")
+        assertEquals(7, rec.fieldPlayerCount)
+        assertTrue(rec.slots.none { it.type == StartingSevenSlotType.GOALKEEPER })
+        assertEquals(StartingSevenSlotType.EXTRA_FIELD_PLAYER, rec.slots.last().type)
+        assertTrue(repo.isValidActiveCourtLineup(rec.fieldPlayerCount, rec.goalKeeperCount))
+
+        assertTrue(repo.applyRecommendedStartingSevenToGame(gameId = 1, useSeventhFieldPlayer = true))
+        val roles = onCourtRoles(repo, 1)
+        assertEquals(0, roles.count { it == PlayerRole.GOALKEEPER })
+        assertEquals(7, roles.count { it == PlayerRole.FIELD_PLAYER })
+        assertTrue(repo.getGameLogs(1).first().description.contains("7 Feld + 0 TW"))
+    }
+
+    @Test
+    fun testStartingSevenExcludesSuspendedAndDisqualifiedPlayers() {
+        val repo = HandballRepository()
+        repo.resetToDemoData()
+        repo.setGameClockSeconds(gameId = 1, targetSeconds = 1200)
+
+        // Juri Knorr-Schmidt (playerId 3, pg 3) erhält Rot, Renars Uscins-Hoffmann (playerId 5, pg 5) 2 Minuten
+        val pg3 = repo.snapshot.value.playerGames.first { it.playerGameId == 3 }
+        repo.updatePlayerDisciplinary(3, pg3.twoMinuteSuspensions, pg3.yellowCard, redCard = true, blueCard = false)
+        val pg5 = repo.snapshot.value.playerGames.first { it.playerGameId == 5 }
+        repo.updatePlayerDisciplinary(5, pg5.twoMinuteSuspensions + 1, pg5.yellowCard, redCard = false, blueCard = false)
+
+        for (useSeventh in listOf(false, true)) {
+            val rec = repo.recommendStartingSeven(gameId = 1, useSeventhFieldPlayer = useSeventh)
+            val involved = rec.slots.flatMap { listOfNotNull(it.chosen?.player?.playerId, it.runnerUp?.player?.playerId) }
+            assertFalse(3 in involved, "Disqualifizierter Spieler darf nicht empfohlen werden")
+            assertFalse(5 in involved, "Zeitbestrafter Spieler darf nicht empfohlen werden")
+        }
+
+        assertTrue(repo.applyRecommendedStartingSevenToGame(gameId = 1))
+        val onCourtIds = repo.snapshot.value.playerGames.filter { it.gameId == 1 && it.isOnCourt }.map { it.playerId }
+        assertFalse(3 in onCourtIds)
+        assertFalse(5 in onCourtIds)
+        // Direktes Übernehmen gesperrter Spieler wird ignoriert
+        assertFalse(repo.applyStartingSevenLineup(gameId = 1, playerIds = listOf(3, 5)))
+    }
+
+    /** Minimaler Snapshot: Standard-Positionen, eine Saison, ein Gegner und frei definierbare Spiele/Spieler. */
+    private fun buildSnapshot(
+        players: List<Player>,
+        games: List<Game>,
+        participations: List<Triple<Int, Int, FieldPlayerGameStats?>> // (gameId, playerId, Feldstatistik)
+    ): DatabaseSnapshot {
+        val pgs = participations.mapIndexed { idx, (gameId, playerId, _) ->
+            PlayerGame(playerGameId = idx + 1, gameId = gameId, playerId = playerId, secondsPlayed = 1800)
+        }
+        val fieldStats = participations.mapIndexedNotNull { idx, (_, _, stats) ->
+            stats?.copy(fieldPlayerGamestatsId = idx + 1, playerGameId = idx + 1)
+        }
+        return DatabaseSnapshot(
+            positions = DemoDataSeed.defaultPositions(),
+            players = players,
+            seasons = listOf(Season(1, "Test-Liga", "2026-01-01", "2026-12-31")),
+            opponentTeams = listOf(OpponentTeam(1, "Gegner", "Halle")),
+            games = games,
+            playerGames = pgs,
+            fieldPlayerStats = fieldStats
+        )
+    }
+
+    @Test
+    fun testStartingSevenFallbackWhenPositionHasNoPlayer() {
+        val repo = HandballRepository()
+        // Kein Linksaußen (positionId 2) im Kader, dafür zwei Rückraum-Links-Spieler
+        val players = listOf(
+            Player(1, positionId = 1, firstName = "T", lastName = "Wart", role = PlayerRole.GOALKEEPER, jerseyNumberHomeKit = 1),
+            Player(2, positionId = 3, firstName = "A", lastName = "RL-Eins", jerseyNumberHomeKit = 2),
+            Player(3, positionId = 3, firstName = "B", lastName = "RL-Zwei", jerseyNumberHomeKit = 3),
+            Player(4, positionId = 4, firstName = "C", lastName = "RM", jerseyNumberHomeKit = 4),
+            Player(5, positionId = 5, firstName = "D", lastName = "RR", jerseyNumberHomeKit = 5),
+            Player(6, positionId = 6, firstName = "E", lastName = "RA", jerseyNumberHomeKit = 6),
+            Player(7, positionId = 7, firstName = "F", lastName = "KM", jerseyNumberHomeKit = 7)
+        )
+        val game = Game(1, seasonId = 1, opponentId = 1, location = "Halle", gameDate = "2026-03-01")
+        val state = buildSnapshot(players, listOf(game), players.map { Triple(1, it.playerId, null) })
+
+        val rec = repo.recommendStartingSeven(gameId = 1, useSeventhFieldPlayer = false, state = state)
+        val laSlot = rec.slots.first { it.slotLabel == "LA" }
+        assertTrue(laSlot.chosen != null, "LA muss mit einem Ersatzspieler besetzt werden")
+        assertTrue(laSlot.isPositionFallback, "LA ist eine Ersatzlösung")
+        assertEquals(3, laSlot.chosen.player.positionId, "Freier RL-Spieler springt auf LA ein")
+        assertEquals(1, rec.goalKeeperCount)
+        assertEquals(6, rec.fieldPlayerCount)
+        assertEquals(7, rec.chosenPlayerIds.toSet().size)
+        assertTrue(rec.slots.filter { it.slotLabel != "LA" }.none { it.isPositionFallback })
+
+        // Zu wenige Spieler: die Position bleibt leer, ohne Absturz und ohne Doppelbesetzung
+        val tinyState = buildSnapshot(players.take(3), listOf(game), players.take(3).map { Triple(1, it.playerId, null) })
+        val tiny = repo.recommendStartingSeven(gameId = 1, useSeventhFieldPlayer = false, state = tinyState)
+        assertEquals(3, tiny.chosenPlayerIds.size)
+        assertEquals(3, tiny.chosenPlayerIds.toSet().size)
+        assertTrue(tiny.slots.any { it.chosen == null })
+    }
+
+    @Test
+    fun testStartingSevenWeightingPrefersBetterRecentForm() {
+        val repo = HandballRepository()
+        // Beide spielen Linksaußen: "Früher" hatte ein überragendes erstes Spiel und danach 5 schwache,
+        // "Konstant" spielt in allen 6 Spielen solide. Saisonwert spricht für "Früher", die Form für "Konstant".
+        val earlyStar = Player(1, positionId = 2, firstName = "A", lastName = "Früher", jerseyNumberHomeKit = 11)
+        val inForm = Player(2, positionId = 2, firstName = "B", lastName = "Konstant", jerseyNumberHomeKit = 22)
+
+        val pastGames = (1..6).map { i ->
+            Game(i, seasonId = 1, opponentId = 1, location = "Halle", gameDate = "2026-01-0$i", elapsedSeconds = 3600)
+        }
+        val target = Game(7, seasonId = 1, opponentId = 1, location = "Halle", gameDate = "2026-02-01")
+
+        val participations = pastGames.flatMap { g ->
+            val starStats = if (g.gameId == 1) {
+                FieldPlayerGameStats(0, 0, goalsScored = 20, goalesAttempted = 20)
+            } else {
+                FieldPlayerGameStats(0, 0, goalsScored = 0, goalesAttempted = 0)
+            }
+            listOf(
+                Triple(g.gameId, earlyStar.playerId, starStats),
+                Triple(g.gameId, inForm.playerId, FieldPlayerGameStats(0, 0, goalsScored = 4, goalesAttempted = 6))
+            )
+        }
+        // Restliche Feldpositionen (RL..KM) besetzen, damit kein LA-Kandidat als Ersatz abwandert
+        val fillers = (3..7).map { pos ->
+            Player(10 + pos, positionId = pos, firstName = "F", lastName = "Pos$pos", jerseyNumberHomeKit = 10 + pos)
+        }
+        val targetParticipations = (listOf(earlyStar, inForm) + fillers).map { Triple(7, it.playerId, FieldPlayerGameStats(0, 0)) }
+
+        val state = buildSnapshot(listOf(earlyStar, inForm) + fillers, pastGames + target, participations + targetParticipations)
+        val rec = repo.recommendStartingSeven(gameId = 7, useSeventhFieldPlayer = false, state = state)
+        val laSlot = rec.slots.first { it.slotLabel == "LA" }
+
+        val chosen = laSlot.chosen!!
+        val runnerUp = laSlot.runnerUp!!
+        assertEquals(inForm.playerId, chosen.player.playerId, "Bessere aktuelle Form muss bevorzugt werden")
+        assertEquals(earlyStar.playerId, runnerUp.player.playerId)
+        assertTrue(
+            runnerUp.breakdown.seasonPerformanceScore > chosen.breakdown.seasonPerformanceScore,
+            "Nach reinem Saisonwert läge der Zweitplatzierte vorn"
+        )
+        assertTrue(chosen.breakdown.recentFormScore > runnerUp.breakdown.recentFormScore)
+        assertEquals(StartingSevenWeights.RECENT_GAMES, chosen.breakdown.recentGamesCount)
+        assertTrue(chosen.breakdown.weightedScore > runnerUp.breakdown.weightedScore)
+
+        // Kein TW im Kader → TW-Platz bleibt leer, es stehen trotzdem nie 2 TW oder Duplikate auf dem Feld
+        assertEquals(0, rec.goalKeeperCount)
+        assertEquals(rec.chosenPlayerIds.size, rec.chosenPlayerIds.toSet().size)
     }
 
     @Test

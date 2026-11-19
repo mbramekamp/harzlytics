@@ -102,8 +102,11 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - [x] **UI-Bereinigung & Professionalisierung**: Entfernung redundanter Labels, erklärender Hilfstexte und technischer Datenbank-Begriffe in der gesamten App.
 
 ### Nächste geplante Features (Priorität)
-1. [ ] **Performance-basierte Start 7 (Starting Seven Feature)**:
+1. [x] **Performance-basierte Start 7 (Starting Seven Feature)**:
    - Dedizierte Funktion & Ansicht, die auf Grundlage der bisherigen Spieler-Performance (Performance-Index, Wurf-/Fangquoten, Plus/Minus, Formkurve der letzten Spiele) automatisch die beste **Start 7** (`TW`, `LA`, `RL`, `RM`, `RR`, `RA`, `KM` bzw. `7-Feldspieler`-Variante) zusammenstellt, begründet/vergleichbar macht und vor oder im Spiel direkt als Startaufstellung übernimmt.
+   - Umgesetzt: `HandballRepository.recommendStartingSeven(gameId, useSeventhFieldPlayer)` (reine Funktion → `StartingSevenRecommendation` mit Platz, Wahl, Zweitplatziertem und `StartingSevenScoreBreakdown`), Gewichtung in `StartingSevenWeights` (45 % Saison-Performance-Index, 40 % Form der letzten 5 Spiele, 15 % Plus/Minus pro Spiel). Ein noch nicht angepfiffenes Zielspiel fließt nicht in die Bewertung ein. Gesperrte/zeitbestrafte Spieler werden ausgeschlossen; unbesetzbare Positionen übernimmt der beste freie Feldspieler (als Ersatzlösung markiert).
+   - `applyStartingSevenLineup(gameId, playerIds)` übernimmt eine (ggf. manuell getauschte) Aufstellung nur bei gültiger `6+1` / `7+0` Formation und protokolliert sie als `LINEUP_SET` im `GAME_LOG`; `applyRecommendedStartingSevenToGame` nutzt beides.
+   - UI: `ui/screens/StartingSevenDialog.kt` (Vorschau je Position mit Saison/Form/+/-, Tausch mit dem Zweitplatzierten, Umschalter `6+1` / `7+0`, „Übernehmen“), geöffnet über alle Startsieben-Buttons in `SeasonScreen.kt`. Abgesichert durch Unit-Tests in `HandballRepositoryTest.kt`.
 2. [ ] **User-Login, Authentifizierung & Benutzer-/Rollenverwaltung (RBAC)** – *gemäß [`USER_FEATURE.md`](file:///C:/Users/matsb/harzlytics/USER_FEATURE.md)*:
    - [ ] **Phase 1 (Supabase Backend & PostgreSQL RLS)**:
      - `public.user_profiles`-Tabelle (`id`, `email`, `role`, `player_id`, `status`) und `public.club_invitations` im Supabase SQL Editor anlegen.
