@@ -1,7 +1,7 @@
 package com.handball.stattracker.server
 
 import com.handball.stattracker.model.DatabaseSnapshot
-import com.handball.stattracker.repository.DemoDataSeed
+import com.handball.stattracker.repository.DefaultClubData
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -41,9 +41,9 @@ fun Application.module() {
     var currentSnapshot: DatabaseSnapshot = if (snapshotFile.exists()) {
         runCatching {
             json.decodeFromString<DatabaseSnapshot>(snapshotFile.readText(Charsets.UTF_8))
-        }.getOrElse { DemoDataSeed.createDemoSnapshot() }
+        }.getOrElse { DefaultClubData.emptySnapshot() }
     } else {
-        val seeded = DemoDataSeed.createDemoSnapshot()
+        val seeded = DefaultClubData.emptySnapshot()
         snapshotFile.writeText(json.encodeToString(seeded), Charsets.UTF_8)
         persistSnapshotToSqlite(sqliteDbFile, seeded)
         seeded

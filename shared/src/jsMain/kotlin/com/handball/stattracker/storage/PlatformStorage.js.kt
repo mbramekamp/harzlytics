@@ -29,4 +29,13 @@ actual object PlatformStorage {
     actual fun platformName(): String = "Web (Browser LocalStorage)"
 
     actual fun readEnvVar(key: String): String? = null
+
+    actual fun readValue(key: String): String? = runCatching { localStorage.getItem("handball_kv_$key") }.getOrNull()
+
+    actual fun writeValue(key: String, value: String?) {
+        runCatching {
+            if (value == null) localStorage.removeItem("handball_kv_$key")
+            else localStorage.setItem("handball_kv_$key", value)
+        }
+    }
 }

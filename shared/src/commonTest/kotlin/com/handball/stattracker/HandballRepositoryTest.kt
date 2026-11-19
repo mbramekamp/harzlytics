@@ -26,8 +26,8 @@ class HandballRepositoryTest {
 
     @Test
     fun testDemoSeedAndStandingsCalculation() {
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
 
         val state = repo.snapshot.value
         assertEquals(7, state.positions.size, "7 klassische Handball-Positionen müssen initialisiert sein")
@@ -50,8 +50,8 @@ class HandballRepositoryTest {
 
     @Test
     fun testPlayerProfileAggregationAndCrud() {
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
 
         // Juri Knorr-Schmidt (playerId = 3) hat in 3 Spielen 9 + 8 + 10 = 27 Tore erzielt
         val stats = repo.computePlayerAggregatedStats(playerId = 3)
@@ -79,8 +79,8 @@ class HandballRepositoryTest {
 
     @Test
     fun testPerformanceGraphsPositionComparisonAndRanking() {
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
 
         // 1. Chronologische Performance-Serie für Juri Knorr-Schmidt (playerId = 3, Position RM = 4)
         val series = repo.getPlayerPerformanceSeries(playerId = 3)
@@ -114,8 +114,8 @@ class HandballRepositoryTest {
 
     @Test
     fun testActiveOnCourtBenchLockSubstitutionsAndPlusMinus() {
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
 
         // In Spiel 1 sind 7 Spieler aktiv auf dem Feld (darunter #15 Knorr-Schmidt = playerId 3, playerGameId 3)
         // und #20 Witzke-Hartmann (playerId 13, playerGameId 30) sitzt auf der Bank (isOnCourt = false).
@@ -221,9 +221,38 @@ class HandballRepositoryTest {
     }
 
     @Test
+    fun testNewGameStartsWithPerformanceBasedStartingSeven() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        val before = repo.snapshot.value
+        val nominated = before.players.filter { it.role != PlayerRole.COACH }.map { it.playerId }.toSet()
+
+        val game = repo.addGame(
+            seasonId = 1,
+            opponentId = before.opponentTeams.first().opponentTeamId,
+            secondOpponentId = null,
+            isHomeGame = true,
+            location = "Halle",
+            gameType = "Ligaspiel",
+            gameDate = "2026-12-01",
+            nominatedPlayerIds = nominated
+        )
+
+        val onCourt = repo.snapshot.value.playerGames
+            .filter { it.gameId == game.gameId && it.isOnCourt }
+            .map { it.playerId }.toSet()
+        val expected = repo.recommendStartingSeven(game.gameId, useSeventhFieldPlayer = false)
+            .chosenPlayerIds.toSet()
+
+        assertEquals(7, onCourt.size, "Neues Spiel startet mit 7 Spielern auf dem Feld")
+        assertEquals(expected, onCourt, "Startsieben eines neuen Spiels folgt der Performance-Empfehlung")
+        assertEquals(1, onCourtRoles(repo, game.gameId).count { it == PlayerRole.GOALKEEPER })
+    }
+
+    @Test
     fun testStartingSevenNeverTwoGoalkeepers() {
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
 
         // Spiel 1 hat zwei nominierte Torhüter (playerId 1 und 2)
         val rec = repo.recommendStartingSeven(gameId = 1, useSeventhFieldPlayer = false)
@@ -257,8 +286,8 @@ class HandballRepositoryTest {
 
     @Test
     fun testStartingSevenSeventhFieldPlayerVariantHasNoGoalkeeper() {
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
 
         val rec = repo.recommendStartingSeven(gameId = 1, useSeventhFieldPlayer = true)
         assertEquals(0, rec.goalKeeperCount, "7+0 Variante hat keinen Torwart")
@@ -276,8 +305,8 @@ class HandballRepositoryTest {
 
     @Test
     fun testStartingSevenExcludesSuspendedAndDisqualifiedPlayers() {
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
         repo.setGameClockSeconds(gameId = 1, targetSeconds = 1200)
 
         // Juri Knorr-Schmidt (playerId 3, pg 3) erhält Rot, Renars Uscins-Hoffmann (playerId 5, pg 5) 2 Minuten
@@ -326,7 +355,7 @@ class HandballRepositoryTest {
 
     @Test
     fun testStartingSevenFallbackWhenPositionHasNoPlayer() {
-        val repo = HandballRepository()
+        val repo = HandballRepository(persistLocally = false)
         // Kein Linksaußen (positionId 2) im Kader, dafür zwei Rückraum-Links-Spieler
         val players = listOf(
             Player(1, positionId = 1, firstName = "T", lastName = "Wart", role = PlayerRole.GOALKEEPER, jerseyNumberHomeKit = 1),
@@ -360,7 +389,7 @@ class HandballRepositoryTest {
 
     @Test
     fun testStartingSevenWeightingPrefersBetterRecentForm() {
-        val repo = HandballRepository()
+        val repo = HandballRepository(persistLocally = false)
         // Beide spielen Linksaußen: "Früher" hatte ein überragendes erstes Spiel und danach 5 schwache,
         // "Konstant" spielt in allen 6 Spielen solide. Saisonwert spricht für "Früher", die Form für "Konstant".
         val earlyStar = Player(1, positionId = 2, firstName = "A", lastName = "Früher", jerseyNumberHomeKit = 11)
@@ -411,8 +440,8 @@ class HandballRepositoryTest {
 
     @Test
     fun testSupabaseEnvConfigAndLiveSync() = runBlocking {
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
 
         if (SupabaseConfig.hasConfiguredKeys() && SupabaseConfig.resolvedProjectUrl().isNotBlank()) {
             assertTrue(
@@ -432,8 +461,8 @@ class HandballRepositoryTest {
     @Test
     fun testSupabaseSyncWithoutSessionDegradesGracefully() = runBlocking {
         SupabaseAuthSession.clear()
-        val repo = HandballRepository()
-        repo.resetToDemoData()
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
         val before = repo.snapshot.value
 
         // Darf weder crashen noch einen Netzwerkaufruf als anon machen noch lokale Daten verlieren

@@ -35,4 +35,15 @@ actual object PlatformStorage {
     actual fun readEnvVar(key: String): String? {
         return (NSProcessInfo.processInfo.environment[key] as? String)?.takeIf { it.isNotBlank() }
     }
+
+    // TODO(Auth): Session-Token in die iOS Keychain verschieben.
+    actual fun readValue(key: String): String? =
+        runCatching { NSUserDefaults.standardUserDefaults.stringForKey("handball_kv_$key") }.getOrNull()
+
+    actual fun writeValue(key: String, value: String?) {
+        runCatching {
+            if (value == null) NSUserDefaults.standardUserDefaults.removeObjectForKey("handball_kv_$key")
+            else NSUserDefaults.standardUserDefaults.setObject(value, forKey = "handball_kv_$key")
+        }
+    }
 }

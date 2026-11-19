@@ -16,7 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.handball.stattracker.config.SupabaseConfig
+import androidx.compose.material.icons.automirrored.filled.Logout
+import com.handball.stattracker.model.AuthState
+import com.handball.stattracker.repository.AuthRepository
+import kotlinx.coroutines.launch
 import com.handball.stattracker.model.DatabaseSnapshot
 import com.handball.stattracker.repository.HandballRepository
 import com.handball.stattracker.ui.screens.*
@@ -30,15 +33,55 @@ enum class MainNavScreen(val label: String) {
 }
 
 @Composable
-fun HandballApp(
-    repository: HandballRepository = remember { HandballRepository(autoSync = true) }
-) {
-    LaunchedEffect(repository) {
-        if (SupabaseConfig.hasConfiguredKeys() && SupabaseConfig.resolvedProjectUrl().isNotBlank()) {
-            repository.syncWithBackend()
+fun HandballApp() {
+    val auth = remember { AuthRepository() }
+    val authState by auth.state.collectAsState()
+    var darkTheme by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(auth) { auth.restore() }
+
+    HandballTheme(darkTheme = darkTheme) {
+        when (val state = authState) {
+            AuthState.Loading -> AuthLoadingScreen()
+            AuthState.NotConfigured -> NotConfiguredScreen()
+            is AuthState.SignedOut -> LoginScreen(auth = auth, initialMessage = state.message)
+            is AuthState.PendingApproval -> PendingApprovalScreen(auth = auth, state = state)
+            is AuthState.SignedIn -> {
+                val userId = state.session.userId
+                val repository = remember(userId) {
+                    HandballRepository(autoSync = true).also { it.prepareForAccount(userId) }
+                }
+                LaunchedEffect(userId) { repository.syncWithBackend() }
+                LaunchedEffect(userId) { auth.keepSessionFresh() }
+
+                val name = state.profile.fullName.ifBlank { state.session.email }
+                val accountLabel = buildString {
+                    append(name)
+                    append(" · ")
+                    append(state.profile.role.label)
+                    if (state.offline) append(" · offline")
+                }
+                MainAppContent(
+                    repository = repository,
+                    darkTheme = darkTheme,
+                    onToggleDarkTheme = { darkTheme = !darkTheme },
+                    accountLabel = accountLabel,
+                    onSignOut = { scope.launch { auth.signOut() } }
+                )
+            }
         }
     }
-    var darkTheme by remember { mutableStateOf(false) }
+}
+
+@Composable
+private fun MainAppContent(
+    repository: HandballRepository,
+    darkTheme: Boolean,
+    onToggleDarkTheme: () -> Unit,
+    accountLabel: String,
+    onSignOut: () -> Unit
+) {
     val snapshot by repository.snapshot.collectAsState()
 
     var currentScreen by remember { mutableStateOf(MainNavScreen.HOME_DASHBOARD) }
@@ -90,7 +133,7 @@ fun HandballApp(
                                 }
                             },
                             onOpenPlusMenu = { creationModal = CreationModalType.CHOOSER },
-                            onToggleDarkTheme = { darkTheme = !darkTheme }
+                            onToggleDarkTheme = onToggleDarkTheme
                         )
 
                         Column(
@@ -99,7 +142,9 @@ fun HandballApp(
                         ) {
                             StaticTopHeaderBox(
                                 title = staticHeaderTitle,
-                                subtitle = snapshot.ownClubName
+                                subtitle = snapshot.ownClubName,
+                                accountLabel = accountLabel,
+                                onSignOut = onSignOut
                             )
 
                             Surface(
@@ -151,7 +196,8 @@ fun HandballApp(
                                 if (currentScreen == MainNavScreen.SEASON) selectedGameId = null
                             },
                             darkTheme = darkTheme,
-                            onToggleDarkTheme = { darkTheme = !darkTheme }
+                            onToggleDarkTheme = onToggleDarkTheme,
+                            onSignOut = onSignOut
                         )
 
                         Box(
@@ -267,7 +313,8 @@ private fun MobileTopHeaderBar(
     showBackButton: Boolean,
     onBack: () -> Unit,
     darkTheme: Boolean,
-    onToggleDarkTheme: () -> Unit
+    onToggleDarkTheme: () -> Unit,
+    onSignOut: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -336,6 +383,13 @@ private fun MobileTopHeaderBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            IconButton(onClick = onSignOut) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    contentDescription = "Abmelden",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -343,7 +397,9 @@ private fun MobileTopHeaderBar(
 @Composable
 private fun StaticTopHeaderBox(
     title: String,
-    subtitle: String
+    subtitle: String,
+    accountLabel: String,
+    onSignOut: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().height(74.dp),
@@ -369,6 +425,22 @@ private fun StaticTopHeaderBox(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = accountLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 260.dp)
+                )
+                IconButton(onClick = onSignOut) {
+                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Abmelden")
+                }
             }
         }
     }

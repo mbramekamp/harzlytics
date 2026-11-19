@@ -22,7 +22,9 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 
 class HandballRepository(
-    private val autoSync: Boolean = false
+    private val autoSync: Boolean = false,
+    /** false = nichts lokal lesen/schreiben (Unit-Tests), damit echte Benutzerdaten unberührt bleiben. */
+    private val persistLocally: Boolean = true
 ) {
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var debounceSyncJob: Job? = null
@@ -43,90 +45,21 @@ class HandballRepository(
     val syncStatus: StateFlow<String> = _syncStatus.asStateFlow()
 
     private fun loadInitialSnapshot(): DatabaseSnapshot {
+        if (!persistLocally) return DefaultClubData.emptySnapshot()
         val loaded = PlatformStorage.loadSnapshot()
-        if (loaded != null && loaded.positions.isNotEmpty()) {
-            val migrated = migrateSnapshotIfNeeded(loaded)
-            if (migrated != loaded) {
-                PlatformStorage.saveSnapshot(migrated)
-            }
-            return migrated
-        }
-        val seeded = DemoDataSeed.createDemoSnapshot()
-        PlatformStorage.saveSnapshot(seeded)
-        return seeded
+        if (loaded != null && loaded.positions.isNotEmpty()) return loaded
+        return DefaultClubData.emptySnapshot()
     }
 
-    /**
-     * Stellt sicher, dass ältere gespeicherte Snapshots (vor Einführung von Aufstellung, +/- und Spielprotokoll)
-     * automatisch eine aktive Startsieben auf dem Feld sowie realistische Demo-Protokolle erhalten.
-     */
-    private fun migrateSnapshotIfNeeded(snapshot: DatabaseSnapshot): DatabaseSnapshot {
-        val hasAnyOnCourt = snapshot.playerGames.any { it.isOnCourt }
-        if (hasAnyOnCourt && snapshot.gameLogs.isNotEmpty()) {
-            return snapshot
-        }
-
-        val demo = DemoDataSeed.createDemoSnapshot()
-        val demoPgById = demo.playerGames.associateBy { it.playerGameId }
-
-        val updatedGames = snapshot.games.map { g ->
-            if (g.elapsedSeconds == 0 && (g.homeTeamScore > 0 || g.awayTeamScore > 0)) {
-                g.copy(elapsedSeconds = 3600)
-            } else g
-        }
-
-        val updatedPlayerGames = snapshot.playerGames.groupBy { it.gameId }.flatMap { (_, pbs) ->
-            val anyActive = pbs.any { it.isOnCourt }
-            if (anyActive) {
-                pbs
-            } else {
-                // Prüfe ob Demo-Werte vorhanden sind, sonst wähle bis zu 7 Spieler (1 TW + 6 Feld)
-                val keeperCandidates = pbs.filter { pg ->
-                    snapshot.players.find { it.playerId == pg.playerId }?.role == PlayerRole.GOALKEEPER
-                }
-                val fieldCandidates = pbs.filter { pg ->
-                    snapshot.players.find { it.playerId == pg.playerId }?.role == PlayerRole.FIELD_PLAYER
-                }
-                val defaultActiveIds = (keeperCandidates.take(1) + fieldCandidates.take(6))
-                    .map { it.playerGameId }
-                    .toSet()
-
-                pbs.map { pg ->
-                    val demoPg = demoPgById[pg.playerGameId]
-                    if (demoPg != null && demoPg.gameId == pg.gameId && demoPg.playerId == pg.playerId) {
-                        pg.copy(
-                            isOnCourt = demoPg.isOnCourt,
-                            plusMinus = if (pg.plusMinus == 0) demoPg.plusMinus else pg.plusMinus,
-                            secondsPlayed = if (pg.secondsPlayed == 0) demoPg.secondsPlayed else pg.secondsPlayed
-                        )
-                    } else {
-                        pg.copy(
-                            isOnCourt = pg.playerGameId in defaultActiveIds,
-                            secondsPlayed = if (pg.secondsPlayed == 0 && pg.playerGameId in defaultActiveIds) 1800 else pg.secondsPlayed
-                        )
-                    }
-                }
-            }
-        }
-
-        val updatedLogs = if (snapshot.gameLogs.isEmpty()) {
-            demo.gameLogs.filter { log -> snapshot.games.any { it.gameId == log.gameId } }
-        } else {
-            snapshot.gameLogs
-        }
-
-        return snapshot.copy(
-            games = updatedGames,
-            playerGames = updatedPlayerGames,
-            gameLogs = updatedLogs
-        )
+    private fun persist(snapshot: DatabaseSnapshot) {
+        if (persistLocally) PlatformStorage.saveSnapshot(snapshot)
     }
 
     private fun mutate(block: (DatabaseSnapshot) -> DatabaseSnapshot) {
         val now = Clock.System.now().toEpochMilliseconds()
         val updated = block(_snapshot.value).copy(lastUpdatedEpochMillis = now)
         _snapshot.value = updated
-        PlatformStorage.saveSnapshot(updated)
+        persist(updated)
         scheduleAutoSyncIfEnabled()
     }
 
@@ -139,14 +72,30 @@ class HandballRepository(
         }
     }
 
-    fun resetToDemoData() {
-        val demo = DemoDataSeed.createDemoSnapshot().copy(
-            lastUpdatedEpochMillis = Clock.System.now().toEpochMilliseconds()
-        )
-        _snapshot.value = demo
-        PlatformStorage.saveSnapshot(demo)
-        _syncStatus.value = "Demo-Daten erfolgreich wiederhergestellt"
-        scheduleAutoSyncIfEnabled()
+    /** Ersetzt den kompletten lokalen Stand (z. B. Testdaten), ohne Sync auszulösen. */
+    internal fun replaceSnapshot(snapshot: DatabaseSnapshot) {
+        _snapshot.value = snapshot
+        persist(snapshot)
+    }
+
+    /** Verwirft alle lokalen Daten (leerer Verein, Zeitstempel 0 -> beim nächsten Sync gewinnt der Server). */
+    fun clearLocalData() {
+        debounceSyncJob?.cancel()
+        replaceSnapshot(DefaultClubData.emptySnapshot())
+    }
+
+    /**
+     * Bindet den lokalen Datenbestand an das angemeldete Konto. Gehören die lokalen Daten
+     * einem anderen (oder keinem) Konto – z. B. alte Demo-Daten –, werden sie verworfen,
+     * damit sie nie in den Cloud-Stand eines Vereins geschrieben werden.
+     */
+    fun prepareForAccount(userId: String) {
+        if (!persistLocally) return
+        val owner = PlatformStorage.readValue(SNAPSHOT_OWNER_KEY)
+        if (owner != userId) {
+            clearLocalData()
+            PlatformStorage.writeValue(SNAPSHOT_OWNER_KEY, userId)
+        }
     }
 
     fun updateClubName(newName: String) {
@@ -308,24 +257,13 @@ class HandballRepository(
             val nominatedPlayers = nominatedPlayerIds.mapNotNull { pid ->
                 state.players.find { it.playerId == pid }
             }
-            // Wähle bis zu 7 Spieler als initiale Startsieben (1 Torwart + bis zu 6 Feldspieler)
-            val startingKeeper = nominatedPlayers.firstOrNull { it.role == PlayerRole.GOALKEEPER }
-            val startingField = nominatedPlayers
-                .filter { it.role == PlayerRole.FIELD_PLAYER }
-                .distinctBy { it.positionId ?: it.playerId }
-                .let { distinctPos ->
-                    if (distinctPos.size >= 6) distinctPos.take(6)
-                    else (distinctPos + nominatedPlayers.filter { it.role == PlayerRole.FIELD_PLAYER && it !in distinctPos }).take(6)
-                }
-            val startingSevenIds = (listOfNotNull(startingKeeper) + startingField).map { it.playerId }.toSet()
-
             nominatedPlayers.forEach { player ->
                 val pgId = nextPgId++
                 newPlayerGames += PlayerGame(
                     playerGameId = pgId,
                     gameId = nextGameId,
                     playerId = player.playerId,
-                    isOnCourt = player.playerId in startingSevenIds
+                    isOnCourt = false
                 )
                 when (player.role) {
                     PlayerRole.FIELD_PLAYER -> {
@@ -344,6 +282,16 @@ class HandballRepository(
                         // Timeouts werden bei Bedarf über COACH_GAMESTATS + TIMEOUT angelegt
                     }
                 }
+            }
+
+            // Initiale Startsieben performance-basiert (TW + 6 Feldpositionen) über [recommendStartingSeven]
+            val draftState = state.copy(
+                games = listOf(newGame) + state.games,
+                playerGames = state.playerGames + newPlayerGames
+            )
+            val startingSevenIds = initialStartingSevenIds(nextGameId, nominatedPlayers, draftState)
+            for (i in newPlayerGames.indices) {
+                newPlayerGames[i] = newPlayerGames[i].copy(isOnCourt = newPlayerGames[i].playerId in startingSevenIds)
             }
 
             if (startingSevenIds.isNotEmpty()) {
@@ -383,6 +331,31 @@ class HandballRepository(
             )
         }
         return newGame
+    }
+
+    /**
+     * Startsieben für ein neu angelegtes Spiel: Empfehlung aus [recommendStartingSeven];
+     * ist sie keine gültige 6+1 / 7+0 Formation, werden die ersten Nominierten je Position genommen.
+     */
+    private fun initialStartingSevenIds(
+        gameId: Int,
+        nominatedPlayers: List<Player>,
+        draftState: DatabaseSnapshot
+    ): Set<Int> {
+        val recommended = recommendStartingSeven(gameId, useSeventhFieldPlayer = false, state = draftState)
+            .chosenPlayerIds.toSet()
+        val recPlayers = nominatedPlayers.filter { it.playerId in recommended }
+        if (recPlayers.isNotEmpty() && isValidActiveCourtLineup(
+                recPlayers.count { it.role == PlayerRole.FIELD_PLAYER },
+                recPlayers.count { it.role == PlayerRole.GOALKEEPER }
+            )
+        ) return recommended
+
+        val startingKeeper = nominatedPlayers.firstOrNull { it.role == PlayerRole.GOALKEEPER }
+        val fieldPlayers = nominatedPlayers.filter { it.role == PlayerRole.FIELD_PLAYER }
+        val distinctPos = fieldPlayers.distinctBy { it.positionId ?: it.playerId }
+        val startingField = (distinctPos + fieldPlayers.filter { it !in distinctPos }).take(6)
+        return (listOfNotNull(startingKeeper) + startingField).map { it.playerId }.toSet()
     }
 
     fun togglePlayerInGame(gameId: Int, playerId: Int) {
@@ -2195,10 +2168,16 @@ class HandballRepository(
                 }.body()
             }
             _snapshot.value = response
-            PlatformStorage.saveSnapshot(response)
+            persist(response)
             _syncStatus.value = "Sync erfolgreich mit $normalizedUrl (${response.games.size} Spiele, ${response.players.size} Kader)"
+        } catch (e: SupabaseAuthRequiredException) {
+            _syncStatus.value = "Cloud-Sync nicht möglich: nicht angemeldet oder Konto nicht freigeschaltet (lokal gespeichert)"
         } catch (e: Exception) {
             _syncStatus.value = "Offline-Modus aktiv (Server unter $normalizedUrl nicht erreichbar – lokal gespeichert)"
         }
+    }
+
+    companion object {
+        private const val SNAPSHOT_OWNER_KEY = "snapshot_owner_user_id"
     }
 }

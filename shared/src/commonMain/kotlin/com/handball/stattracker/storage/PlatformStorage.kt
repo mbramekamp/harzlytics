@@ -11,4 +11,10 @@ expect object PlatformStorage {
     fun saveSnapshot(snapshot: DatabaseSnapshot)
     fun platformName(): String
     fun readEnvVar(key: String): String?
+
+    /** Kleiner Schlüssel-Wert-Speicher (z. B. Login-Session, Besitzer der lokalen Daten). null = nicht vorhanden. */
+    fun readValue(key: String): String?
+
+    /** Speichert [value] unter [key]; `null` löscht den Eintrag. */
+    fun writeValue(key: String, value: String?)
 }

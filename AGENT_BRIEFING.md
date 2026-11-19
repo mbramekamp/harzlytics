@@ -100,19 +100,24 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - [x] **Handball-Formations-Check (`6 Feld + 1 TW` oder `7 Feld + 0 TW`)**: Softwareseitige Prüfung in Repository & UI, dass niemals 2 Torhüter gleichzeitig auf dem Feld stehen.
 - [x] **Torverlauf-Ausschlag (`+3 / 0 / -3`)**: Darstellung des Torverlaufs als Ausschlag um die Nulllinie statt als steigender Graph.
 - [x] **UI-Bereinigung & Professionalisierung**: Entfernung redundanter Labels, erklärender Hilfstexte und technischer Datenbank-Begriffe in der gesamten App.
+- [x] **Mobile-Ergonomie (Android) & Supabase Cloud-Sync** (Snapshot-Sync via `SupabaseSyncService.kt`, Konfiguration über `.env` / `SupabaseConfig.kt`).
 
 ### Nächste geplante Features (Priorität)
 1. [x] **Performance-basierte Start 7 (Starting Seven Feature)**:
    - Dedizierte Funktion & Ansicht, die auf Grundlage der bisherigen Spieler-Performance (Performance-Index, Wurf-/Fangquoten, Plus/Minus, Formkurve der letzten Spiele) automatisch die beste **Start 7** (`TW`, `LA`, `RL`, `RM`, `RR`, `RA`, `KM` bzw. `7-Feldspieler`-Variante) zusammenstellt, begründet/vergleichbar macht und vor oder im Spiel direkt als Startaufstellung übernimmt.
    - Umgesetzt: `HandballRepository.recommendStartingSeven(gameId, useSeventhFieldPlayer)` (reine Funktion → `StartingSevenRecommendation` mit Platz, Wahl, Zweitplatziertem und `StartingSevenScoreBreakdown`), Gewichtung in `StartingSevenWeights` (45 % Saison-Performance-Index, 40 % Form der letzten 5 Spiele, 15 % Plus/Minus pro Spiel). Ein noch nicht angepfiffenes Zielspiel fließt nicht in die Bewertung ein. Gesperrte/zeitbestrafte Spieler werden ausgeschlossen; unbesetzbare Positionen übernimmt der beste freie Feldspieler (als Ersatzlösung markiert).
    - `applyStartingSevenLineup(gameId, playerIds)` übernimmt eine (ggf. manuell getauschte) Aufstellung nur bei gültiger `6+1` / `7+0` Formation und protokolliert sie als `LINEUP_SET` im `GAME_LOG`; `applyRecommendedStartingSevenToGame` nutzt beides.
-   - UI: `ui/screens/StartingSevenDialog.kt` (Vorschau je Position mit Saison/Form/+/-, Tausch mit dem Zweitplatzierten, Umschalter `6+1` / `7+0`, „Übernehmen“), geöffnet über alle Startsieben-Buttons in `SeasonScreen.kt`. Abgesichert durch Unit-Tests in `HandballRepositoryTest.kt`.
+   - UI: `ui/screens/StartingSevenDialog.kt` (Vorschau je Position mit Saison/Form/+/-, Tausch mit dem Zweitplatzierten, Umschalter `6+1` / `7+0`, „Übernehmen“), geöffnet über alle Startsieben-Buttons in `SeasonScreen.kt`. Neu angelegte Spiele (`addGame`) starten automatisch mit der empfohlenen Startsieben (Fallback: erste Nominierte je Position). Abgesichert durch Unit-Tests in `HandballRepositoryTest.kt`.
 2. [ ] **User-Login, Authentifizierung & Benutzer-/Rollenverwaltung (RBAC)** – *gemäß [`USER_FEATURE.md`](file:///C:/Users/matsb/harzlytics/USER_FEATURE.md)*:
-   - [ ] **Phase 1 (Supabase Backend & PostgreSQL RLS)**:
-     - `public.user_profiles`-Tabelle (`id`, `email`, `role`, `player_id`, `status`) und `public.club_invitations` im Supabase SQL Editor anlegen.
-     - Auth Trigger `handle_new_user()` für automatische Profilerstellung & Profil-Claiming via E-Mail aktivieren.
-     - Granulare Row Level Security (RLS) Policies für Rollen `SPIELER`, `TRAINER`, `ADMIN` auf allen Tabellen einrichten.
-     - RPC-Funktion `sync_handball_snapshot` absichern (Spieler erhalten Read-Sync; nur Trainer/Admin dürfen Server-Snapshot überschreiben).
+   - **Stand:** `supabase_schema.sql` (Tabellen, `sync_handball_snapshot` RPC) und `SupabaseSyncService.kt` existieren bereits. Zugriff abgesichert: `anon` hat keinen Zugriff mehr, `authenticated` nur Lesezugriff; Schreiben ausschließlich über die `SECURITY DEFINER`-RPC mit User-JWT (`SupabaseAuthSession.kt`). Cloud-Sync ist bis zum Login-Flow inaktiv. Das SQL wurde am 2026-11-19 im Supabase SQL Editor ausgeführt (Live-Projekt ist abgesichert).
+   - [x] **Phase 1 (Supabase Backend & PostgreSQL RLS)** – umgesetzt in `supabase_schema.sql` (Abschnitte 3a, 3, 4, 5); *muss im Supabase SQL Editor erneut ausgeführt werden (idempotent)*:
+     - `public.app_role` Enum, `public.user_profiles` (`id`, `email`, `full_name`, `role`, `player_id`, `claim_player_id`, `status`) und `public.club_invitations`. **Bewusst ohne FK auf `player`**, da der Sync `player` bei jedem Lauf neu befüllt.
+     - Trigger `handle_auth_user_change()` auf `auth.users`: Profil bei Signup (Standard `SPIELER` / `PENDING`), Einladungscode aus `raw_user_meta_data.invite_code` setzt Rolle/Spieler & `ACTIVE`; Kader-Verknüpfung per E-Mail erst nach E-Mail-Bestätigung und nur bei eindeutigem Treffer. **Rolle wird nie aus Signup-Metadaten übernommen.**
+     - `guard_user_profile_update()`: Nicht-Admins dürfen nur `full_name` und `claim_player_id` ändern (kein Self-Upgrade).
+     - Helfer `current_user_role()`, `current_player_id()`, `is_active_member()`, `is_admin()`, `is_coach_or_admin()` (nur für `ACTIVE`-Profile).
+     - RLS: Fachtabellen nur lesbar für aktive Mitglieder; `user_profiles` eigenes Profil bzw. Admin alles; `club_invitations` nur Admin.
+     - `sync_handball_snapshot`: nicht freigeschaltet → 403; `SPIELER` → reiner Lese-Sync; `TRAINER`/`ADMIN` → Schreib-Sync.
+     - Erster Admin: nach eigener Registrierung `UPDATE public.user_profiles SET role = 'ADMIN', status = 'ACTIVE' WHERE email = '...';` im SQL Editor.
    - [ ] **Phase 2 (KMP Shared Modul `:shared`)**:
      - Auth-Datenmodelle (`UserRole`, `UserProfile`, `AuthTokens`, `AuthState`) in `model/AuthModels.kt` anlegen.
      - `SupabaseAuthService` mit Ktor Client (`/auth/v1/signup`, `/auth/v1/token`, `/auth/v1/logout`) implementieren.
