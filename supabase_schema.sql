@@ -150,18 +150,40 @@ ON CONFLICT (position_id) DO NOTHING;
 -- 3. RPC-FUNKTION FÜR DIREKTEN KMP-SYNC (/rest/v1/rpc/sync_handball_snapshot)
 -- Vergleicht lastUpdatedEpochMillis, speichert den neuesten Stand in app_snapshots
 -- UND spiegelt alle Entitäten sauber in die 12 relationalen PostgreSQL-Tabellen.
+--
+-- SICHERHEIT: Die Funktion läuft als SECURITY DEFINER (mit den Rechten des Owners),
+-- weil Clients keine direkten INSERT/UPDATE/DELETE-Rechte mehr auf den Tabellen haben.
+-- Der search_path ist fest auf '' gesetzt (alle Objekte sind voll qualifiziert), damit
+-- niemand über eigene Schemas/Objekte die Funktion kapern kann.
+-- Aufrufbar nur für die Rolle `authenticated` (siehe GRANT/REVOKE in Abschnitt 4).
 
 CREATE OR REPLACE FUNCTION public.sync_handball_snapshot(incoming_snapshot JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
     existing_record public.app_snapshots%ROWTYPE;
     incoming_ts BIGINT;
     incoming_club TEXT;
 BEGIN
+    -- Defense in depth: auch wenn EXECUTE nur an `authenticated` vergeben ist,
+    -- ohne gültige Benutzer-Session (JWT mit sub) keinen Schreibzugriff erlauben.
+    IF auth.uid() IS NULL THEN
+        RAISE EXCEPTION 'sync_handball_snapshot: authentication required'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- TODO(RBAC, siehe USER_FEATURE.md): Hier die Rollenprüfung einbauen, z. B.
+    --   IF NOT EXISTS (
+    --       SELECT 1 FROM public.user_profiles
+    --       WHERE user_id = auth.uid() AND role IN ('ADMIN', 'COACH', 'STATISTICIAN')
+    --   ) THEN
+    --       RAISE EXCEPTION 'sync_handball_snapshot: insufficient role' USING ERRCODE = '42501';
+    --   END IF;
+    -- Bis dahin darf JEDER angemeldete Benutzer den Snapshot schreiben.
+
     incoming_ts := COALESCE((incoming_snapshot->>'lastUpdatedEpochMillis')::BIGINT, 0);
     incoming_club := COALESCE(incoming_snapshot->>'ownClubName', 'HC Handball Löwen');
 
@@ -381,7 +403,13 @@ ALTER TABLE public.coach_gamestats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.game_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_snapshots ENABLE ROW LEVEL SECURITY;
 
--- Policies für Lese-/Schreibzugriff (anon & authenticated), damit der Client-Sync sofort funktioniert
+-- Zugriffsmodell:
+--   * anon          -> KEIN Zugriff (weder Tabellen noch RPC)
+--   * authenticated -> nur SELECT auf alle Tabellen; Schreiben ausschließlich über
+--                      die RPC public.sync_handball_snapshot (SECURITY DEFINER)
+--   * Kein direktes INSERT/UPDATE/DELETE von Clients.
+-- Das Skript ist idempotent und entfernt auch die alte offene Policy
+-- "Allow access for app sync" (FOR ALL TO anon, authenticated USING (true)).
 DO $$
 DECLARE
     tbl TEXT;
@@ -392,17 +420,42 @@ BEGIN
         'timeout', 'coach_gamestats', 'game_log', 'app_snapshots'
     ]
     LOOP
+        -- Alte, offene Policy entfernen
         EXECUTE format('DROP POLICY IF EXISTS "Allow access for app sync" ON public.%I;', tbl);
+
+        -- Nur Lesezugriff für angemeldete Benutzer
+        -- TODO(RBAC, siehe USER_FEATURE.md): USING (true) später durch Rollen-/Team-Prüfung
+        --   über public.user_profiles ersetzen.
+        EXECUTE format('DROP POLICY IF EXISTS "Authenticated read access" ON public.%I;', tbl);
         EXECUTE format(
-            'CREATE POLICY "Allow access for app sync" ON public.%I FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);',
+            'CREATE POLICY "Authenticated read access" ON public.%I FOR SELECT TO authenticated USING (true);',
             tbl
         );
     END LOOP;
 END;
 $$;
 
-GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.sync_handball_snapshot(JSONB) TO anon, authenticated;
+-- Tabellen-Rechte: Supabase vergibt standardmäßig ALL an anon/authenticated.
+-- Diese Rechte hier explizit zurücknehmen (RLS allein ist die zweite Verteidigungslinie).
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated;
+REVOKE USAGE, UPDATE ON ALL SEQUENCES IN SCHEMA public FROM authenticated;
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
+
+-- Künftig neu angelegte Tabellen/Sequenzen/Funktionen im Schema public nicht mehr
+-- automatisch für anon/authenticated öffnen (gilt für Objekte, die die Rolle anlegt,
+-- die dieses Skript ausführt – im SQL Editor ist das `postgres`).
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM authenticated;
+
+-- RPC: Postgres vergibt EXECUTE standardmäßig an PUBLIC (und damit auch an anon) –
+-- deshalb zuerst überall entziehen und dann nur `authenticated` erlauben.
+REVOKE EXECUTE ON FUNCTION public.sync_handball_snapshot(JSONB) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.sync_handball_snapshot(JSONB) FROM anon;
+GRANT EXECUTE ON FUNCTION public.sync_handball_snapshot(JSONB) TO authenticated;
 
 COMMIT;
