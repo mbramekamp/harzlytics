@@ -1,5 +1,6 @@
 package com.handball.stattracker
 
+import com.handball.stattracker.config.SupabaseAuthSession
 import com.handball.stattracker.config.SupabaseConfig
 import com.handball.stattracker.model.GameLogEventType
 import com.handball.stattracker.model.PlayerRole
@@ -210,11 +211,40 @@ class HandballRepositoryTest {
                 SupabaseConfig.resolvedApiKey().startsWith("sb_publishable_"),
                 "Client muss den sicheren sb_publishable_ Key bevorzugen"
             )
-            repo.syncWithBackend()
-            assertTrue(
-                repo.syncStatus.value.startsWith("Sync erfolgreich"),
-                "Supabase Sync sollte erfolgreich sein, Status war: ${repo.syncStatus.value}"
-            )
+            if (SupabaseAuthSession.isAuthenticated()) {
+                repo.syncWithBackend()
+                assertTrue(
+                    repo.syncStatus.value.startsWith("Sync erfolgreich"),
+                    "Supabase Sync sollte erfolgreich sein, Status war: ${repo.syncStatus.value}"
+                )
+            }
         }
+    }
+
+    @Test
+    fun testSupabaseSyncWithoutSessionDegradesGracefully() = runBlocking {
+        SupabaseAuthSession.clear()
+        val repo = HandballRepository()
+        repo.resetToDemoData()
+        val before = repo.snapshot.value
+
+        // Darf weder crashen noch einen Netzwerkaufruf als anon machen noch lokale Daten verlieren
+        repo.syncWithBackend(
+            serverBaseUrl = "https://example-project.supabase.co",
+            supabaseAnonKey = "sb_publishable_test"
+        )
+
+        assertFalse(
+            repo.syncStatus.value.startsWith("Sync erfolgreich"),
+            "Ohne Login darf kein erfolgreicher Sync gemeldet werden, Status war: ${repo.syncStatus.value}"
+        )
+        assertEquals(before, repo.snapshot.value, "Lokaler Snapshot muss unverändert bleiben")
+    }
+
+    @Test
+    fun testSecretKeysAreNeverUsedClientSide() {
+        // Über die Runtime-Konfiguration lässt sich kein sb_secret_ Key einschleusen;
+        // resolvedApiKey() darf ihn in keinem Fall zurückgeben.
+        assertFalse(SupabaseConfig.resolvedApiKey().startsWith("sb_secret_", ignoreCase = true))
     }
 }

@@ -50,27 +50,34 @@ object SupabaseConfig {
 
     /**
      * Liefert den sicheren Client-API-Key für die KMP-App (Desktop, Web, iOS, Android).
-     * Bevorzugt `sb_publishable_...` bzw. Nicht-Secret-Keys (`SUPABASE_PUBLIC_KEY`),
-     * da `sb_secret_...`-Keys von Supabase im Browser blockiert werden und nur für reine
-     * Server-Backends gedacht sind.
+     * Nur `sb_publishable_...` bzw. Nicht-Secret-Keys (`SUPABASE_PUBLIC_KEY`, dann
+     * `SUPABASE_ANON_KEY`). `sb_secret_...`-Keys umgehen RLS und gehören nur in
+     * Server-Backends – sie werden hier NIE zurückgegeben; dann ist das Ergebnis "".
      */
     fun resolvedApiKey(): String {
         val p = publicKey.trim()
         val a = anonKey.trim()
         return when {
-            p.isNotEmpty() && !p.startsWith("http", ignoreCase = true) && !p.startsWith("sb_secret_", ignoreCase = true) -> p
-            a.isNotEmpty() && !a.startsWith("http", ignoreCase = true) && !a.startsWith("sb_secret_", ignoreCase = true) -> a
-            p.isNotEmpty() && !p.startsWith("http", ignoreCase = true) -> p
-            a.isNotEmpty() && !a.startsWith("http", ignoreCase = true) -> a
+            isClientSafeKey(p) -> p
+            isClientSafeKey(a) -> a
             else -> ""
         }
     }
 
+    private fun isClientSafeKey(key: String): Boolean =
+        key.isNotEmpty() &&
+            !key.startsWith("http", ignoreCase = true) &&
+            !key.startsWith("sb_secret_", ignoreCase = true) &&
+            // Legacy-JWT-Keys: der service_role-Key ist ebenfalls ein Secret
+            !extractJwtClaim(key, "role").equals("service_role", ignoreCase = true)
+
     fun hasConfiguredKeys(): Boolean =
         resolvedApiKey().isNotBlank()
 
+    private fun extractProjectRefFromJwt(token: String): String? = extractJwtClaim(token, "ref")
+
     @OptIn(ExperimentalEncodingApi::class)
-    private fun extractProjectRefFromJwt(token: String): String? {
+    private fun extractJwtClaim(token: String, claim: String): String? {
         val trimmed = token.trim()
         val parts = trimmed.split('.')
         if (parts.size != 3) return null
@@ -80,7 +87,7 @@ object SupabaseConfig {
             val decodedBytes = Base64.UrlSafe.decode(padded)
             val jsonString = decodedBytes.decodeToString()
             val jsonObj = Json.parseToJsonElement(jsonString).jsonObject
-            jsonObj["ref"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            jsonObj[claim]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         }.getOrNull()
     }
 }
