@@ -20,7 +20,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 
 1. **Datenhaltung & Synchronisation (Offline-First)**:
    - Jeder Client speichert Daten lokal (`PlatformStorage`: Desktop nutzt SQLDelight SQLite + JSON-Snapshot unter `~/.handball-stat-tracker/`, Web nutzt Browser `localStorage`, iOS `NSUserDefaults`, Android lokalen App-Storage).
-   - Zusätzlich existiert im selben Projekt ein eigenes **Ktor-Backend (`:server`)** mit SQLite-Datenbank (`~/.handball-stat-tracker-server/`), über das alle Clients via `GET/POST /api/sync` synchronisieren können.
+   - Einziges Backend ist **Supabase** (PostgreSQL + PostgREST, später GoTrue Auth). Clients synchronisieren über `SupabaseSyncService`. Das frühere eigene Ktor-Backend (`:server`) wurde entfernt, da die App primär als Android-/Desktop-App am Spielfeldrand genutzt wird und Supabase Datenbank, API und Auth abdeckt.
 2. **Datenmodell & Erweiterungen gegenüber dem Mermaid-Diagramm**:
    - **7 klassische Handball-Positionen** (`TW`, `LA`, `RL`, `RM`, `RR`, `RA`, `KM`) werden automatisch als Seed-Daten in `POSITION` angelegt; eigene Positionen können ergänzt werden.
    - **Trainer (`COACH`)**: Werden in derselben Tabelle `PLAYER` über `role = PlayerRole.COACH` gespeichert (`position_id`, `jersey_number_home_kit` und `jersey_number_away_kit` sind dafür `nullable`).
@@ -61,7 +61,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - **`:shared`**:
   - `shared/src/commonMain/sqldelight/com/handball/stattracker/db/HandballDatabase.sq` – SQLDelight-Tabellen & Queries (inkl. `GAME_LOG` & Aufstellungs-/Plus-Minus-Feldern)
   - `shared/src/commonMain/kotlin/com/handball/stattracker/model/Models.kt` – Alle Entitäten, `DatabaseSnapshot`, `GameLogEntry`, `GameLogEventType`, `StandingsRow`, `PlayerAggregatedStats`, `PlayerGameHistoryEntry`, `PlayerGamePerformancePoint`, `PositionMetricComparison`, `PlayerRankingEntry`, `RadarMetricAxis`
-  - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/HandballRepository.kt` – StateFlow-Datenhaltung, CRUD, 7-on-Court Aufstellung inkl. `6+1` / `7+0` Regel-Check, 2-Klick-Wechsel, Spieluhr, Plus/Minus-Automatik, Spielprotokoll, 2-Punkte-Tabellenberechnung, Performance-Index, Positionsvergleich, Spieler-Ranking, Ktor-Sync
+  - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/HandballRepository.kt` – StateFlow-Datenhaltung, CRUD, 7-on-Court Aufstellung inkl. `6+1` / `7+0` Regel-Check, 2-Klick-Wechsel, Spieluhr, Plus/Minus-Automatik, Spielprotokoll, 2-Punkte-Tabellenberechnung, Performance-Index, Positionsvergleich, Spieler-Ranking, Supabase-Sync
   - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/DemoDataSeed.kt` – Initiale Demo-Daten (mit 7 aktiven Feld-/Torwartspielern, Bankspielern, `+/-`, Einsatzzeiten und realistischen Führungswechseln im Spielprotokoll)
   - `shared/src/commonMain/kotlin/com/handball/stattracker/storage/PlatformStorage.kt` (+ `desktopMain`, `jsMain`, `iosMain`, `androidMain`)
   - `shared/src/commonTest/kotlin/com/handball/stattracker/HandballRepositoryTest.kt` – Unit-Tests (inkl. Tests für `6 Feld + 1 TW` vs. `7 Feld + 0 TW` und Verbot eines 2. Torwarts auf dem Feld)
@@ -74,8 +74,6 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/SeasonScreen.kt` – Saison-Ansicht & Spiel-Dashboard (Spieluhr, Links: 7 Aktive Spieler vs. Rechts: Bank, 2-Klick-Wechsel mit `6+1`/`7+0`-Check, eigener Tab `Verlauf & Protokoll` mit `+3/0/-3` Torverlauf)
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/StandingsScreen.kt` – Ligatabelle
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/PlusCreationDialogs.kt` – `+`-Menü & Erstellungsdialoge
-- **`:server`**:
-  - `server/src/main/kotlin/com/handball/stattracker/server/Application.kt` – Ktor-Server (Port 8080) mit SQLite-Persistenz & `/api/sync`
 
 ---
 
@@ -83,10 +81,9 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 
 - Auf dem System ist **Java 26 (`jdk-26.0.1`)** installiert; daher wird **Gradle 9.8.2** genutzt und in den `build.gradle.kts`-Dateien mit `JvmTarget.JVM_21` kompiliert (ohne `foojay-resolver`, da dieser in älteren Versionen mit Gradle 9.8 inkompatibel war).
 - **Wichtige Befehle**:
-  - Build & Tests prüfen: `.\gradlew.bat :shared:compileKotlinDesktop :composeApp:compileKotlinDesktop :server:compileKotlin :shared:desktopTest`
+  - Build & Tests prüfen: `.\gradlew.bat :shared:compileKotlinDesktop :composeApp:compileKotlinDesktop :shared:desktopTest`
   - Desktop-App starten: `.\gradlew.bat :composeApp:run`
   - Web-App starten: `.\gradlew.bat :composeApp:jsBrowserDevelopmentRun`
-  - Ktor-Backend starten: `.\gradlew.bat :server:run`
 
 ---
 

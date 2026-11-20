@@ -4,10 +4,7 @@ import com.handball.stattracker.config.SupabaseConfig
 import com.handball.stattracker.model.*
 import com.handball.stattracker.storage.PlatformStorage
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -2018,37 +2015,27 @@ class HandballRepository(
         }
     }
 
-    // --- OFFLINE-FIRST BACKEND SYNC (Supabase & lokaler Ktor-Server) ---
+    // --- OFFLINE-FIRST CLOUD SYNC (Supabase) ---
     suspend fun syncWithBackend(
-        serverBaseUrl: String = SupabaseConfig.resolvedProjectUrl().ifBlank { "http://localhost:8080" },
+        supabaseUrl: String = SupabaseConfig.resolvedProjectUrl(),
         supabaseAnonKey: String = SupabaseConfig.resolvedApiKey()
     ) {
         val cleanAnonKey = supabaseAnonKey.trim().ifBlank { SupabaseConfig.resolvedApiKey() }
-        val normalizedUrl = serverBaseUrl.trim().trimEnd('/').ifBlank {
-            SupabaseConfig.resolvedProjectUrl().ifBlank { "http://localhost:8080" }
-        }
-        val isSupabase = cleanAnonKey.isNotEmpty() || normalizedUrl.contains(".supabase.co", ignoreCase = true)
+        val normalizedUrl = supabaseUrl.trim().trimEnd('/').ifBlank { SupabaseConfig.resolvedProjectUrl() }
 
-        if (isSupabase && cleanAnonKey.isEmpty()) {
-            _syncStatus.value = "Bitte SUPABASE_ANON_KEY / SUPABASE_PUBLIC_KEY in .env oder im Feld eintragen."
+        if (normalizedUrl.isEmpty() || cleanAnonKey.isEmpty()) {
+            _syncStatus.value = "Bitte SUPABASE_URL und SUPABASE_PUBLIC_KEY in .env oder im Feld eintragen."
             return
         }
 
         _syncStatus.value = "Synchronisiere mit $normalizedUrl ..."
         try {
-            val response: DatabaseSnapshot = if (isSupabase) {
-                SupabaseSyncService.syncSnapshotWithSupabase(
-                    httpClient = httpClient,
-                    baseUrl = normalizedUrl,
-                    apiKey = cleanAnonKey,
-                    localSnapshot = _snapshot.value
-                )
-            } else {
-                httpClient.post("$normalizedUrl/api/sync") {
-                    contentType(ContentType.Application.Json)
-                    setBody(_snapshot.value)
-                }.body()
-            }
+            val response: DatabaseSnapshot = SupabaseSyncService.syncSnapshotWithSupabase(
+                httpClient = httpClient,
+                baseUrl = normalizedUrl,
+                apiKey = cleanAnonKey,
+                localSnapshot = _snapshot.value
+            )
             _snapshot.value = response
             PlatformStorage.saveSnapshot(response)
             _syncStatus.value = "Sync erfolgreich mit $normalizedUrl (${response.games.size} Spiele, ${response.players.size} Kader)"
