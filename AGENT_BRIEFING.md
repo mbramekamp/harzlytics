@@ -136,7 +136,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - **Alles implementiert und per Desktop-Tests/-Screenshots geprüft:** Login mit Rollen (Spieler read-only, Trainer/Admin bearbeiten), Admin-Benutzerverwaltung, verschlüsselte Token-Speicherung, Android-Datenordner `filesDir` mit Umzug, Sync-Fixes (keine verlorenen Eingaben), Lila/Weiß-Theme, Inhalts-Audit Welle 1 und 2.
 - **Welle 2 enthielt:** Vereinsname und Teilnehmer-Auswahl wanderten aus Start/Tabelle in den `ClubDialog` (Konto-Dialog → "Verein verwalten", nur Trainer/Admin); der Knopf "Gegner" in der Tabelle ist weg (Gegner nur über `+`); Spielwerte in der Kader-Historie sind Wert-Paare (`GameValueRow`) ohne Nullwerte statt einer langen Textzeile; Profil-Kennzahlen zeigen "0× 2Min" nicht mehr.
 - **Branches:** Arbeitsbranch `claude/repository-status-o99lyd`, `main` wird nur per Fast-Forward nachgezogen.
-- **Tests:** 59 Logik-Tests (`:shared:desktopTest`) + 12 Screenshot-Tests (`:composeApp:desktopTest`).
+- **Tests:** 59 Logik-Tests (`:shared:desktopTest`) + 15 Screenshot-Tests (`:composeApp:desktopTest`).
 
 ### 6.2 Offene Entscheidungen des Nutzers (nicht eigenmächtig ändern)
 1. **Filter "Alle / Eigene Spiele / Liga-Spiele"** in der Saison-Liste: behalten oder streichen?

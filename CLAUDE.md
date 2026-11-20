@@ -17,7 +17,7 @@ Full history, decisions, roadmap and the **hand-over state** (what is done, what
 ## Commands (Windows, Java 26, Gradle 9.8.2, JvmTarget 21)
 - Full check: `.\gradlew.bat :shared:compileKotlinDesktop :composeApp:compileKotlinDesktop :shared:desktopTest :composeApp:desktopTest`
 - Desktop app: `.\gradlew.bat :composeApp:run`; Android APK: `.\gradlew.bat :composeApp:assembleDebug` (needs `.env` with the Supabase keys at build time)
-- `:composeApp:desktopTest` renders the main screens headless (desktop/mobile, light/dark, player profile, club dialog) to `composeApp/build/screenshots/` (`ScreenshotTest`). **Look at the PNGs after every UI change.** Pass `width`/`height` in dp (the helper multiplies by density).
+- `:composeApp:desktopTest` renders the main screens headless (desktop/mobile, light/dark, player profile, account/club/user dialogs) to `composeApp/build/screenshots/` (`ScreenshotTest`). **Look at the PNGs after every UI change.** Pass `width`/`height` in dp (the helper multiplies by density).
 - Cloud sessions (Linux): Gradle works, but there is **no Android SDK** (installing it needs license acceptance, which the sandbox blocks), so Android code (`androidMain`, `MainActivity`) is not compiled there. A Kotlin incremental-compile bug sometimes appears after changes in `:shared` ("FqNames can't be derived"): `rm -rf composeApp/build/kotlin composeApp/build/classes` and rebuild. Maven Central may answer 429; just retry.
 
 ## Conventions

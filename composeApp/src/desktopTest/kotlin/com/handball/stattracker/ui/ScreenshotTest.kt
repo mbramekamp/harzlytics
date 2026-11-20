@@ -2,7 +2,10 @@ package com.handball.stattracker.ui
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.handball.stattracker.model.AuthActionResult
@@ -125,6 +128,76 @@ class ScreenshotTest {
             assertTrue(file.length() > 3_000)
         } finally {
             scene.close()
+        }
+    }
+
+    /** Zeichnet einen Dialog (so, wie ihn der Nutzer sieht) auf neutralem Hintergrund. */
+    private fun renderDialog(name: String, width: Int, height: Int, dark: Boolean = false, dialog: @androidx.compose.runtime.Composable () -> Unit) {
+        val scene = ImageComposeScene(width, height, Density(1f)) {
+            com.handball.stattracker.ui.theme.HandballTheme(darkTheme = dark) {
+                androidx.compose.material3.Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.background) {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize())
+                }
+                dialog()
+            }
+        }
+        try {
+            var image = scene.render(0)
+            for (i in 1..5) image = scene.render(i * 100_000_000L)
+            val file = File(outDir, "$name.png").also { it.writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes) }
+            assertTrue(file.length() > 3_000, "$name leer")
+        } finally {
+            scene.close()
+        }
+    }
+
+    private fun adminRepo(): HandballRepository =
+        HandballRepository(persistLocally = false, canEdit = true).also { it.replaceSnapshot(DemoDataSeed.createDemoSnapshot()) }
+
+    @Test
+    fun adminAccountDialog() {
+        val repo = adminRepo()
+        renderDialog("dialog-admin-konto", 700, 560) {
+            CompositionLocalProvider(LocalUserRole provides UserRole.ADMIN) {
+                com.handball.stattracker.ui.screens.AccountDialog(
+                    profile = profile, email = profile.email, offline = false,
+                    players = repo.snapshot.value.players,
+                    onRequestClaim = { AuthActionResult.Success },
+                    onSignOut = {}, darkTheme = false, onToggleDarkTheme = {},
+                    onOpenClub = {}, onOpenAdmin = {}, onDismiss = {}
+                )
+            }
+        }
+    }
+
+    @Test
+    fun adminClubDialog() {
+        val repo = adminRepo()
+        val snapshot = repo.snapshot.value
+        renderDialog("dialog-admin-verein", 700, 560) {
+            CompositionLocalProvider(LocalUserRole provides UserRole.ADMIN) {
+                com.handball.stattracker.ui.screens.ClubDialog(repo, snapshot, snapshot.seasons.first().seasonId, onDismiss = {})
+            }
+        }
+    }
+
+    @Test
+    fun adminUserDialog() {
+        val users = listOf(
+            profile,
+            UserProfile(id = "p1", email = "nina@club.de", fullName = "Nina Neu", status = "PENDING"),
+            UserProfile(id = "c1", email = "max@club.de", fullName = "Max Muster", status = "ACTIVE", claimPlayerId = 4),
+            UserProfile(id = "l1", email = "lena@club.de", fullName = "Lena Lang", role = UserRole.TRAINER, status = "ACTIVE", playerId = 9),
+            UserProfile(id = "s1", email = "sven@club.de", fullName = "Sven Gesperrt", status = "SUSPENDED")
+        )
+        val api = object : com.handball.stattracker.repository.AdminApi {
+            override suspend fun listProfiles(accessToken: String) = users
+            override suspend fun patchProfile(accessToken: String, userId: String, patch: kotlinx.serialization.json.JsonObject) {}
+        }
+        val admin = com.handball.stattracker.repository.AdminRepository(api, ownUserId = profile.id) { "token" }
+        val repo = adminRepo()
+        renderDialog("dialog-admin-benutzer", 760, 760) {
+            com.handball.stattracker.ui.screens.AdminDialog(admin, profile.id, repo.snapshot.value.players, onDismiss = {})
         }
     }
 }
