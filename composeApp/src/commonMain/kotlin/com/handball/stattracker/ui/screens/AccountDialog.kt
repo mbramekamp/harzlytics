@@ -22,9 +22,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun RoleBadge(role: UserRole, offline: Boolean = false, modifier: Modifier = Modifier) {
     val container = when (role) {
-        UserRole.ADMIN -> MaterialTheme.colorScheme.tertiaryContainer
+        UserRole.ADMIN -> MaterialTheme.colorScheme.primary
         UserRole.TRAINER -> MaterialTheme.colorScheme.primaryContainer
-        UserRole.SPIELER -> MaterialTheme.colorScheme.secondaryContainer
+        UserRole.SPIELER -> MaterialTheme.colorScheme.surfaceContainerHighest
     }
     Surface(shape = RoundedCornerShape(50), color = container, modifier = modifier) {
         Text(

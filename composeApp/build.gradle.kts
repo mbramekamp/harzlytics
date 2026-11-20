@@ -48,6 +48,13 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
         }
+        named("desktopTest") {
+            // Demo-Daten für die Bildschirm-Vorschau (liegen im Test-Quellordner von :shared)
+            kotlin.srcDir("../shared/src/commonTest/kotlin/com/handball/stattracker/repository")
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }
 
@@ -97,4 +104,10 @@ compose.desktop {
             packageVersion = "1.0.0"
         }
     }
+}
+
+tasks.withType<Test>().configureEach {
+    // Vorschau-Bilder ohne Fenster rendern (Skia-Software-Rendering)
+    systemProperty("java.awt.headless", "true")
+    systemProperty("screenshot.dir", layout.buildDirectory.dir("screenshots").get().asFile.absolutePath)
 }

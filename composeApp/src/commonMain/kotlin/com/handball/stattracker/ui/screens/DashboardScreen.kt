@@ -1,6 +1,7 @@
 package com.handball.stattracker.ui.screens
 
 import com.handball.stattracker.ui.EditorOnly
+import com.handball.stattracker.ui.theme.seasonChipColors
 import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -145,7 +146,7 @@ fun DashboardScreen(
                     }
 
                     EditorOnly {
-                        FilledTonalButton(onClick = onOpenPlusMenu) {
+                        Button(onClick = onOpenPlusMenu) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(Modifier.width(6.dp))
                             Text("Neu")
@@ -164,7 +165,8 @@ fun DashboardScreen(
                             FilterChip(
                                 selected = season.seasonId == activeSeason?.seasonId,
                                 onClick = { onSelectSeason(season.seasonId) },
-                                label = { Text(season.division) }
+                                label = { Text(season.division) },
+                                colors = seasonChipColors()
                             )
                         }
                     }

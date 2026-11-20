@@ -28,6 +28,7 @@ import com.handball.stattracker.model.DatabaseSnapshot
 import com.handball.stattracker.repository.HandballRepository
 import com.handball.stattracker.ui.screens.*
 import com.handball.stattracker.ui.theme.HandballTheme
+import com.handball.stattracker.ui.theme.navigationItemColors
 
 enum class MainNavScreen(val label: String) {
     HOME_DASHBOARD("Home"),
@@ -82,7 +83,7 @@ fun HandballApp() {
 }
 
 @Composable
-private fun MainAppContent(
+internal fun MainAppContent(
     repository: HandballRepository,
     darkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
@@ -91,19 +92,21 @@ private fun MainAppContent(
     offline: Boolean,
     onRequestClaim: suspend (Int?) -> AuthActionResult,
     adminRepository: AdminRepository?,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    initialScreen: MainNavScreen = MainNavScreen.HOME_DASHBOARD,
+    initialGameId: Int? = null
 ) {
     val snapshot by repository.snapshot.collectAsState()
     val canEdit = rememberCanEdit()
     var showAccount by remember { mutableStateOf(false) }
     var showAdmin by remember { mutableStateOf(false) }
 
-    var currentScreen by remember { mutableStateOf(MainNavScreen.HOME_DASHBOARD) }
+    var currentScreen by remember { mutableStateOf(initialScreen) }
     var selectedSeasonId by remember(snapshot.seasons) {
         mutableStateOf(snapshot.seasons.firstOrNull()?.seasonId ?: 1)
     }
     var selectedPlayerId by remember { mutableStateOf<Int?>(null) }
-    var selectedGameId by remember { mutableStateOf<Int?>(null) }
+    var selectedGameId by remember { mutableStateOf(initialGameId) }
     var creationModal by remember { mutableStateOf(CreationModalType.NONE) }
     // Spieler dürfen nichts anlegen; die Buttons sind ohnehin ausgeblendet, dies ist die zweite Absicherung
     val openModal: (CreationModalType) -> Unit = { if (canEdit) creationModal = it }
@@ -454,11 +457,12 @@ private fun StaticTopHeaderBox(
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         tonalElevation = 2.dp
     ) {
-        Box(
+        Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-            contentAlignment = Alignment.Center
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Titel nimmt den Platz links vom Konto ein und überlappt es nie
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
@@ -473,7 +477,6 @@ private fun StaticTopHeaderBox(
                 )
             }
             Row(
-                modifier = Modifier.align(Alignment.CenterEnd),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onOpenAccount) {
@@ -577,13 +580,13 @@ private fun VerticalRoundedNavbar(
                         modifier = Modifier.size(52.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
+                            containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Neu anlegen (+)",
-                            tint = MaterialTheme.colorScheme.onSecondary
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
@@ -658,12 +661,14 @@ private fun BottomMobileNavbar(
     ) {
         NavigationBarItem(
             selected = currentScreen == MainNavScreen.HOME_DASHBOARD,
+            colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.HOME_DASHBOARD) },
             icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
             label = { Text("Home") }
         )
         NavigationBarItem(
             selected = currentScreen == MainNavScreen.ROSTER,
+            colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.ROSTER) },
             icon = { Icon(Icons.Default.Groups, contentDescription = "Kader") },
             label = { Text("Kader") }
@@ -680,8 +685,8 @@ private fun BottomMobileNavbar(
                 FloatingActionButton(
                     onClick = onOpenPlusMenu,
                     shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(2.dp),
                     modifier = Modifier.size(46.dp)
                 ) {
@@ -696,12 +701,14 @@ private fun BottomMobileNavbar(
 
         NavigationBarItem(
             selected = currentScreen == MainNavScreen.SEASON,
+            colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.SEASON) },
             icon = { Icon(Icons.Default.SportsHandball, contentDescription = "Saison") },
             label = { Text("Saison") }
         )
         NavigationBarItem(
             selected = currentScreen == MainNavScreen.STANDINGS,
+            colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.STANDINGS) },
             icon = { Icon(Icons.Default.FormatListNumbered, contentDescription = "Tabelle") },
             label = { Text("Tabelle") }

@@ -14,8 +14,10 @@ For the full history, design decisions and roadmap, read `AGENT_BRIEFING.md`. Th
 - Full check: `.\gradlew.bat :shared:compileKotlinDesktop :composeApp:compileKotlinDesktop :shared:desktopTest`
 - Tests only: `.\gradlew.bat :shared:desktopTest`
 - Desktop app: `.\gradlew.bat :composeApp:run`
+- Screenshots ohne Fenster: `.\gradlew.bat :composeApp:desktopTest` rendert die Hauptscreens (Desktop/Mobil, hell/dunkel) nach `composeApp/build/screenshots/` (`ScreenshotTest`). Nach UI-Änderungen ansehen.
 
 ## Conventions
+- Theme: Lila (leichter Magenta-Einschlag) auf Weiß, Dunkelmodus bleibt. `secondary` ist bewusst Bernstein (Gegenfarbe: Gast-Serien, Gelbe Karten, Auszeiten), `tertiary` Grün = "gut/positiv". Farben nur in `ui/theme/HandballTheme.kt` ändern, Text-Paare mindestens WCAG 4,5:1. Gemeinsame Komponentenfarben in `ui/theme/ComponentColors.kt`.
 - All UI text is **German**. Keep the UI clean: no explanatory help text, no redundant badges, no DB table names in labels.
 - Handball lineup rule: at most 7 on court, either 6 field + 1 TW or 7 field + 0 TW, never 2 TW at once. It is enforced in `isValidActiveCourtLineup` / `canSubstituteOrEnterCourt`. Changes to lineup logic need tests.
 - Coaches are stored in `PLAYER` with `role = PlayerRole.COACH`.

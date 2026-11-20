@@ -1,6 +1,7 @@
 package com.handball.stattracker.ui.screens
 
 import com.handball.stattracker.ui.EditorOnly
+import com.handball.stattracker.ui.theme.seasonChipColors
 import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -158,7 +159,8 @@ fun StandingsScreen(
                         FilterChip(
                             selected = season.seasonId == activeSeason?.seasonId,
                             onClick = { onSelectSeason(season.seasonId) },
-                            label = { Text(season.division) }
+                            label = { Text(season.division) },
+                            colors = seasonChipColors()
                         )
                     }
                 }
@@ -206,12 +208,17 @@ fun StandingsScreen(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Box(
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+              // Tabelle füllt auf breiten Fenstern die ganze Breite, auf schmalen scrollt sie waagerecht
+              val tableMinWidth = maxOf(620.dp, maxWidth)
+              // restliche Spalten (Pl., Sp., S, U, N, Tore, Diff., Punkte) + Zeilenrand = 426 dp, der Rest gehört dem Namen
+              val nameColumnWidth = maxOf(180.dp, tableMinWidth - 426.dp)
+              Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-            ) {
-                Column(modifier = Modifier.widthIn(min = 620.dp)) {
+              ) {
+                Column(modifier = Modifier.widthIn(min = tableMinWidth)) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -220,7 +227,7 @@ fun StandingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Pl.", modifier = Modifier.width(38.dp), fontWeight = FontWeight.Bold)
-                        Text("Mannschaft", modifier = Modifier.width(180.dp), fontWeight = FontWeight.Bold)
+                        Text("Mannschaft", modifier = Modifier.width(nameColumnWidth), fontWeight = FontWeight.Bold)
                         Text("Sp.", modifier = Modifier.width(42.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
                         Text("S", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
                         Text("U", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
@@ -249,7 +256,7 @@ fun StandingsScreen(
                                 modifier = Modifier.width(38.dp),
                                 fontWeight = FontWeight.Bold
                             )
-                            Column(modifier = Modifier.width(180.dp)) {
+                            Column(modifier = Modifier.width(nameColumnWidth)) {
                                 Text(
                                     text = row.teamName,
                                     fontWeight = if (row.isOwnTeam) FontWeight.ExtraBold else FontWeight.SemiBold,
@@ -279,6 +286,7 @@ fun StandingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                     }
                 }
+              }
             }
         }
 

@@ -100,8 +100,8 @@ class HandballRepository(
         }
     }
 
-    /** Ersetzt den kompletten lokalen Stand (z. B. Testdaten), ohne Sync auszulösen. */
-    internal fun replaceSnapshot(snapshot: DatabaseSnapshot) {
+    /** Ersetzt den kompletten lokalen Stand (Tests, Bildschirm-Vorschau), ohne Sync auszulösen. */
+    fun replaceSnapshot(snapshot: DatabaseSnapshot) {
         _snapshot.value = snapshot
         persist(snapshot)
     }
