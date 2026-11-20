@@ -1,5 +1,7 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.ui.EditorOnly
+import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -124,15 +126,19 @@ fun SeasonScreen(
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = onOpenNewSeasonDialog) {
-                                Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Saison")
+                            EditorOnly {
+                                OutlinedButton(onClick = onOpenNewSeasonDialog) {
+                                    Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Saison")
+                                }
                             }
-                            Button(onClick = onOpenNewGameDialog) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Spiel")
+                            EditorOnly {
+                                Button(onClick = onOpenNewGameDialog) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Spiel")
+                                }
                             }
                         }
                     }
@@ -156,21 +162,25 @@ fun SeasonScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            OutlinedButton(
-                                modifier = Modifier.weight(1f),
-                                onClick = onOpenNewSeasonDialog
-                            ) {
-                                Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Saison")
+                            EditorOnly {
+                                OutlinedButton(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = onOpenNewSeasonDialog
+                                ) {
+                                    Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Saison")
+                                }
                             }
-                            Button(
-                                modifier = Modifier.weight(1f),
-                                onClick = onOpenNewGameDialog
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Spiel")
+                            EditorOnly {
+                                Button(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = onOpenNewGameDialog
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Spiel")
+                                }
                             }
                         }
                     }
@@ -230,8 +240,10 @@ fun SeasonScreen(
                         text = "Noch keine Spiele in dieser Ansicht vorhanden.",
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Button(onClick = onOpenNewGameDialog) {
-                        Text("Erstes Spiel für diese Saison anlegen")
+                    EditorOnly {
+                        Button(onClick = onOpenNewGameDialog) {
+                            Text("Erstes Spiel für diese Saison anlegen")
+                        }
                     }
                 }
             }
@@ -351,6 +363,7 @@ private fun GameInteractiveDashboard(
     onBack: () -> Unit,
     onNavigateToPlayer: (Int) -> Unit
 ) {
+    val canEdit = rememberCanEdit()
     var isEditMode by remember(game.gameId) { mutableStateOf(false) }
     var isClockRunning by remember(game.gameId) { mutableStateOf(false) }
     // 0 = Aufstellung: Feld (7) & Bank, 1 = Spielprotokoll & Torverlauf, 2 = Trainer & Auszeiten, 3 = Kader nominieren (nur im Edit-Modus)
@@ -452,7 +465,7 @@ private fun GameInteractiveDashboard(
                 onCourtCount = onCourtParticipants.size,
                 activeSuspensions = activeSuspensions,
                 onBack = onBack,
-                onToggleEditMode = { isEditMode = !isEditMode },
+                onToggleEditMode = { if (canEdit) isEditMode = !isEditMode },
                 onToggleClockRunning = { isClockRunning = !isClockRunning },
                 onAdjustClock = { deltaSec -> repository.advanceGameClock(game.gameId, deltaSec) },
                 onSetClock = { targetSec -> repository.setGameClockSeconds(game.gameId, targetSec) },
@@ -564,8 +577,10 @@ private fun GameInteractiveDashboard(
                             },
                             onNavigateToPlayer = onNavigateToPlayer,
                             onEnterEditAndManageSquad = {
-                                isEditMode = true
-                                activeTab = 3
+                                if (canEdit) {
+                                    isEditMode = true
+                                    activeTab = 3
+                                }
                             }
                         )
                     }
@@ -586,8 +601,10 @@ private fun GameInteractiveDashboard(
                             EmptySquadHint(
                                 isEditMode = isEditMode,
                                 onEnterEditAndManageSquad = {
-                                    isEditMode = true
-                                    activeTab = 3
+                                    if (canEdit) {
+                                        isEditMode = true
+                                        activeTab = 3
+                                    }
                                 }
                             )
                         } else {
@@ -726,10 +743,12 @@ private fun ScoreboardAndMatchClockCard(
                                 Text("Fertig")
                             }
                         } else {
-                            Button(onClick = onToggleEditMode) {
-                                Icon(Icons.Default.Edit, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Bearbeiten")
+                            EditorOnly {
+                                Button(onClick = onToggleEditMode) {
+                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Bearbeiten")
+                                }
                             }
                         }
                     }
@@ -763,10 +782,12 @@ private fun ScoreboardAndMatchClockCard(
                                 Text("Fertig")
                             }
                         } else {
-                            Button(onClick = onToggleEditMode) {
-                                Icon(Icons.Default.Edit, contentDescription = null)
-                                Spacer(Modifier.width(4.dp))
-                                Text("Bearbeiten")
+                            EditorOnly {
+                                Button(onClick = onToggleEditMode) {
+                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Bearbeiten")
+                                }
                             }
                         }
                     }
@@ -2293,8 +2314,10 @@ private fun EmptySquadHint(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("Noch keine Personen dieser Kategorie für dieses Spiel nominiert.")
-            Button(onClick = onEnterEditAndManageSquad) {
-                Text(if (isEditMode) "Spieltagskader auswählen" else "Bearbeitungsmodus starten & Kader auswählen")
+            EditorOnly {
+                Button(onClick = onEnterEditAndManageSquad) {
+                    Text(if (isEditMode) "Spieltagskader auswählen" else "Bearbeitungsmodus starten & Kader auswählen")
+                }
             }
         }
     }

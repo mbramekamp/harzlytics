@@ -17,7 +17,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.automirrored.filled.Logout
+import com.handball.stattracker.model.AuthActionResult
 import com.handball.stattracker.model.AuthState
+import com.handball.stattracker.model.UserProfile
 import com.handball.stattracker.repository.AuthRepository
 import kotlinx.coroutines.launch
 import com.handball.stattracker.model.DatabaseSnapshot
@@ -50,25 +52,26 @@ fun HandballApp() {
             is AuthState.SignedIn -> {
                 val userId = state.session.userId
                 val repository = remember(userId) {
-                    HandballRepository(autoSync = true).also { it.prepareForAccount(userId) }
+                    HandballRepository(autoSync = true, canEdit = state.profile.canEdit)
+                        .also { it.prepareForAccount(userId) }
                 }
+                // Rolle kann sich ändern (Profil wird regelmäßig neu geladen)
+                LaunchedEffect(repository, state.profile.canEdit) { repository.setCanEdit(state.profile.canEdit) }
                 LaunchedEffect(userId) { repository.syncWithBackend() }
                 LaunchedEffect(userId) { auth.keepSessionFresh() }
 
-                val name = state.profile.fullName.ifBlank { state.session.email }
-                val accountLabel = buildString {
-                    append(name)
-                    append(" · ")
-                    append(state.profile.role.label)
-                    if (state.offline) append(" · offline")
+                CompositionLocalProvider(LocalUserRole provides state.profile.role) {
+                    MainAppContent(
+                        repository = repository,
+                        darkTheme = darkTheme,
+                        onToggleDarkTheme = { darkTheme = !darkTheme },
+                        profile = state.profile,
+                        email = state.session.email,
+                        offline = state.offline,
+                        onRequestClaim = { playerId -> auth.requestPlayerClaim(playerId) },
+                        onSignOut = { scope.launch { auth.signOut() } }
+                    )
                 }
-                MainAppContent(
-                    repository = repository,
-                    darkTheme = darkTheme,
-                    onToggleDarkTheme = { darkTheme = !darkTheme },
-                    accountLabel = accountLabel,
-                    onSignOut = { scope.launch { auth.signOut() } }
-                )
             }
         }
     }
@@ -79,10 +82,15 @@ private fun MainAppContent(
     repository: HandballRepository,
     darkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
-    accountLabel: String,
+    profile: UserProfile,
+    email: String,
+    offline: Boolean,
+    onRequestClaim: suspend (Int?) -> AuthActionResult,
     onSignOut: () -> Unit
 ) {
     val snapshot by repository.snapshot.collectAsState()
+    val canEdit = rememberCanEdit()
+    var showAccount by remember { mutableStateOf(false) }
 
     var currentScreen by remember { mutableStateOf(MainNavScreen.HOME_DASHBOARD) }
     var selectedSeasonId by remember(snapshot.seasons) {
@@ -91,6 +99,8 @@ private fun MainAppContent(
     var selectedPlayerId by remember { mutableStateOf<Int?>(null) }
     var selectedGameId by remember { mutableStateOf<Int?>(null) }
     var creationModal by remember { mutableStateOf(CreationModalType.NONE) }
+    // Spieler dürfen nichts anlegen; die Buttons sind ohnehin ausgeblendet, dies ist die zweite Absicherung
+    val openModal: (CreationModalType) -> Unit = { if (canEdit) creationModal = it }
 
     val staticHeaderTitle = remember(currentScreen, selectedPlayerId, selectedSeasonId, selectedGameId, snapshot) {
         computeHeaderTitle(
@@ -132,7 +142,7 @@ private fun MainAppContent(
                                     selectedGameId = null
                                 }
                             },
-                            onOpenPlusMenu = { creationModal = CreationModalType.CHOOSER },
+                            onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) },
                             onToggleDarkTheme = onToggleDarkTheme
                         )
 
@@ -143,7 +153,10 @@ private fun MainAppContent(
                             StaticTopHeaderBox(
                                 title = staticHeaderTitle,
                                 subtitle = snapshot.ownClubName,
-                                accountLabel = accountLabel,
+                                profile = profile,
+                                email = email,
+                                offline = offline,
+                                onOpenAccount = { showAccount = true },
                                 onSignOut = onSignOut
                             )
 
@@ -174,7 +187,7 @@ private fun MainAppContent(
                                         }
                                     },
                                     onNavigateToStandings = { currentScreen = MainNavScreen.STANDINGS },
-                                    onOpenModal = { creationModal = it }
+                                    onOpenModal = openModal
                                 )
                             }
                         }
@@ -197,7 +210,7 @@ private fun MainAppContent(
                             },
                             darkTheme = darkTheme,
                             onToggleDarkTheme = onToggleDarkTheme,
-                            onSignOut = onSignOut
+                            onOpenAccount = { showAccount = true }
                         )
 
                         Box(
@@ -225,7 +238,7 @@ private fun MainAppContent(
                                     }
                                 },
                                 onNavigateToStandings = { currentScreen = MainNavScreen.STANDINGS },
-                                onOpenModal = { creationModal = it }
+                                onOpenModal = openModal
                             )
                         }
 
@@ -237,10 +250,22 @@ private fun MainAppContent(
                                     selectedGameId = null
                                 }
                             },
-                            onOpenPlusMenu = { creationModal = CreationModalType.CHOOSER }
+                            onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) }
                         )
                     }
                 }
+            }
+
+            if (showAccount) {
+                AccountDialog(
+                    profile = profile,
+                    email = email,
+                    offline = offline,
+                    players = snapshot.players,
+                    onRequestClaim = onRequestClaim,
+                    onSignOut = { showAccount = false; onSignOut() },
+                    onDismiss = { showAccount = false }
+                )
             }
 
             PlusCreationModalHost(
@@ -314,7 +339,7 @@ private fun MobileTopHeaderBar(
     onBack: () -> Unit,
     darkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
-    onSignOut: () -> Unit
+    onOpenAccount: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -383,10 +408,10 @@ private fun MobileTopHeaderBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            IconButton(onClick = onSignOut) {
+            IconButton(onClick = onOpenAccount) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Logout,
-                    contentDescription = "Abmelden",
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "Konto",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -398,7 +423,10 @@ private fun MobileTopHeaderBar(
 private fun StaticTopHeaderBox(
     title: String,
     subtitle: String,
-    accountLabel: String,
+    profile: UserProfile,
+    email: String,
+    offline: Boolean,
+    onOpenAccount: () -> Unit,
     onSignOut: () -> Unit
 ) {
     Surface(
@@ -430,14 +458,17 @@ private fun StaticTopHeaderBox(
                 modifier = Modifier.align(Alignment.CenterEnd),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = accountLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 260.dp)
-                )
+                TextButton(onClick = onOpenAccount) {
+                    Text(
+                        text = profile.fullName.ifBlank { email },
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 200.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    RoleBadge(profile.role, offline)
+                }
                 IconButton(onClick = onSignOut) {
                     Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Abmelden")
                 }
@@ -522,19 +553,21 @@ private fun VerticalRoundedNavbar(
 
                 Spacer(Modifier.height(4.dp))
 
-                FilledIconButton(
-                    onClick = onOpenPlusMenu,
-                    modifier = Modifier.size(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Neu anlegen (+)",
-                        tint = MaterialTheme.colorScheme.onSecondary
-                    )
+                EditorOnly {
+                    FilledIconButton(
+                        onClick = onOpenPlusMenu,
+                        modifier = Modifier.size(52.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Neu anlegen (+)",
+                            tint = MaterialTheme.colorScheme.onSecondary
+                        )
+                    }
                 }
             }
 
@@ -618,26 +651,28 @@ private fun BottomMobileNavbar(
             label = { Text("Kader") }
         )
 
-        // Prominenter Plus-Button
-        Box(
-            modifier = Modifier
-                .weight(0.9f)
-                .wrapContentHeight(Alignment.CenterVertically),
-            contentAlignment = Alignment.Center
-        ) {
-            FloatingActionButton(
-                onClick = onOpenPlusMenu,
-                shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary,
-                elevation = FloatingActionButtonDefaults.elevation(2.dp),
-                modifier = Modifier.size(46.dp)
+        // Prominenter Plus-Button (nur Trainer/Admin)
+        EditorOnly {
+            Box(
+                modifier = Modifier
+                    .weight(0.9f)
+                    .wrapContentHeight(Alignment.CenterVertically),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Neu anlegen",
-                    modifier = Modifier.size(24.dp)
-                )
+                FloatingActionButton(
+                    onClick = onOpenPlusMenu,
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                    elevation = FloatingActionButtonDefaults.elevation(2.dp),
+                    modifier = Modifier.size(46.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Neu anlegen",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
 

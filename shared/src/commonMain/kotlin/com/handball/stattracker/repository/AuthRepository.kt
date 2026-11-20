@@ -131,6 +131,18 @@ class AuthRepository(
         }
     }
 
+    /** Beantragt die Verknüpfung des Kontos mit einem Kadereintrag (Freigabe durch einen Admin). */
+    suspend fun requestPlayerClaim(playerId: Int?): AuthActionResult {
+        val api = api ?: return notConfigured()
+        val session = currentSession() ?: return AuthActionResult.Error("Nicht angemeldet.")
+        return guarded {
+            val fresh = ensureFreshSession(session)
+            api.requestPlayerClaim(fresh.accessToken, fresh.userId, playerId)
+            publish(fresh, api.fetchProfile(fresh.accessToken, fresh.userId))
+            AuthActionResult.Success
+        }
+    }
+
     suspend fun signOut() {
         val session = currentSession()
         val api = api

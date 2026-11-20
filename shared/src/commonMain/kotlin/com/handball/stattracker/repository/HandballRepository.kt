@@ -25,8 +25,18 @@ import kotlin.coroutines.cancellation.CancellationException
 class HandballRepository(
     private val autoSync: Boolean = false,
     /** false = nichts lokal lesen/schreiben (Unit-Tests), damit echte Benutzerdaten unberührt bleiben. */
-    private val persistLocally: Boolean = true
+    private val persistLocally: Boolean = true,
+    /** false (Rolle SPIELER) = reiner Lesezugriff: Änderungen werden verworfen, nur der Sync liefert neue Daten. */
+    canEdit: Boolean = true
 ) {
+    @kotlin.concurrent.Volatile
+    private var editingAllowed: Boolean = canEdit
+
+    /** Wird bei Rollenwechsel (z. B. nach Profil-Neuladen) aktualisiert. */
+    fun setCanEdit(allowed: Boolean) {
+        editingAllowed = allowed
+    }
+
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var debounceSyncJob: Job? = null
 
@@ -57,6 +67,9 @@ class HandballRepository(
     }
 
     private fun mutate(block: (DatabaseSnapshot) -> DatabaseSnapshot) {
+        // Zweite Schutzschicht neben der UI (RoleGuard) und der Supabase-RPC: ein Spieler kann
+        // lokal nichts ändern, was der Server ohnehin nie annehmen würde.
+        if (!editingAllowed) return
         val now = Clock.System.now().toEpochMilliseconds()
         // update{} statt get+set: atomar gegenüber einem parallel endenden Sync
         val updated = _snapshot.updateAndGet { block(it).copy(lastUpdatedEpochMillis = now) }

@@ -103,7 +103,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
    - Umgesetzt: `HandballRepository.recommendStartingSeven(gameId, useSeventhFieldPlayer)` (reine Funktion → `StartingSevenRecommendation` mit Platz, Wahl, Zweitplatziertem und `StartingSevenScoreBreakdown`), Gewichtung in `StartingSevenWeights` (45 % Saison-Performance-Index, 40 % Form der letzten 5 Spiele, 15 % Plus/Minus pro Spiel). Ein noch nicht angepfiffenes Zielspiel fließt nicht in die Bewertung ein. Gesperrte/zeitbestrafte Spieler werden ausgeschlossen; unbesetzbare Positionen übernimmt der beste freie Feldspieler (als Ersatzlösung markiert).
    - `applyStartingSevenLineup(gameId, playerIds)` übernimmt eine (ggf. manuell getauschte) Aufstellung nur bei gültiger `6+1` / `7+0` Formation und protokolliert sie als `LINEUP_SET` im `GAME_LOG`; `applyRecommendedStartingSevenToGame` nutzt beides.
    - UI: `ui/screens/StartingSevenDialog.kt` (Vorschau je Position mit Saison/Form/+/-, Tausch mit dem Zweitplatzierten, Umschalter `6+1` / `7+0`, „Übernehmen“), geöffnet über alle Startsieben-Buttons in `SeasonScreen.kt`. Neu angelegte Spiele (`addGame`) starten automatisch mit der empfohlenen Startsieben (Fallback: erste Nominierte je Position). Abgesichert durch Unit-Tests in `HandballRepositoryTest.kt`.
-2. [ ] **User-Login, Authentifizierung & Benutzer-/Rollenverwaltung (RBAC)** – *gemäß [`USER_FEATURE.md`](file:///C:/Users/matsb/harzlytics/USER_FEATURE.md)*:
+2. [x] **User-Login, Authentifizierung & Benutzer-/Rollenverwaltung (RBAC)** – *gemäß [`USER_FEATURE.md`](file:///C:/Users/matsb/harzlytics/USER_FEATURE.md)*:
    - **Stand:** `supabase_schema.sql` (Tabellen, `sync_handball_snapshot` RPC) und `SupabaseSyncService.kt` existieren bereits. Zugriff abgesichert: `anon` hat keinen Zugriff mehr, `authenticated` nur Lesezugriff; Schreiben ausschließlich über die `SECURITY DEFINER`-RPC mit User-JWT (`SupabaseAuthSession.kt`). Cloud-Sync ist bis zum Login-Flow inaktiv. Das SQL wurde am 2026-11-19 im Supabase SQL Editor ausgeführt (Live-Projekt ist abgesichert).
    - [x] **Phase 1 (Supabase Backend & PostgreSQL RLS)** – umgesetzt in `supabase_schema.sql` (Abschnitte 3a, 3, 4, 5); *muss im Supabase SQL Editor erneut ausgeführt werden (idempotent)*:
      - `public.app_role` Enum, `public.user_profiles` (`id`, `email`, `full_name`, `role`, `player_id`, `claim_player_id`, `status`) und `public.club_invitations`. **Bewusst ohne FK auf `player`**, da der Sync `player` bei jedem Lauf neu befüllt.
@@ -113,21 +113,11 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
      - RLS: Fachtabellen nur lesbar für aktive Mitglieder; `user_profiles` eigenes Profil bzw. Admin alles; `club_invitations` nur Admin.
      - `sync_handball_snapshot`: nicht freigeschaltet → 403; `SPIELER` → reiner Lese-Sync; `TRAINER`/`ADMIN` → Schreib-Sync.
      - Erster Admin: nach eigener Registrierung `UPDATE public.user_profiles SET role = 'ADMIN', status = 'ACTIVE' WHERE email = '...';` im SQL Editor.
-   - [ ] **Phase 2 (KMP Shared Modul `:shared`)**:
-     - Auth-Datenmodelle (`UserRole`, `UserProfile`, `AuthTokens`, `AuthState`) in `model/AuthModels.kt` anlegen.
-     - `SupabaseAuthService` mit Ktor Client (`/auth/v1/signup`, `/auth/v1/token`, `/auth/v1/logout`) implementieren.
-     - `AuthRepository` mit `StateFlow<AuthState>` und automatischer Session-Wiederherstellung aufbauen.
-     - Multiplatform Token Storage in `PlatformStorage` absichern (Desktop Keyring/File, Android EncryptedSharedPreferences, iOS Keychain).
-     - `SupabaseSyncService` mit dynamischem `Authorization: Bearer <access_token>` Header ausstatten.
-   - [ ] **Phase 3 (Compose Multiplatform UI `:composeApp`)**:
-     - Auth Screens (`LoginScreen.kt`, `RegisterScreen.kt`, `ForgotPasswordDialog.kt`) entwickeln.
-     - Profil-Claiming-Dialog zur Verknüpfung von Spieler-Accounts mit vorhandenen Kadereinträgen implementieren.
-     - Wiederverwendbaren `RoleGuard(allowedRoles = ...)` Composable zur deklarativen Absicherung von Aktionen und UI-Elementen bereitstellen.
-     - Side-by-Side Live-Ticker (`SeasonScreen.kt`), Kader-Bearbeitung (`RosterScreen.kt`) und `+`-Erstellungsmenü (`PlusCreationDialogs.kt`) rollenspezifisch schützen (Read-Only für Spieler, Full-Access für Trainer/Admin).
-   - [ ] **Phase 4 (Navigation & Header-Integration)**:
-     - Aktives Benutzerprofil samt Rollen-Badge (`[Spieler]`, `[Trainer]`, `[Admin]`) im `StaticTopHeaderBox` (`HandballApp.kt`) anzeigen.
-     - Account-Menü mit Logout & Profilverwaltung integrieren.
-     - Navigation dynamisch an die Rolle anpassen.
+   - [x] **Phase 2 (KMP Shared Modul `:shared`)**: `model/AuthModels.kt`, `SupabaseAuthService` (Ktor, `/auth/v1/...` + Profil-Abfrage + `requestPlayerClaim`), `AuthRepository` (`StateFlow<AuthState>`, Session-Wiederherstellung auch offline, Token-Refresh), Token-Speicher über `PlatformStorage`, `SupabaseSyncService` mit Benutzer-JWT. *Offen:* Token-Speicher ist plattformüblicher App-Speicher, kein Keystore/Keychain.
+   - [x] **Phase 3 (Compose UI `:composeApp`)**: `LoginScreen` (Login, Registrierung mit optionalem Einladungscode, Passwort-Reset), `PendingApprovalScreen`, `ui/RoleGuard.kt` (`LocalUserRole`, `RoleGuard(vararg roles)`, `EditorOnly`, `rememberCanEdit()`; Standardrolle ohne Provider = SPIELER) und `screens/AccountDialog.kt` (Profil, Rollen-Badge, Kadereintrag beantragen/zurückziehen, Abmelden).
+     - Spieler sehen alles, aber ohne Bearbeiten-Button, `+`-Menü, Löschen, Vereinsnamen-Edit und Mannschaftszuordnung. Zusätzlich verwirft `HandballRepository(canEdit = false)` jede Änderung (`mutate`), und die RPC lässt Spieler serverseitig nur lesen.
+   - [x] **Phase 4 (Navigation & Header)**: Rollen-Badge und Konto-Dialog im Header (Desktop: Name + Badge klickbar; Mobil: Konto-Icon), `+`-Button in beiden Navigationsleisten nur für Trainer/Admin.
+   - [ ] **Offen:** Admin-Oberfläche in der App, um Konten freizuschalten und Kader-Verknüpfungen (`claim_player_id` → `player_id`) zu bestätigen. Bisher nur per SQL im Supabase-Dashboard.
 3. [ ] **Weitere Analyse-Erweiterungen (Optional)**:
    - Interaktives Wurfbild & 9-Zonen-Tor-Matrix (*Shot Map & Goal Sectors*) für Feldspieler und Torhüter.
    - Gegner-Scouting-Profile & Team-Splits (1. vs. 2. Halbzeit, Heim vs. Auswärts).

@@ -1,5 +1,7 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.ui.EditorOnly
+import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -177,11 +179,15 @@ private fun RosterListPanel(
                 fontWeight = FontWeight.Bold
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilledTonalIconButton(onClick = onOpenNewPlayerDialog) {
-                    Icon(Icons.Default.PersonAdd, contentDescription = "Neuen Spieler anlegen")
+                EditorOnly {
+                    FilledTonalIconButton(onClick = onOpenNewPlayerDialog) {
+                        Icon(Icons.Default.PersonAdd, contentDescription = "Neuen Spieler anlegen")
+                    }
                 }
-                FilledTonalIconButton(onClick = onOpenNewTrainerDialog) {
-                    Icon(Icons.Default.Sports, contentDescription = "Neuen Trainer anlegen")
+                EditorOnly {
+                    FilledTonalIconButton(onClick = onOpenNewTrainerDialog) {
+                        Icon(Icons.Default.Sports, contentDescription = "Neuen Trainer anlegen")
+                    }
                 }
             }
         }
@@ -410,28 +416,32 @@ private fun PlayerProfileDetailPanel(
                     }
 
                     if (isWideScreen) {
-                        OutlinedButton(
-                            onClick = {
-                                repository.deletePlayer(player.playerId)
-                                onDeleted()
+                        EditorOnly {
+                            OutlinedButton(
+                                onClick = {
+                                    repository.deletePlayer(player.playerId)
+                                    onDeleted()
+                                }
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Entfernen")
                             }
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Entfernen")
                         }
                     } else {
-                        IconButton(
-                            onClick = {
-                                repository.deletePlayer(player.playerId)
-                                onDeleted()
+                        EditorOnly {
+                            IconButton(
+                                onClick = {
+                                    repository.deletePlayer(player.playerId)
+                                    onDeleted()
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Spieler entfernen",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Spieler entfernen",
-                                tint = MaterialTheme.colorScheme.error
-                            )
                         }
                     }
                 }

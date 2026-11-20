@@ -12,7 +12,9 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -45,6 +47,8 @@ interface AuthApi {
     suspend fun signOut(accessToken: String)
     /** null = kein Profil vorhanden (z. B. SQL-Migration noch nicht ausgeführt). */
     suspend fun fetchProfile(accessToken: String, userId: String): UserProfile?
+    /** Beantragt die Verknüpfung mit einem Kadereintrag (`claim_player_id`); null nimmt den Antrag zurück. */
+    suspend fun requestPlayerClaim(accessToken: String, userId: String, playerId: Int?)
 }
 
 @Serializable
@@ -129,6 +133,15 @@ class SupabaseAuthService(
         if (response.status == HttpStatusCode.NotFound) return null
         ensureSuccess(response)
         return json.decodeFromString<List<UserProfile>>(response.bodyAsText()).firstOrNull()
+    }
+
+    override suspend fun requestPlayerClaim(accessToken: String, userId: String, playerId: Int?) {
+        val response = httpClient.patch("$baseUrl/rest/v1/user_profiles") {
+            authHeaders(accessToken)
+            parameter("id", "eq.$userId")
+            setBody(buildJsonObject { put("claim_player_id", playerId?.let { JsonPrimitive(it) } ?: JsonNull) })
+        }
+        ensureSuccess(response)
     }
 
     private fun HttpRequestBuilder.authHeaders(userJwt: String? = null) {

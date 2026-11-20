@@ -1,5 +1,7 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.ui.EditorOnly
+import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -129,21 +131,25 @@ fun DashboardScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
-                                IconButton(onClick = { editingClubName = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Vereinsnamen ändern",
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
+                                EditorOnly {
+                                    IconButton(onClick = { editingClubName = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Vereinsnamen ändern",
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    FilledTonalButton(onClick = onOpenPlusMenu) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Neu")
+                    EditorOnly {
+                        FilledTonalButton(onClick = onOpenPlusMenu) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Neu")
+                        }
                     }
                 }
 

@@ -1,5 +1,7 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.ui.EditorOnly
+import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -75,20 +77,26 @@ fun StandingsScreen(
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
-                                Icon(Icons.Default.Groups, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Mannschaften")
+                            EditorOnly {
+                                OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
+                                    Icon(Icons.Default.Groups, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Mannschaften")
+                                }
                             }
-                            OutlinedButton(onClick = onOpenNewOpponentDialog) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(Modifier.width(4.dp))
-                                Text("Gegner")
+                            EditorOnly {
+                                OutlinedButton(onClick = onOpenNewOpponentDialog) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Gegner")
+                                }
                             }
-                            Button(onClick = onOpenNewGameDialog) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(Modifier.width(4.dp))
-                                Text("Spiel")
+                            EditorOnly {
+                                Button(onClick = onOpenNewGameDialog) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Spiel")
+                                }
                             }
                         }
                     }
@@ -117,20 +125,26 @@ fun StandingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
-                            Icon(Icons.Default.Groups, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Mannschaften")
+                        EditorOnly {
+                            OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
+                                Icon(Icons.Default.Groups, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Mannschaften")
+                            }
                         }
-                        OutlinedButton(onClick = onOpenNewOpponentDialog) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Gegner")
+                        EditorOnly {
+                            OutlinedButton(onClick = onOpenNewOpponentDialog) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Gegner")
+                            }
                         }
-                        Button(onClick = onOpenNewGameDialog) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Spiel")
+                        EditorOnly {
+                            Button(onClick = onOpenNewGameDialog) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Spiel")
+                            }
                         }
                     }
                 }

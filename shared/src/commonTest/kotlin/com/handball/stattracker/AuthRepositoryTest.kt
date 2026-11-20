@@ -54,6 +54,10 @@ private class FakeAuthApi : AuthApi {
     override suspend fun sendPasswordReset(email: String) { net() }
     override suspend fun signOut(accessToken: String) { net() }
     override suspend fun fetchProfile(accessToken: String, userId: String): UserProfile? { net(); return profile }
+    override suspend fun requestPlayerClaim(accessToken: String, userId: String, playerId: Int?) {
+        net()
+        profile = profile?.copy(claimPlayerId = playerId)
+    }
 }
 
 class AuthRepositoryTest {
@@ -72,6 +76,26 @@ class AuthRepositoryTest {
         assertEquals(UserRole.TRAINER, state.profile.role)
         assertEquals("access-login", store.session?.accessToken)
         assertEquals("access-login", SupabaseAuthSession.currentAccessToken())
+    }
+
+    @Test
+    fun playerClaimRequestIsStoredAndReflectedInProfile() = runBlocking<Unit> {
+        val api = FakeAuthApi(); val store = MemoryStore()
+        val auth = repo(api, store)
+        auth.signIn("coach@club.de", "Richtig123")
+
+        assertIs<AuthActionResult.Success>(auth.requestPlayerClaim(7))
+        assertEquals(7, assertIs<AuthState.SignedIn>(auth.state.value).profile.claimPlayerId)
+        assertEquals(7, store.session?.profile?.claimPlayerId)
+
+        assertIs<AuthActionResult.Success>(auth.requestPlayerClaim(null))
+        assertNull(assertIs<AuthState.SignedIn>(auth.state.value).profile.claimPlayerId)
+    }
+
+    @Test
+    fun playerClaimRequestWithoutSessionFails() = runBlocking<Unit> {
+        val auth = repo(FakeAuthApi(), MemoryStore())
+        assertIs<AuthActionResult.Error>(auth.requestPlayerClaim(7))
     }
 
     @Test
