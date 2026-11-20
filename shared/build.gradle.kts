@@ -34,7 +34,7 @@ val generateSupabaseEnv = tasks.register("generateSupabaseEnv") {
 
         val rawAnon = envMap["SUPABASE_ANON_KEY"] ?: System.getenv("SUPABASE_ANON_KEY") ?: ""
         val rawPublic = envMap["SUPABASE_PUBLIC_KEY"] ?: System.getenv("SUPABASE_PUBLIC_KEY") ?: ""
-        // Secret Keys (sb_secret_...) niemals in den Client-Build (Web/Mobile) einbetten
+        // Secret Keys (sb_secret_...) niemals in den Client-Build (Desktop/Mobile) einbetten
         val safeAnonKey = if (rawAnon.startsWith("sb_secret_", ignoreCase = true)) "" else escapeKotlin(rawAnon)
         val publicKey = if (rawPublic.startsWith("sb_secret_", ignoreCase = true)) "" else escapeKotlin(rawPublic)
         val supabaseUrl = escapeKotlin(envMap["SUPABASE_URL"] ?: System.getenv("SUPABASE_URL") ?: "")
@@ -73,10 +73,6 @@ kotlin {
         }
     }
 
-    js {
-        browser()
-    }
-
     iosArm64()
     iosSimulatorArm64()
 
@@ -104,9 +100,6 @@ kotlin {
             implementation(libs.ktor.client.cio)
             implementation(libs.sqldelight.sqlite.driver)
             implementation(libs.sqlite.jdbc)
-        }
-        jsMain.dependencies {
-            implementation(libs.ktor.client.js)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

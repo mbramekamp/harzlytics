@@ -4,7 +4,7 @@ import com.handball.stattracker.model.DatabaseSnapshot
 
 /**
  * Plattformspezifische lokale Speicherung für den Offline-First-Modus
- * (Desktop: SQLDelight SQLite + Datei im User-Home, Web: Browser localStorage, iOS: NSUserDefaults/Dokumentenordner, Android: App-Storage).
+ * (Desktop: SQLDelight SQLite + Datei im User-Home, iOS: NSUserDefaults/Dokumentenordner, Android: App-Storage).
  */
 expect object PlatformStorage {
     fun loadSnapshot(): DatabaseSnapshot?

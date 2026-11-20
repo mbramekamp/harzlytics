@@ -1,6 +1,6 @@
 # Handball Stat Tracker (Kotlin Multiplatform)
 
-Eine **Kotlin Multiplatform (KMP)** & **Compose Multiplatform** Anwendung zur Erfassung und Auswertung von Handball-Spiel- und Kaderstatistiken für **Desktop (JVM)**, **Web (Browser)**, **iOS** und **Android** mit **Offline-First-Speicherung** und **Cloud-Synchronisation über Supabase**.
+Eine **Kotlin Multiplatform (KMP)** & **Compose Multiplatform** Anwendung zur Erfassung und Auswertung von Handball-Spiel- und Kaderstatistiken für **Android**, **Desktop (JVM)** und **iOS** mit **Offline-First-Speicherung** und **Cloud-Synchronisation über Supabase**.
 
 ---
 
@@ -8,7 +8,7 @@ Eine **Kotlin Multiplatform (KMP)** & **Compose Multiplatform** Anwendung zur Er
 
 - **`:shared`**:
   - **Datenmodell**: [Models.kt](file:///C:/Users/matsb/Desktop/Programmieren/Handball/shared/src/commonMain/kotlin/com/handball/stattracker/model/Models.kt) & SQLDelight-Schema [HandballDatabase.sq](file:///C:/Users/matsb/Desktop/Programmieren/Handball/shared/src/commonMain/sqldelight/com/handball/stattracker/db/HandballDatabase.sq) basierend auf [handball-stata-tracker-database-modell.mermaid](file:///C:/Users/matsb/Desktop/Programmieren/Handball/handball-stata-tracker-database-modell.mermaid).
-  - **Offline-First Persistenz**: [PlatformStorage.kt](file:///C:/Users/matsb/Desktop/Programmieren/Handball/shared/src/commonMain/kotlin/com/handball/stattracker/storage/PlatformStorage.kt) (Desktop: SQLite + Datei im User-Home, Web: Browser `localStorage`, iOS: `NSUserDefaults`, Android: App-Storage).
+  - **Offline-First Persistenz**: [PlatformStorage.kt](file:///C:/Users/matsb/Desktop/Programmieren/Handball/shared/src/commonMain/kotlin/com/handball/stattracker/storage/PlatformStorage.kt) (Desktop: SQLite + Datei im User-Home, iOS: `NSUserDefaults`, Android: App-Storage).
   - **Repository & Berechnungslogik**: [HandballRepository.kt](file:///C:/Users/matsb/Desktop/Programmieren/Handball/shared/src/commonMain/kotlin/com/handball/stattracker/repository/HandballRepository.kt) (Offizielle 2-Punkte-Ligatabelle, Quotenberechnung, Spielhistorie, Supabase-Sync) sowie [DemoDataSeed.kt](file:///C:/Users/matsb/Desktop/Programmieren/Handball/shared/src/commonMain/kotlin/com/handball/stattracker/repository/DemoDataSeed.kt).
 - **`:composeApp`**:
   - **App-Shell & Adaptive Navigation**: [HandballApp.kt](file:///C:/Users/matsb/Desktop/Programmieren/Handball/composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/HandballApp.kt) setzt das UI-Grundkonzept ([Screenshot 2026-10-24 093637.png](file:///C:/Users/matsb/Desktop/Programmieren/Handball/Screenshot%202026-10-24%20093637.png)) um:
@@ -29,11 +29,6 @@ Eine **Kotlin Multiplatform (KMP)** & **Compose Multiplatform** Anwendung zur Er
 ### Desktop (JVM) starten
 ```bash
 ./gradlew :composeApp:run
-```
-
-### Web (Browser) starten
-```bash
-./gradlew :composeApp:jsBrowserDevelopmentRun
 ```
 
 ### Tests ausführen

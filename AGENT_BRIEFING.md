@@ -8,7 +8,6 @@ Dieses Dokument dient als Übergabe-Briefing für KI-Coding-Assistenten, um in e
 
 Auf Basis des vorhandenen ER-Datenmodells (`handball-stata-tracker-database-modell.mermaid`) und des skizzierten UI-Grundkonzepts (`Screenshot 2026-10-24 093637.png`) entsteht eine **Kotlin Multiplatform (KMP)** App mit **Compose Multiplatform**, die auf:
 - **Desktop (JVM)**
-- **Web (JS Browser)**
 - **iOS** (`iosArm64`, `iosSimulatorArm64`)
 - **Android**
 
@@ -19,8 +18,8 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 ## 2. Getroffene Architektur- & Design-Entscheidungen (inkl. bisheriger Umsetzungen)
 
 1. **Datenhaltung & Synchronisation (Offline-First)**:
-   - Jeder Client speichert Daten lokal (`PlatformStorage`: Desktop nutzt SQLDelight SQLite + JSON-Snapshot unter `~/.handball-stat-tracker/`, Web nutzt Browser `localStorage`, iOS `NSUserDefaults`, Android lokalen App-Storage).
-   - Einziges Backend ist **Supabase** (PostgreSQL + PostgREST, später GoTrue Auth). Clients synchronisieren über `SupabaseSyncService`. Das frühere eigene Ktor-Backend (`:server`) wurde entfernt, da die App primär als Android-/Desktop-App am Spielfeldrand genutzt wird und Supabase Datenbank, API und Auth abdeckt.
+   - Jeder Client speichert Daten lokal (`PlatformStorage`: Desktop nutzt SQLDelight SQLite + JSON-Snapshot unter `~/.handball-stat-tracker/`, iOS `NSUserDefaults`, Android lokalen App-Storage).
+   - Einziges Backend ist **Supabase** (PostgreSQL + PostgREST, später GoTrue Auth). Clients synchronisieren über `SupabaseSyncService`. Das frühere eigene Ktor-Backend (`:server`) wurde entfernt, ebenso das Web-Target (JS/Browser), da die App primär als Android-/Desktop-App am Spielfeldrand genutzt wird und Supabase Datenbank, API und Auth abdeckt.
 2. **Datenmodell & Erweiterungen gegenüber dem Mermaid-Diagramm**:
    - **7 klassische Handball-Positionen** (`TW`, `LA`, `RL`, `RM`, `RR`, `RA`, `KM`) werden automatisch als Seed-Daten in `POSITION` angelegt; eigene Positionen können ergänzt werden.
    - **Trainer (`COACH`)**: Werden in derselben Tabelle `PLAYER` über `role = PlayerRole.COACH` gespeichert (`position_id`, `jersey_number_home_kit` und `jersey_number_away_kit` sind dafür `nullable`).
@@ -63,7 +62,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
   - `shared/src/commonMain/kotlin/com/handball/stattracker/model/Models.kt` – Alle Entitäten, `DatabaseSnapshot`, `GameLogEntry`, `GameLogEventType`, `StandingsRow`, `PlayerAggregatedStats`, `PlayerGameHistoryEntry`, `PlayerGamePerformancePoint`, `PositionMetricComparison`, `PlayerRankingEntry`, `RadarMetricAxis`
   - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/HandballRepository.kt` – StateFlow-Datenhaltung, CRUD, 7-on-Court Aufstellung inkl. `6+1` / `7+0` Regel-Check, 2-Klick-Wechsel, Spieluhr, Plus/Minus-Automatik, Spielprotokoll, 2-Punkte-Tabellenberechnung, Performance-Index, Positionsvergleich, Spieler-Ranking, Supabase-Sync
   - `shared/src/commonMain/kotlin/com/handball/stattracker/repository/DemoDataSeed.kt` – Initiale Demo-Daten (mit 7 aktiven Feld-/Torwartspielern, Bankspielern, `+/-`, Einsatzzeiten und realistischen Führungswechseln im Spielprotokoll)
-  - `shared/src/commonMain/kotlin/com/handball/stattracker/storage/PlatformStorage.kt` (+ `desktopMain`, `jsMain`, `iosMain`, `androidMain`)
+  - `shared/src/commonMain/kotlin/com/handball/stattracker/storage/PlatformStorage.kt` (+ `desktopMain`, `iosMain`, `androidMain`)
   - `shared/src/commonTest/kotlin/com/handball/stattracker/HandballRepositoryTest.kt` – Unit-Tests (inkl. Tests für `6 Feld + 1 TW` vs. `7 Feld + 0 TW` und Verbot eines 2. Torwarts auf dem Feld)
 - **`:composeApp`**:
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/HandballApp.kt` – Haupt-App-Shell, responsive Navbar & statische Titelzeile
@@ -83,7 +82,6 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - **Wichtige Befehle**:
   - Build & Tests prüfen: `.\gradlew.bat :shared:compileKotlinDesktop :composeApp:compileKotlinDesktop :shared:desktopTest`
   - Desktop-App starten: `.\gradlew.bat :composeApp:run`
-  - Web-App starten: `.\gradlew.bat :composeApp:jsBrowserDevelopmentRun`
 
 ---
 
@@ -111,7 +109,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
      - Auth-Datenmodelle (`UserRole`, `UserProfile`, `AuthTokens`, `AuthState`) in `model/AuthModels.kt` anlegen.
      - `SupabaseAuthService` mit Ktor Client (`/auth/v1/signup`, `/auth/v1/token`, `/auth/v1/logout`) implementieren.
      - `AuthRepository` mit `StateFlow<AuthState>` und automatischer Session-Wiederherstellung aufbauen.
-     - Multiplatform Token Storage in `PlatformStorage` absichern (Desktop Keyring/File, Web localStorage, Android EncryptedSharedPreferences, iOS Keychain).
+     - Multiplatform Token Storage in `PlatformStorage` absichern (Desktop Keyring/File, Android EncryptedSharedPreferences, iOS Keychain).
      - `SupabaseSyncService` mit dynamischem `Authorization: Bearer <access_token>` Header ausstatten.
    - [ ] **Phase 3 (Compose Multiplatform UI `:composeApp`)**:
      - Auth Screens (`LoginScreen.kt`, `RegisterScreen.kt`, `ForgotPasswordDialog.kt`) entwickeln.

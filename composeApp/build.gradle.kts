@@ -21,16 +21,6 @@ kotlin {
         }
     }
 
-    js {
-        outputModuleName.set("composeApp")
-        browser {
-            commonWebpackConfig {
-                outputFileName = "composeApp.js"
-            }
-        }
-        binaries.executable()
-    }
-
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -57,9 +47,6 @@ kotlin {
         named("desktopMain").dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
-        }
-        jsMain.dependencies {
-            implementation(compose.html.core)
         }
     }
 }
