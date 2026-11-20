@@ -25,12 +25,23 @@ object PlatformAuthSessionStore : AuthSessionStore {
     private const val KEY = "supabase_auth_session"
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    override fun load(): StoredAuthSession? = PlatformStorage.readValue(KEY)?.let { raw ->
-        runCatching { json.decodeFromString<StoredAuthSession>(raw) }.getOrNull()
+    override fun load(): StoredAuthSession? {
+        val raw = PlatformStorage.readSecret(KEY) ?: migrateLegacyPlaintext() ?: return null
+        return runCatching { json.decodeFromString<StoredAuthSession>(raw) }.getOrNull()
     }
 
     override fun save(session: StoredAuthSession?) {
-        PlatformStorage.writeValue(KEY, session?.let { json.encodeToString(StoredAuthSession.serializer(), it) })
+        PlatformStorage.writeSecret(KEY, session?.let { json.encodeToString(StoredAuthSession.serializer(), it) })
+        // Klartext-Rest aus früheren Versionen entfernen
+        PlatformStorage.writeValue(KEY, null)
+    }
+
+    /** Frühere Versionen haben die Session unverschlüsselt gespeichert: einmal übernehmen und löschen. */
+    private fun migrateLegacyPlaintext(): String? {
+        val legacy = PlatformStorage.readValue(KEY) ?: return null
+        PlatformStorage.writeSecret(KEY, legacy)
+        if (PlatformStorage.readSecret(KEY) != null) PlatformStorage.writeValue(KEY, null)
+        return legacy
     }
 }
 
@@ -47,6 +58,10 @@ class AuthRepository(
     val state: StateFlow<AuthState> = _state.asStateFlow()
 
     private val refreshMutex = Mutex()
+
+    /** Benutzerverwaltung für Admins; null, wenn Supabase nicht konfiguriert ist. */
+    fun adminRepository(ownUserId: String): AdminRepository? =
+        (api as? AdminApi)?.let { AdminRepository(it, ownUserId) }
 
     /** Beim App-Start: gespeicherte Session wiederherstellen (auch offline). */
     suspend fun restore() {

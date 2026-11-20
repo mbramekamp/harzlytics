@@ -101,6 +101,16 @@ actual object PlatformStorage {
         valueFile(key).takeIf { it.exists() }?.readText(Charsets.UTF_8)
     }.getOrNull()
 
+    private val secretStore: DesktopSecretStore by lazy { DesktopSecretStore.default(storageDir) }
+
+    actual fun readSecret(key: String): String? = secretStore.read(key)
+
+    actual fun writeSecret(key: String, value: String?) {
+        // Konnte nichts verschlüsselt werden, wird bewusst nichts im Klartext abgelegt:
+        // der Benutzer muss sich dann beim nächsten Start neu anmelden.
+        secretStore.write(key, value)
+    }
+
     actual fun writeValue(key: String, value: String?) {
         runCatching {
             val file = valueFile(key)

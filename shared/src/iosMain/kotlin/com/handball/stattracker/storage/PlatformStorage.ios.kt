@@ -36,7 +36,19 @@ actual object PlatformStorage {
         return (NSProcessInfo.processInfo.environment[key] as? String)?.takeIf { it.isNotBlank() }
     }
 
-    // TODO(Auth): Session-Token in die iOS Keychain verschieben.
+    // TODO(iOS): Geheimnisse in die Keychain (SecItemAdd/SecItemCopyMatching) verschieben. Das braucht einen
+    // Mac zum Kompilieren und Testen und ist deshalb noch nicht umgesetzt: bis dahin NSUserDefaults (unverschlüsselt),
+    // aber unter eigenem Schlüssel, damit readValue/writeValue den Eintrag nicht überschreiben.
+    actual fun readSecret(key: String): String? =
+        runCatching { NSUserDefaults.standardUserDefaults.stringForKey("handball_secret_$key") }.getOrNull()
+
+    actual fun writeSecret(key: String, value: String?) {
+        runCatching {
+            if (value == null) NSUserDefaults.standardUserDefaults.removeObjectForKey("handball_secret_$key")
+            else NSUserDefaults.standardUserDefaults.setObject(value, forKey = "handball_secret_$key")
+        }
+    }
+
     actual fun readValue(key: String): String? =
         runCatching { NSUserDefaults.standardUserDefaults.stringForKey("handball_kv_$key") }.getOrNull()
 

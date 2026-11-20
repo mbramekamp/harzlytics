@@ -69,7 +69,7 @@ class SupabaseAuthService(
     private val apiKey: String,
     private val nowEpochSeconds: () -> Long,
     private val httpClient: HttpClient = defaultClient()
-) : AuthApi {
+) : AuthApi, AdminApi {
 
     override suspend fun signIn(email: String, password: String): AuthTokens {
         val response = httpClient.post("$baseUrl/auth/v1/token?grant_type=password") {
@@ -140,6 +140,25 @@ class SupabaseAuthService(
             authHeaders(accessToken)
             parameter("id", "eq.$userId")
             setBody(buildJsonObject { put("claim_player_id", playerId?.let { JsonPrimitive(it) } ?: JsonNull) })
+        }
+        ensureSuccess(response)
+    }
+
+    override suspend fun listProfiles(accessToken: String): List<UserProfile> {
+        val response = httpClient.get("$baseUrl/rest/v1/user_profiles") {
+            authHeaders(accessToken)
+            parameter("select", "*")
+            parameter("order", "created_at.asc")
+        }
+        ensureSuccess(response)
+        return json.decodeFromString<List<UserProfile>>(response.bodyAsText())
+    }
+
+    override suspend fun patchProfile(accessToken: String, userId: String, patch: JsonObject) {
+        val response = httpClient.patch("$baseUrl/rest/v1/user_profiles") {
+            authHeaders(accessToken)
+            parameter("id", "eq.$userId")
+            setBody(patch)
         }
         ensureSuccess(response)
     }

@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import com.handball.stattracker.model.AuthActionResult
 import com.handball.stattracker.model.AuthState
 import com.handball.stattracker.model.UserProfile
+import com.handball.stattracker.model.UserRole
+import com.handball.stattracker.repository.AdminRepository
 import com.handball.stattracker.repository.AuthRepository
 import kotlinx.coroutines.launch
 import com.handball.stattracker.model.DatabaseSnapshot
@@ -55,6 +57,7 @@ fun HandballApp() {
                     HandballRepository(autoSync = true, canEdit = state.profile.canEdit)
                         .also { it.prepareForAccount(userId) }
                 }
+                val adminRepository = remember(userId) { auth.adminRepository(userId) }
                 // Rolle kann sich ändern (Profil wird regelmäßig neu geladen)
                 LaunchedEffect(repository, state.profile.canEdit) { repository.setCanEdit(state.profile.canEdit) }
                 LaunchedEffect(userId) { repository.syncWithBackend() }
@@ -69,6 +72,7 @@ fun HandballApp() {
                         email = state.session.email,
                         offline = state.offline,
                         onRequestClaim = { playerId -> auth.requestPlayerClaim(playerId) },
+                        adminRepository = adminRepository,
                         onSignOut = { scope.launch { auth.signOut() } }
                     )
                 }
@@ -86,11 +90,13 @@ private fun MainAppContent(
     email: String,
     offline: Boolean,
     onRequestClaim: suspend (Int?) -> AuthActionResult,
+    adminRepository: AdminRepository?,
     onSignOut: () -> Unit
 ) {
     val snapshot by repository.snapshot.collectAsState()
     val canEdit = rememberCanEdit()
     var showAccount by remember { mutableStateOf(false) }
+    var showAdmin by remember { mutableStateOf(false) }
 
     var currentScreen by remember { mutableStateOf(MainNavScreen.HOME_DASHBOARD) }
     var selectedSeasonId by remember(snapshot.seasons) {
@@ -264,7 +270,19 @@ private fun MainAppContent(
                     players = snapshot.players,
                     onRequestClaim = onRequestClaim,
                     onSignOut = { showAccount = false; onSignOut() },
+                    onOpenAdmin = if (profile.role == UserRole.ADMIN && adminRepository != null) {
+                        { showAccount = false; showAdmin = true }
+                    } else null,
                     onDismiss = { showAccount = false }
+                )
+            }
+
+            if (showAdmin && adminRepository != null) {
+                AdminDialog(
+                    admin = adminRepository,
+                    ownUserId = profile.id,
+                    players = snapshot.players,
+                    onDismiss = { showAdmin = false }
                 )
             }
 

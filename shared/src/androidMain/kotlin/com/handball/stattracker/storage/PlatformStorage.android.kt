@@ -41,6 +41,26 @@ actual object PlatformStorage {
         valueFile(key).takeIf { it.exists() }?.readText(Charsets.UTF_8)
     }.getOrNull()
 
+    private fun secretFile(key: String): File =
+        File(storageDir, "secret-" + key.replace(Regex("[^A-Za-z0-9_-]"), "_") + ".bin")
+
+    actual fun readSecret(key: String): String? = runCatching {
+        secretFile(key).takeIf { it.exists() }?.readText(Charsets.UTF_8)?.let { AndroidSecretCipher.decrypt(it) }
+    }.getOrNull()
+
+    actual fun writeSecret(key: String, value: String?) {
+        runCatching {
+            val file = secretFile(key)
+            if (value == null) {
+                file.delete()
+            } else {
+                // Ohne Keystore wird bewusst nichts im Klartext gespeichert (dann neu anmelden).
+                val sealed = AndroidSecretCipher.encrypt(value) ?: return
+                file.writeText(sealed, Charsets.UTF_8)
+            }
+        }
+    }
+
     actual fun writeValue(key: String, value: String?) {
         runCatching {
             val file = valueFile(key)

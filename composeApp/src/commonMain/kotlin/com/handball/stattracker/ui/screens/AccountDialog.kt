@@ -48,6 +48,7 @@ fun AccountDialog(
     players: List<Player>,
     onRequestClaim: suspend (Int?) -> AuthActionResult,
     onSignOut: () -> Unit,
+    onOpenAdmin: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -113,6 +114,10 @@ fun AccountDialog(
                 }
                 message?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
+                if (onOpenAdmin != null) {
+                    HorizontalDivider()
+                    FilledTonalButton(enabled = !offline, onClick = onOpenAdmin) { Text("Benutzer verwalten") }
                 }
             }
         },
