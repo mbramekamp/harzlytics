@@ -357,6 +357,8 @@ private fun GameInteractiveDashboard(
     var activeTab by remember(game.gameId) { mutableStateOf(0) }
     var autoSyncScore by remember { mutableStateOf(true) }
     var showDirectScoreDialog by remember { mutableStateOf(false) }
+    // null = geschlossen, false = 6+1, true = 7+0
+    var startingSevenDialogVariant by remember(game.gameId) { mutableStateOf<Boolean?>(null) }
 
     // Für den 2-Klick-Wechsel-Workflow: ID des ausgewählten Bank-Spielers (rechts), der gegen einen Feld-Spieler (links) eingewechselt werden soll
     var pendingSubInPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
@@ -458,7 +460,7 @@ private fun GameInteractiveDashboard(
                 onOpenDirectScoreDialog = { showDirectScoreDialog = true },
                 onApplyStartingSeven = {
                     pendingSubInPlayerId = null
-                    repository.applyRecommendedStartingSevenToGame(game.gameId)
+                    startingSevenDialogVariant = false
                 }
             )
 
@@ -556,9 +558,9 @@ private fun GameInteractiveDashboard(
                             onMoveCourtPlayerToBench = { outPlayerId ->
                                 repository.movePlayerToBench(game.gameId, outPlayerId)
                             },
-                            onApplyStartingSeven = {
+                            onApplyStartingSeven = { useSeventh ->
                                 pendingSubInPlayerId = null
-                                repository.applyRecommendedStartingSevenToGame(game.gameId)
+                                startingSevenDialogVariant = useSeventh
                             },
                             onNavigateToPlayer = onNavigateToPlayer,
                             onEnterEditAndManageSquad = {
@@ -620,6 +622,16 @@ private fun GameInteractiveDashboard(
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+
+    startingSevenDialogVariant?.let { useSeventh ->
+        StartingSevenDialog(
+            repository = repository,
+            gameId = game.gameId,
+            initialUseSeventhFieldPlayer = useSeventh,
+            onDismiss = { startingSevenDialogVariant = null },
+            onApplied = { startingSevenDialogVariant = null }
+        )
     }
 
     if (showDirectScoreDialog) {
@@ -1275,7 +1287,7 @@ private fun SideBySideLineupAndBenchSection(
     onCompleteSubWithCourtPlayer: (Int) -> Unit,
     onPutBenchPlayerDirectlyOnCourt: (Int) -> Unit,
     onMoveCourtPlayerToBench: (Int) -> Unit,
-    onApplyStartingSeven: () -> Unit,
+    onApplyStartingSeven: (useSeventhFieldPlayer: Boolean) -> Unit,
     onNavigateToPlayer: (Int) -> Unit,
     onEnterEditAndManageSquad: () -> Unit
 ) {
@@ -1420,12 +1432,12 @@ private fun SideBySideLineupAndBenchSection(
                         if (isEditMode) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 FilledTonalButton(
-                                    onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = false) }
+                                    onClick = { onApplyStartingSeven(false) }
                                 ) {
                                     Text("6+1")
                                 }
                                 OutlinedButton(
-                                    onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = true) }
+                                    onClick = { onApplyStartingSeven(true) }
                                 ) {
                                     Text("7 Feld")
                                 }
@@ -1484,14 +1496,14 @@ private fun SideBySideLineupAndBenchSection(
                                 FilledTonalButton(
                                     modifier = Modifier.weight(1f),
                                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                                    onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = false) }
+                                    onClick = { onApplyStartingSeven(false) }
                                 ) {
                                     Text("6+1 Startsieben", maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                                 OutlinedButton(
                                     modifier = Modifier.weight(1f),
                                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                                    onClick = { repository.applyRecommendedStartingSevenToGame(game.gameId, useSeventhFieldPlayer = true) }
+                                    onClick = { onApplyStartingSeven(true) }
                                 ) {
                                     Text("7 Feldspieler", maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
@@ -1510,7 +1522,7 @@ private fun SideBySideLineupAndBenchSection(
                     ) {
                         Text("Noch keine aktiven Spieler auf dem Feld.")
                         if (isEditMode) {
-                            Button(onClick = onApplyStartingSeven) {
+                            Button(onClick = { onApplyStartingSeven(false) }) {
                                 Text("Empfohlene Startsieben (6+1) aufs Feld")
                             }
                         }

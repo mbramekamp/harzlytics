@@ -18,6 +18,9 @@ bin/
 Thumbs.db
 local.properties
 
+# Claude Code worktrees
+.claude/worktrees/
+
 # Environment Variables & Secrets
 .env
 .env.*

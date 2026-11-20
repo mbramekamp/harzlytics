@@ -93,4 +93,25 @@ actual object PlatformStorage {
         }
         return System.getenv(key)?.takeIf { it.isNotBlank() }
     }
+
+    private fun valueFile(key: String): File =
+        File(storageDir, "kv-" + key.replace(Regex("[^A-Za-z0-9_-]"), "_") + ".txt")
+
+    actual fun readValue(key: String): String? = runCatching {
+        valueFile(key).takeIf { it.exists() }?.readText(Charsets.UTF_8)
+    }.getOrNull()
+
+    actual fun writeValue(key: String, value: String?) {
+        runCatching {
+            val file = valueFile(key)
+            if (value == null) {
+                file.delete()
+            } else {
+                file.writeText(value, Charsets.UTF_8)
+                // nur für den aktuellen Benutzer lesbar/schreibbar
+                file.setReadable(false, false); file.setReadable(true, true)
+                file.setWritable(false, false); file.setWritable(true, true)
+            }
+        }
+    }
 }

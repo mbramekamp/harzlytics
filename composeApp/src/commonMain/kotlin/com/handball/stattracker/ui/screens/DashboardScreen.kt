@@ -294,11 +294,6 @@ fun DashboardScreen(
                             Spacer(Modifier.width(6.dp))
                             Text("Sync")
                         }
-                        OutlinedButton(onClick = { repository.resetToDemoData() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Demo-Reset")
-                        }
                     }
                 } else {
                     // Auf Mobile sauber untereinander für ergonomische Touch-Bedienung
@@ -335,14 +330,6 @@ fun DashboardScreen(
                                 Icon(Icons.Default.Sync, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
                                 Text("Sync")
-                            }
-                            OutlinedButton(
-                                modifier = Modifier.weight(1f),
-                                onClick = { repository.resetToDemoData() }
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Demo-Reset")
                             }
                         }
                     }

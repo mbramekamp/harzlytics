@@ -448,6 +448,105 @@ data class PlayerRankingEntry(
 )
 
 /**
+ * Gewichtung der Startsieben-Empfehlung. Summe der Gewichte = 1.0.
+ */
+object StartingSevenWeights {
+    const val SEASON_PERFORMANCE = 0.45
+    const val RECENT_FORM = 0.40
+    const val PLUS_MINUS = 0.15
+
+    /** Anzahl der letzten Spiele für die Formkurve. */
+    const val RECENT_GAMES = 5
+
+    /** Plus/Minus pro Spiel wird auf 0..100 abgebildet: 0 → 50, ±10 → 100 / 0. */
+    fun plusMinusToScore(plusMinusPerGame: Double): Double =
+        (50.0 + plusMinusPerGame * 5.0).coerceIn(0.0, 100.0)
+}
+
+/**
+ * Nachvollziehbare Bewertung eines Kandidaten für die Startsieben.
+ */
+data class StartingSevenScoreBreakdown(
+    /** Performance-Index (0..100) über die Saison des Spiels. */
+    val seasonPerformanceScore: Double,
+    /** Durchschnittlicher Einzelspiel-Performance-Index der letzten Spiele (0..100). */
+    val recentFormScore: Double,
+    /** Anzahl der in die Formkurve eingeflossenen Spiele (0 = keine Daten, Form = Saisonwert). */
+    val recentGamesCount: Int,
+    /** Plus/Minus pro Spiel in der Saison. */
+    val plusMinusPerGame: Double,
+    /** Plus/Minus auf 0..100 normalisiert. */
+    val plusMinusScore: Double,
+    /** Gewichteter Gesamtwert gemäß [StartingSevenWeights]. */
+    val weightedScore: Double
+)
+
+data class StartingSevenCandidate(
+    val player: Player,
+    val positionShortName: String,
+    val breakdown: StartingSevenScoreBreakdown
+)
+
+enum class StartingSevenSlotType {
+    GOALKEEPER,
+    POSITION,
+    EXTRA_FIELD_PLAYER
+}
+
+/**
+ * Ein Platz der Startsieben (TW, LA, RL, RM, RR, RA, KM oder zusätzlicher Feldspieler).
+ */
+data class StartingSevenSlot(
+    val slotLabel: String,
+    val positionId: Int?,
+    val type: StartingSevenSlotType,
+    val chosen: StartingSevenCandidate?,
+    val runnerUp: StartingSevenCandidate?
+) {
+    /** true, wenn der gewählte Spieler nicht originär auf dieser Position spielt (Ersatzlösung). */
+    val isPositionFallback: Boolean
+        get() = type == StartingSevenSlotType.POSITION &&
+            chosen != null && chosen.player.positionId != positionId
+}
+
+/**
+ * Ergebnis der performance-basierten Startsieben-Empfehlung für ein Spiel.
+ */
+data class StartingSevenRecommendation(
+    val gameId: Int,
+    val useSeventhFieldPlayer: Boolean,
+    val slots: List<StartingSevenSlot>
+) {
+    val chosenPlayerIds: List<Int>
+        get() = slots.mapNotNull { it.chosen?.player?.playerId }
+
+    val goalKeeperCount: Int
+        get() = slots.count { it.chosen?.player?.role == PlayerRole.GOALKEEPER }
+
+    val fieldPlayerCount: Int
+        get() = slots.count { it.chosen?.player?.role == PlayerRole.FIELD_PLAYER }
+
+    val totalWeightedScore: Double
+        get() = slots.sumOf { it.chosen?.breakdown?.weightedScore ?: 0.0 }
+
+    fun canSwapToRunnerUp(slotIndex: Int): Boolean {
+        val slot = slots.getOrNull(slotIndex) ?: return false
+        val runnerUp = slot.runnerUp ?: return false
+        return runnerUp.player.playerId !in chosenPlayerIds
+    }
+
+    /** Tauscht den gewählten Spieler eines Platzes mit dessen Zweitplatziertem. */
+    fun swapWithRunnerUp(slotIndex: Int): StartingSevenRecommendation {
+        if (!canSwapToRunnerUp(slotIndex)) return this
+        return copy(
+            slots = slots.mapIndexed { idx, slot ->
+                if (idx == slotIndex) slot.copy(chosen = slot.runnerUp, runnerUp = slot.chosen) else slot
+            }
+        )
+    }
+}
+
+/**
  * Normalisierte Achse (0..100) für das Radar-/Stärkenprofil (Spieler vs. Positions-Durchschnitt).
  */
 data class RadarMetricAxis(
