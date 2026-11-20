@@ -185,7 +185,8 @@ class ScreenshotTest {
     fun adminUserDialog() {
         val users = listOf(
             profile,
-            UserProfile(id = "p1", email = "nina@club.de", fullName = "Nina Neu", status = "PENDING"),
+            UserProfile(id = "p1", email = "j.knorr@club.de", fullName = "Juri Knorr Schmidt", status = "PENDING"),
+            UserProfile(id = "p2", email = "nina@club.de", fullName = "Nina Neu", status = "PENDING"),
             UserProfile(id = "c1", email = "max@club.de", fullName = "Max Muster", status = "ACTIVE", claimPlayerId = 4),
             UserProfile(id = "l1", email = "lena@club.de", fullName = "Lena Lang", role = UserRole.TRAINER, status = "ACTIVE", playerId = 9),
             UserProfile(id = "s1", email = "sven@club.de", fullName = "Sven Gesperrt", status = "SUSPENDED")

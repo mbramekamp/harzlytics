@@ -2,6 +2,8 @@ package com.handball.stattracker.repository
 
 import com.handball.stattracker.config.SupabaseAuthSession
 import com.handball.stattracker.model.AuthActionResult
+import com.handball.stattracker.model.Player
+import com.handball.stattracker.model.PlayerRole
 import com.handball.stattracker.model.UserProfile
 import com.handball.stattracker.model.UserRole
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,11 +61,26 @@ class AdminRepository(
         }
     }
 
-    /** Schaltet ein Konto frei (PENDING/SUSPENDED → ACTIVE) und setzt die Rolle. */
-    suspend fun approve(userId: String, role: UserRole): AuthActionResult =
+    /**
+     * Schaltet ein Konto frei (PENDING/SUSPENDED → ACTIVE), setzt die Rolle und verknüpft optional
+     * gleich den Kadereintrag [playerId] (ein offener Antrag des Kontos wird damit erledigt).
+     */
+    suspend fun approve(userId: String, role: UserRole, playerId: Int? = null): AuthActionResult =
         protectedChange(userId) {
-            update(userId, mapOf("status" to JsonPrimitive("ACTIVE"), "role" to JsonPrimitive(role.name))) {
-                it.copy(status = "ACTIVE", role = role)
+            if (playerId != null && _state.value.profiles.any { it.playerId == playerId && it.id != userId }) {
+                return@protectedChange AuthActionResult.Error("Dieser Kadereintrag ist bereits mit einem anderen Konto verknüpft.")
+            }
+            val fields = buildMap<String, JsonElement> {
+                put("status", JsonPrimitive("ACTIVE"))
+                put("role", JsonPrimitive(role.name))
+                if (playerId != null) {
+                    put("player_id", JsonPrimitive(playerId))
+                    put("claim_player_id", JsonNull)
+                }
+            }
+            update(userId, fields) {
+                if (playerId != null) it.copy(status = "ACTIVE", role = role, playerId = playerId, claimPlayerId = null)
+                else it.copy(status = "ACTIVE", role = role)
             }
         }
 
@@ -130,6 +147,39 @@ class AdminRepository(
     }
 
     companion object {
+        /** Spieler (ohne Trainer), die noch zu keinem Konto gehören, nach Nachname sortiert. */
+        fun availablePlayers(players: List<Player>, profiles: List<UserProfile>): List<Player> {
+            val linked = profiles.mapNotNull { it.playerId }.toSet()
+            return players
+                .filter { it.role != PlayerRole.COACH && it.playerId !in linked }
+                .sortedWith(compareBy({ it.lastName.lowercase() }, { it.firstName.lowercase() }))
+        }
+
+        /**
+         * Schlägt für [profile] den Kadereintrag vor: 1. der beantragte, 2. eindeutiger E-Mail-Treffer,
+         * 3. eindeutiger Namenstreffer (Reihenfolge, Groß-/Kleinschreibung, Bindestrich und Umlaute egal).
+         * Nur freie Spieler kommen infrage; bei keinem oder mehreren Treffern null.
+         */
+        fun suggestPlayerId(profile: UserProfile, players: List<Player>, profiles: List<UserProfile>): Int? {
+            val free = availablePlayers(players, profiles.filter { it.id != profile.id })
+            profile.claimPlayerId?.let { claimed -> free.find { it.playerId == claimed }?.let { return it.playerId } }
+
+            val mail = profile.email.trim().lowercase()
+            if (mail.isNotEmpty()) {
+                free.filter { it.email.trim().lowercase() == mail }.singleOrNull()?.let { return it.playerId }
+            }
+            val wanted = nameTokens(profile.fullName)
+            if (wanted.isEmpty()) return null
+            return free.filter { nameTokens("${it.firstName} ${it.lastName}") == wanted }.singleOrNull()?.playerId
+        }
+
+        private fun nameTokens(name: String): List<String> =
+            name.lowercase()
+                .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
+                .split(Regex("[^a-z0-9]+"))
+                .filter { it.isNotEmpty() }
+                .sorted()
+
         fun sections(profiles: List<UserProfile>): AdminSections {
             val byName = compareBy<UserProfile> { it.fullName.ifBlank { it.email }.lowercase() }
             return AdminSections(

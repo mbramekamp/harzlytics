@@ -93,6 +93,23 @@ class AuthRepositoryTest {
     }
 
     @Test
+    fun reloadProfilePicksUpALinkSetByAnAdmin() = runBlocking<Unit> {
+        val api = FakeAuthApi(); val auth = repo(api, MemoryStore())
+        auth.signIn("coach@club.de", "Richtig123")
+        assertNull(assertIs<AuthState.SignedIn>(auth.state.value).profile.playerId)
+
+        api.profile = api.profile!!.copy(playerId = 7)
+        assertIs<AuthActionResult.Success>(auth.reloadProfile())
+        assertEquals(7, assertIs<AuthState.SignedIn>(auth.state.value).profile.playerId)
+
+        // offline: Fehler, der bisherige Stand bleibt erhalten
+        api.offline = true
+        api.profile = api.profile!!.copy(playerId = 8)
+        assertIs<AuthActionResult.Error>(auth.reloadProfile())
+        assertEquals(7, assertIs<AuthState.SignedIn>(auth.state.value).profile.playerId)
+    }
+
+    @Test
     fun playerClaimRequestWithoutSessionFails() = runBlocking<Unit> {
         val auth = repo(FakeAuthApi(), MemoryStore())
         assertIs<AuthActionResult.Error>(auth.requestPlayerClaim(7))

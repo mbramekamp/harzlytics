@@ -24,6 +24,7 @@ import com.handball.stattracker.model.UserProfile
 import com.handball.stattracker.model.UserRole
 import com.handball.stattracker.repository.AdminRepository
 import com.handball.stattracker.repository.AuthRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.handball.stattracker.model.DatabaseSnapshot
 import com.handball.stattracker.repository.HandballRepository
@@ -75,6 +76,7 @@ fun HandballApp() {
                         offline = state.offline,
                         onRequestClaim = { playerId -> auth.requestPlayerClaim(playerId) },
                         adminRepository = adminRepository,
+                        onRefreshAccount = { auth.reloadProfile() },
                         onSignOut = { scope.launch { auth.signOut() } }
                     )
                 }
@@ -94,6 +96,8 @@ internal fun MainAppContent(
     onRequestClaim: suspend (Int?) -> AuthActionResult,
     adminRepository: AdminRepository?,
     onSignOut: () -> Unit,
+    /** Lädt das Profil neu (z. B. nach Freigabe/Verknüpfung durch einen Admin). */
+    onRefreshAccount: suspend () -> Unit = {},
     initialScreen: MainNavScreen = MainNavScreen.HOME_DASHBOARD,
     initialGameId: Int? = null,
     initialPlayerId: Int? = null
@@ -114,7 +118,18 @@ internal fun MainAppContent(
         ?: currentSeasonId ?: 1
     val syncState by repository.syncState.collectAsState()
     val syncScope = rememberCoroutineScope()
-    val onSync: () -> Unit = { syncScope.launch { repository.syncWithBackend() } }
+    // Wolken-Symbol = alles aktualisieren: Daten und Konto
+    val onSync: () -> Unit = {
+        syncScope.launch { onRefreshAccount() }
+        syncScope.launch { repository.syncWithBackend() }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(5 * 60 * 1000L)
+            onRefreshAccount()
+        }
+    }
+    LaunchedEffect(showAccount) { if (showAccount) onRefreshAccount() }
     var selectedPlayerId by remember { mutableStateOf(initialPlayerId) }
     // Spieler mit verknüpftem Kadereintrag: der zweite Tab unten ist ihr eigenes Profil statt der Kaderliste
     val ownPlayerId = profile.playerId?.takeIf { id -> snapshot.players.any { it.playerId == id } }

@@ -6,12 +6,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -80,7 +82,12 @@ fun AdminDialog(
                     if (sections.pending.isNotEmpty()) {
                         item { SectionTitle("Warten auf Freigabe (${sections.pending.size})") }
                         items(sections.pending, key = { "p-" + it.id }) { profile ->
-                            PendingRow(profile, enabled = !busy) { role -> act { admin.approve(profile.id, role) } }
+                            PendingRow(
+                                profile = profile,
+                                available = AdminRepository.availablePlayers(players, state.profiles),
+                                suggested = AdminRepository.suggestPlayerId(profile, players, state.profiles),
+                                enabled = !busy
+                            ) { role, playerId -> act { admin.approve(profile.id, role, playerId) } }
                         }
                     }
                     if (sections.claims.isNotEmpty()) {
@@ -159,12 +166,47 @@ private fun RoleChips(selected: UserRole, enabled: Boolean, onSelect: (UserRole)
 }
 
 @Composable
-private fun PendingRow(profile: UserProfile, enabled: Boolean, onApprove: (UserRole) -> Unit) {
+private fun PendingRow(
+    profile: UserProfile,
+    available: List<Player>,
+    suggested: Int?,
+    enabled: Boolean,
+    onApprove: (UserRole, Int?) -> Unit
+) {
     var role by remember(profile.id) { mutableStateOf(UserRole.SPIELER) }
+    // Der Vorschlag (Antrag, E-Mail, Name) ist vorgewählt, solange der Admin nicht selbst gewählt hat
+    var picked by remember(profile.id) { mutableStateOf(false) }
+    var playerId by remember(profile.id) { mutableStateOf(suggested) }
+    LaunchedEffect(suggested) { if (!picked) playerId = suggested }
+
     UserCard(profile) {
+        PlayerPicker(available, playerId, enabled) { picked = true; playerId = it }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(modifier = Modifier.weight(1f)) { RoleChips(role, enabled) { role = it } }
-            Button(enabled = enabled, onClick = { onApprove(role) }) { Text("Freigeben") }
+            Button(enabled = enabled, onClick = { onApprove(role, playerId) }) { Text("Freigeben") }
+        }
+    }
+}
+
+/** Auswahl des Kadereintrags beim Freigeben; zur Wahl stehen nur Spieler ohne Konto. */
+@Composable
+private fun PlayerPicker(available: List<Player>, selectedId: Int?, enabled: Boolean, onSelect: (Int?) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val label = available.find { it.playerId == selectedId }
+        ?.let { "Kader: ${it.firstName} ${it.lastName}".trim() } ?: "Kein Kadereintrag"
+    Box {
+        TextButton(enabled = enabled, onClick = { expanded = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Kadereintrag wählen")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(text = { Text("Kein Kadereintrag") }, onClick = { expanded = false; onSelect(null) })
+            available.forEach { p ->
+                DropdownMenuItem(
+                    text = { Text("${p.firstName} ${p.lastName}".trim()) },
+                    onClick = { expanded = false; onSelect(p.playerId) }
+                )
+            }
         }
     }
 }
