@@ -96,9 +96,16 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
-        androidMain.dependencies {
-            implementation(libs.ktor.client.cio)
-            implementation(libs.sqldelight.android.driver)
+        androidMain {
+            kotlin.srcDir("src/jvmSharedMain/kotlin")
+            dependencies {
+                implementation(libs.ktor.client.cio)
+                implementation(libs.sqldelight.android.driver)
+            }
+        }
+        // StorageMigration (reine JVM-Datei-Logik) liegt in jvmSharedMain und wird hier mitgetestet
+        named("desktopTest") {
+            kotlin.srcDir("src/jvmSharedMain/kotlin")
         }
         named("desktopMain").dependencies {
             implementation(libs.ktor.client.cio)

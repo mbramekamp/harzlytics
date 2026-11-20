@@ -1,6 +1,7 @@
 package com.handball.stattracker.storage
 
 import com.handball.stattracker.model.DatabaseSnapshot
+import android.content.Context
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -11,11 +12,33 @@ actual object PlatformStorage {
         encodeDefaults = true
     }
 
-    private val storageDir: File by lazy {
-        File(System.getProperty("java.io.tmpdir"), "handball-stat-tracker").apply { if (!exists()) mkdirs() }
+    @Volatile
+    private var appContext: Context? = null
+
+    /** Früherer Speicherort: der Cache-Ordner, den Android jederzeit leeren darf (Datenverlust-Risiko). */
+    private val legacyDir: File
+        get() = File(System.getProperty("java.io.tmpdir"), "handball-stat-tracker")
+
+    /**
+     * Muss einmal beim App-Start aufgerufen werden (`MainActivity.onCreate`, vor `setContent`).
+     * Ab dann liegen alle Daten im dauerhaften App-Ordner `filesDir`; vorhandene Daten aus dem
+     * alten Cache-Ordner werden dorthin übernommen.
+     */
+    fun init(context: Context) {
+        appContext = context.applicationContext
+        runCatching { StorageMigration.moveFiles(legacyDir, storageDir) }
     }
 
-    private val storageFile: File by lazy { File(storageDir, "handball-android-offline.json") }
+    /** Vor [init] (z. B. in Tests) bleibt es beim alten Ordner, damit nichts verloren geht. */
+    private val storageDir: File
+        get() {
+            val dir = appContext?.let { File(it.filesDir, "handball-stat-tracker") } ?: legacyDir
+            if (!dir.exists()) dir.mkdirs()
+            return dir
+        }
+
+    private val storageFile: File
+        get() = File(storageDir, "handball-android-offline.json")
 
     actual fun loadSnapshot(): DatabaseSnapshot? {
         if (!storageFile.exists()) return null
