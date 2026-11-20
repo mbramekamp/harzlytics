@@ -13,6 +13,10 @@ val rootEnvFile = rootProject.file(".env")
 
 val generateSupabaseEnv = tasks.register("generateSupabaseEnv") {
     inputs.files(rootEnvFile).optional()
+    // Auch Umgebungsvariablen als Input melden, sonst hält Gradle den Task bei geänderten Keys für aktuell
+    listOf("SUPABASE_ANON_KEY", "SUPABASE_PUBLIC_KEY", "SUPABASE_URL").forEach { name ->
+        inputs.property(name, providers.environmentVariable(name).orElse(""))
+    }
     outputs.dir(generatedEnvDir)
 
     doLast {

@@ -14,9 +14,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 
 class HandballRepository(
     private val autoSync: Boolean = false,
@@ -54,18 +58,32 @@ class HandballRepository(
 
     private fun mutate(block: (DatabaseSnapshot) -> DatabaseSnapshot) {
         val now = Clock.System.now().toEpochMilliseconds()
-        val updated = block(_snapshot.value).copy(lastUpdatedEpochMillis = now)
-        _snapshot.value = updated
+        // update{} statt get+set: atomar gegenüber einem parallel endenden Sync
+        val updated = _snapshot.updateAndGet { block(it).copy(lastUpdatedEpochMillis = now) }
         persist(updated)
         scheduleAutoSyncIfEnabled()
     }
 
+    /** Es läuft immer höchstens ein Sync gleichzeitig; weitere warten und senden danach den neuesten Stand. */
+    private val syncMutex = Mutex()
+
+    /**
+     * Netzwerkaufruf des Syncs. Standard: Supabase-RPC. Tests ersetzen ihn, um ohne Netzwerk
+     * z. B. einen langsamen Server zu simulieren.
+     */
+    internal var syncTransport: suspend (baseUrl: String, apiKey: String, local: DatabaseSnapshot) -> DatabaseSnapshot =
+        { baseUrl, apiKey, local ->
+            SupabaseSyncService.syncSnapshotWithSupabase(httpClient, baseUrl, apiKey, local)
+        }
+
     private fun scheduleAutoSyncIfEnabled() {
         if (!autoSync || !SupabaseConfig.hasConfiguredKeys()) return
+        // Entprellt wird nur die Wartezeit. Der Sync selbst läuft als eigener Job und wird
+        // durch neue Eingaben NICHT abgebrochen (sonst bliebe er halb fertig und meldet "Offline").
         debounceSyncJob?.cancel()
         debounceSyncJob = syncScope.launch {
             delay(700)
-            syncWithBackend()
+            syncScope.launch { syncWithBackend() }
         }
     }
 
@@ -2146,17 +2164,32 @@ class HandballRepository(
             return
         }
 
+        syncMutex.withLock {
+            syncOnce(normalizedUrl, cleanAnonKey)
+        }
+    }
+
+    private suspend fun syncOnce(normalizedUrl: String, cleanAnonKey: String) {
         _syncStatus.value = "Synchronisiere mit $normalizedUrl ..."
         try {
-            val response: DatabaseSnapshot = SupabaseSyncService.syncSnapshotWithSupabase(
-                httpClient = httpClient,
-                baseUrl = normalizedUrl,
-                apiKey = cleanAnonKey,
-                localSnapshot = _snapshot.value
-            )
-            _snapshot.value = response
-            persist(response)
-            _syncStatus.value = "Sync erfolgreich mit $normalizedUrl (${response.games.size} Spiele, ${response.players.size} Kader)"
+            val sent = _snapshot.value
+            val response: DatabaseSnapshot = syncTransport(normalizedUrl, cleanAnonKey, sent)
+
+            // Antwort nur übernehmen, wenn sich lokal seit dem Absenden nichts geändert hat.
+            // Sonst würden z. B. Tore, die während des Syncs getippt wurden, verloren gehen.
+            // Die neueren lokalen Änderungen gehen mit dem nächsten Sync raus.
+            if (_snapshot.compareAndSet(sent, response)) {
+                persist(response)
+                _syncStatus.value = "Sync erfolgreich mit $normalizedUrl (${response.games.size} Spiele, ${response.players.size} Kader)"
+            } else {
+                _syncStatus.value = if (autoSync) {
+                    "Sync erfolgreich mit $normalizedUrl – neuere lokale Änderungen werden nachgesendet"
+                } else {
+                    "Sync erfolgreich mit $normalizedUrl – neuere lokale Änderungen bitte erneut synchronisieren"
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: SupabaseAuthRequiredException) {
             _syncStatus.value = "Cloud-Sync nicht möglich: nicht angemeldet oder Konto nicht freigeschaltet (lokal gespeichert)"
         } catch (e: Exception) {
