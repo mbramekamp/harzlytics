@@ -102,6 +102,7 @@ internal fun MainAppContent(
     val canEdit = rememberCanEdit()
     var showAccount by remember { mutableStateOf(false) }
     var showAdmin by remember { mutableStateOf(false) }
+    var showClub by remember { mutableStateOf(false) }
 
     var currentScreen by remember { mutableStateOf(initialScreen) }
     // Beim Start die aktuelle Saison; eine gewählte bleibt, solange es sie gibt
@@ -285,10 +286,22 @@ internal fun MainAppContent(
                     onSignOut = { showAccount = false; onSignOut() },
                     darkTheme = darkTheme,
                     onToggleDarkTheme = onToggleDarkTheme,
+                    onOpenClub = if (canEdit) {
+                        { showAccount = false; showClub = true }
+                    } else null,
                     onOpenAdmin = if (profile.role == UserRole.ADMIN && adminRepository != null) {
                         { showAccount = false; showAdmin = true }
                     } else null,
                     onDismiss = { showAccount = false }
+                )
+            }
+
+            if (showClub && canEdit) {
+                ClubDialog(
+                    repository = repository,
+                    snapshot = snapshot,
+                    selectedSeasonId = selectedSeasonId,
+                    onDismiss = { showClub = false }
                 )
             }
 
@@ -709,8 +722,7 @@ private fun MainContentRouter(
                 repository = repository,
                 snapshot = snapshot,
                 isWideScreen = isWideScreen,
-                selectedSeasonId = selectedSeasonId,
-                onOpenNewOpponentDialog = { onOpenModal(CreationModalType.NEW_OPPONENT) }
+                selectedSeasonId = selectedSeasonId
             )
         }
     }

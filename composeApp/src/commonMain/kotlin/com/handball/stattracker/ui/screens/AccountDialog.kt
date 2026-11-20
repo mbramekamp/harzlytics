@@ -50,6 +50,7 @@ fun AccountDialog(
     onSignOut: () -> Unit,
     darkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
+    onOpenClub: (() -> Unit)? = null,
     onOpenAdmin: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
@@ -121,6 +122,9 @@ fun AccountDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Dunkles Design", modifier = Modifier.weight(1f))
                     Switch(checked = darkTheme, onCheckedChange = { onToggleDarkTheme() })
+                }
+                if (onOpenClub != null) {
+                    FilledTonalButton(onClick = onOpenClub) { Text("Verein verwalten") }
                 }
                 if (onOpenAdmin != null) {
                     FilledTonalButton(enabled = !offline, onClick = onOpenAdmin) { Text("Benutzer verwalten") }

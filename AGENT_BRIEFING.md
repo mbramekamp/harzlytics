@@ -97,6 +97,8 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - [x] **UI-Bereinigung & Professionalisierung**: Entfernung redundanter Labels, erklärender Hilfstexte und technischer Datenbank-Begriffe in der gesamten App.
 - [x] **Mobile-Ergonomie (Android) & Supabase Cloud-Sync** (Snapshot-Sync via `SupabaseSyncService.kt`, Konfiguration über `.env` / `SupabaseConfig.kt`).
 
+- [x] **UI-Überarbeitung Welle 1 & 2** (Details in §6): Lila/Weiß-Theme mit Dunkelmodus, Inhalts-Audit (ein Element = ein Zweck), Saison-Menü in der Kopfzeile, Sync-Symbol, Begriffe Kader/Staff/Aufgebot, Spieler-Profil-Tab mobil, Vereinsverwaltung (`ClubDialog`), Headless-Screenshot-Test.
+
 ### Nächste geplante Features (Priorität)
 1. [x] **Performance-basierte Start 7 (Starting Seven Feature)**:
    - Dedizierte Funktion & Ansicht, die auf Grundlage der bisherigen Spieler-Performance (Performance-Index, Wurf-/Fangquoten, Plus/Minus, Formkurve der letzten Spiele) automatisch die beste **Start 7** (`TW`, `LA`, `RL`, `RM`, `RR`, `RA`, `KM` bzw. `7-Feldspieler`-Variante) zusammenstellt, begründet/vergleichbar macht und vor oder im Spiel direkt als Startaufstellung übernimmt.
@@ -123,3 +125,42 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
    - Interaktives Wurfbild & 9-Zonen-Tor-Matrix (*Shot Map & Goal Sectors*) für Feldspieler und Torhüter.
    - Gegner-Scouting-Profile & Team-Splits (1. vs. 2. Halbzeit, Heim vs. Auswärts).
    - Granulare Konfliktauflösung beim Backend-Sync & Android-SDK-Aktivierung.
+
+---
+
+## 6. Übergabe: Stand nach UI-Welle 2
+
+*Diesen Abschnitt zuerst lesen, wenn eine neue Session hier weiterarbeitet.*
+
+### 6.1 Stand
+- **Alles implementiert und per Desktop-Tests/-Screenshots geprüft:** Login mit Rollen (Spieler read-only, Trainer/Admin bearbeiten), Admin-Benutzerverwaltung, verschlüsselte Token-Speicherung, Android-Datenordner `filesDir` mit Umzug, Sync-Fixes (keine verlorenen Eingaben), Lila/Weiß-Theme, Inhalts-Audit Welle 1 und 2.
+- **Welle 2 enthielt:** Vereinsname und Teilnehmer-Auswahl wanderten aus Start/Tabelle in den `ClubDialog` (Konto-Dialog → "Verein verwalten", nur Trainer/Admin); der Knopf "Gegner" in der Tabelle ist weg (Gegner nur über `+`); Spielwerte in der Kader-Historie sind Wert-Paare (`GameValueRow`) ohne Nullwerte statt einer langen Textzeile; Profil-Kennzahlen zeigen "0× 2Min" nicht mehr.
+- **Branches:** Arbeitsbranch `claude/repository-status-o99lyd`, `main` wird nur per Fast-Forward nachgezogen.
+- **Tests:** 59 Logik-Tests (`:shared:desktopTest`) + 12 Screenshot-Tests (`:composeApp:desktopTest`).
+
+### 6.2 Offene Entscheidungen des Nutzers (nicht eigenmächtig ändern)
+1. **Filter "Alle / Eigene Spiele / Liga-Spiele"** in der Saison-Liste: behalten oder streichen?
+2. **Spielerkarten in der Spielansicht** (`SeasonScreen.kt`, `FieldPlayerStatTrackerCard`/`GoalKeeperStatTrackerCard`) zeigen sehr viele Zahlen. Größter Hebel für "so wenig wie möglich", aber Kernfunktion am Spielfeldrand: erst fragen, welche Werte im Spiel wirklich gebraucht werden.
+3. **Profil-Kennzahlen** (`ProfileStatBox`) kombinieren je zwei Werte ("Assists & Abwehr", "Tore / Würfe"): aufteilen?
+4. **Staff** steht als eigene Gruppe in der Kaderliste (Annahme aus einer mehrdeutigen Antwort); Alternative wäre ein eigener Menüpunkt.
+5. Das "H"-Zeichen in der mobilen Kopfzeile wurde entfernt (Desktop-Seitenleiste behält es); auf Wunsch zurückholen.
+
+### 6.3 Nächster geplanter Schritt: UI Phase 3 "Bewegung" (noch nicht begonnen)
+`AnimatedContent` zwischen den Haupt-Tabs (Überblenden + kurzes Schieben in Tab-Richtung), Liste → Detail (Kader, Spiel) nach vorn/zurück schieben, gleitender Indikator in der unteren Navigation, weiches Überblenden bei Hell/Dunkel (`animateColorAsState`), Dialoge blenden ein/skalieren, Zahlen (Spielstand) zählen kurz hoch. Auf dem Altgerät leicht halten (kurze Dauer, nur Verschieben/Überblenden, keine Layout-Animationen in `SeasonScreen`). Standbilder können Bewegung nicht prüfen: der Nutzer testet auf dem Handy. Die Navigation ist bisher ein `when(currentScreen)` in `MainContentRouter` (`HandballApp.kt`).
+
+### 6.4 Auf dem Gerät des Nutzers zu prüfen (hier nicht ausführbar)
+- Android-Build (`assembleDebug`) und alles in `androidMain` (`AndroidSecretCipher`, `PlatformStorage.init`, Datenumzug), Windows-DPAPI-Pfad (`WindowsDpapiProtector`), Migration der alten Klartext-Session, Flugmodus-/Offline-Test im Spiel, Login/Rollen/Admin-Dialog mit echtem Supabase.
+- iOS: nicht gebaut (kein Xcode-Projekt, Token unverschlüsselt in `NSUserDefaults`, Keychain fehlt). Der Nutzer hat kein Mac; Weg wäre GitHub-Actions-Mac + Sideloadly, aktuell zurückgestellt (Android-Altgerät vorhanden).
+
+### 6.5 Weiteres Backlog (Reihenfolge nach Nutzen)
+1. **CI mit GitHub Actions** (`.github/` fehlt): Tests + `assembleDebug` auf `ubuntu-latest` (Android-SDK vorinstalliert); damit wird der Android-Build erstmals ohne Nutzer geprüft.
+2. Einladungscodes in der App erzeugen (bisher per SQL in `club_invitations`; braucht einen sicheren Zufallsgenerator pro Plattform).
+3. Sync-Konflikte (Review-Finding #6): zwei Geräte offline, das mit der späteren Uhrzeit überschreibt das ganze Snapshot; bräuchte Zusammenführen pro Entität oder Serverzeit.
+4. Release-APK mit eigenem Signaturschlüssel; Supabase-Einstellungen prüfen (E-Mail-Bestätigung, Passwort-Reset-Link).
+5. `SeasonScreen.kt` aufteilen (~3,7k Zeilen), README/Briefing von Windows-`file:///`-Links auf relative Links umstellen.
+6. Optional: Wurfbild/Tor-Zonen, Gegner-Scouting, Halbzeit- und Heim/Auswärts-Auswertung.
+
+### 6.6 Arbeitsweise, die sich bewährt hat
+- Erst Audit/Plan mit Befunden und Empfehlung, dann umsetzen; subjektive Entscheidungen (Farben, Informationen streichen) vorher abstimmen.
+- Nach jeder UI-Änderung `:composeApp:desktopTest` laufen lassen und die PNGs ansehen (so wurden u. a. eine kollabierte Tabellenspalte, überlappende Titel und doppelte Zurück-Pfeile gefunden).
+- Neue Berechtigungs- oder Sync-Logik zuerst im Repository mit Test, dann in der UI.

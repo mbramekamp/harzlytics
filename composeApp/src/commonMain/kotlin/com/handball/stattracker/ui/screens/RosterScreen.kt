@@ -593,7 +593,10 @@ private fun PlayerProfileDetailPanel(
                                 modifier = Modifier.weight(1f),
                                 label = "Assists & Abwehr",
                                 value = "${stats.totalAssists} A / ${stats.totalSteals + stats.totalBlocks} Abw",
-                                sub = "${stats.totalTechnicalMistakes} TF • ${stats.totalTwoMin}× 2Min"
+                                sub = listOfNotNull(
+                                    stats.totalTechnicalMistakes.takeIf { it > 0 }?.let { "$it Techn. Fehler" },
+                                    stats.totalTwoMin.takeIf { it > 0 }?.let { "${it}× 2Min" }
+                                ).joinToString(" • ").ifEmpty { "ohne Fehler und Strafen" }
                             )
                         }
                     } else {
@@ -629,7 +632,10 @@ private fun PlayerProfileDetailPanel(
                                     modifier = Modifier.weight(1f),
                                     label = "Assists & Abwehr",
                                     value = "${stats.totalAssists} A / ${stats.totalSteals + stats.totalBlocks} Abw",
-                                    sub = "${stats.totalTechnicalMistakes} TF • ${stats.totalTwoMin}× 2Min"
+                                    sub = listOfNotNull(
+                                    stats.totalTechnicalMistakes.takeIf { it > 0 }?.let { "$it Techn. Fehler" },
+                                    stats.totalTwoMin.takeIf { it > 0 }?.let { "${it}× 2Min" }
+                                ).joinToString(" • ").ifEmpty { "ohne Fehler und Strafen" }
                                 )
                             }
                         }
@@ -978,26 +984,40 @@ private fun PlayerGameHistoryCard(
                 }
             }
 
-            // Detailwerte des Spielers in diesem Spiel
+            // Detailwerte des Spielers in diesem Spiel: Werte mit 0 entfallen, außer Tore/7m bzw. Paraden
             when (role) {
                 PlayerRole.FIELD_PLAYER -> {
                     val fs = entry.fieldStats
                     if (fs != null) {
-                        Text(
-                            text = "Tore: ${fs.goalsScored}/${fs.goalesAttempted} • 7m: ${fs.penaltiesScored}/${fs.penaltiesAttempted} (${fs.penaltiesDrawn} gez.) • Assists: ${fs.assists} • Steals: ${fs.steals} • Blocks: ${fs.blocks} • TF: ${fs.technicalMistakes} • 2Min: ${entry.playerGame.twoMinuteSuspensions}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        val values = buildList {
+                            add("Tore" to "${fs.goalsScored}/${fs.goalesAttempted}")
+                            if (fs.penaltiesAttempted > 0 || fs.penaltiesDrawn > 0) {
+                                add("7m" to "${fs.penaltiesScored}/${fs.penaltiesAttempted}" +
+                                    if (fs.penaltiesDrawn > 0) " (${fs.penaltiesDrawn} gez.)" else "")
+                            }
+                            if (fs.assists > 0) add("Assists" to "${fs.assists}")
+                            if (fs.steals > 0) add("Steals" to "${fs.steals}")
+                            if (fs.blocks > 0) add("Blocks" to "${fs.blocks}")
+                            if (fs.technicalMistakes > 0) add("Techn. Fehler" to "${fs.technicalMistakes}")
+                            if (entry.playerGame.twoMinuteSuspensions > 0) add("2 Min" to "${entry.playerGame.twoMinuteSuspensions}")
+                        }
+                        GameValueRow(values, MaterialTheme.colorScheme.primary)
                     }
                 }
                 PlayerRole.GOALKEEPER -> {
                     val ks = entry.keeperStats
                     if (ks != null) {
-                        Text(
-                            text = "Paraden: ${ks.saves} (Gegentore: ${ks.goalesConceded}) • 7m gehalten: ${ks.penaltiesSaved}/${ks.penaltiesSaved + ks.penaltiesConceded} • Gegenstoßpässe: ${ks.sucessfulFastBreakPasses}/${ks.attemptedFastBreakPasses}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
+                        val values = buildList {
+                            add("Paraden" to "${ks.saves}")
+                            add("Gegentore" to "${ks.goalesConceded}")
+                            if (ks.penaltiesSaved + ks.penaltiesConceded > 0) {
+                                add("7m gehalten" to "${ks.penaltiesSaved}/${ks.penaltiesSaved + ks.penaltiesConceded}")
+                            }
+                            if (ks.attemptedFastBreakPasses > 0) {
+                                add("Gegenstoßpässe" to "${ks.sucessfulFastBreakPasses}/${ks.attemptedFastBreakPasses}")
+                            }
+                        }
+                        GameValueRow(values, MaterialTheme.colorScheme.tertiary)
                     }
                 }
                 PlayerRole.COACH -> {
@@ -1017,6 +1037,23 @@ private fun PlayerGameHistoryCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Kleine Wert-Paare ("Tore 5/6") umbrechen automatisch; ersetzt die frühere lange Textzeile. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GameValueRow(values: List<Pair<String, String>>, accent: androidx.compose.ui.graphics.Color) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        values.forEach { (label, value) ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = accent)
             }
         }
     }

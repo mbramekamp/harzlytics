@@ -34,8 +34,6 @@ fun DashboardScreen(
     onNavigateToGame: (Int) -> Unit,
     onNavigateToStandings: () -> Unit
 ) {
-    var editingClubName by remember { mutableStateOf(false) }
-    var clubNameDraft by remember(snapshot.ownClubName) { mutableStateOf(snapshot.ownClubName) }
 
     val activeSeason = snapshot.seasons.find { it.seasonId == selectedSeasonId } ?: snapshot.seasons.firstOrNull()
     val standings = remember(snapshot, activeSeason) {
@@ -76,38 +74,11 @@ fun DashboardScreen(
             .padding(if (isWideScreen) 20.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Vereinsname (Änderung nur für Trainer/Admin)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (editingClubName) {
-                OutlinedTextField(
-                    value = clubNameDraft,
-                    onValueChange = { clubNameDraft = it },
-                    singleLine = true,
-                    label = { Text("Vereinsname") },
-                    modifier = Modifier.weight(1f)
-                )
-                Button(onClick = {
-                    repository.updateClubName(clubNameDraft)
-                    editingClubName = false
-                }) {
-                    Text("Speichern")
-                }
-            } else {
-                Text(
-                    text = snapshot.ownClubName,
-                    style = if (isWideScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                EditorOnly {
-                    IconButton(onClick = { editingClubName = true }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Vereinsnamen ändern")
-                    }
-                }
-            }
-        }
+        Text(
+            text = snapshot.ownClubName,
+            style = if (isWideScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
 
         // Kennzahlen-Reihe (Tabellenplatz, Punkte, Kadergröße)
         Row(

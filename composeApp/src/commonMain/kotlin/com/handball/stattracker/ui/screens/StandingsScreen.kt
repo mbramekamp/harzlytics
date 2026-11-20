@@ -28,14 +28,12 @@ fun StandingsScreen(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
     isWideScreen: Boolean = true,
-    selectedSeasonId: Int,
-    onOpenNewOpponentDialog: () -> Unit
+    selectedSeasonId: Int
 ) {
     val activeSeason = snapshot.seasons.find { it.seasonId == selectedSeasonId } ?: snapshot.seasons.firstOrNull()
     val standings = remember(snapshot, activeSeason) {
         activeSeason?.let { repository.computeStandings(it.seasonId, snapshot) } ?: emptyList()
     }
-    var showManageLeagueTeams by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -44,60 +42,6 @@ fun StandingsScreen(
             .padding(if (isWideScreen) 20.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Saison wählt das Menü in der Kopfzeile; "Neues Spiel" gibt es nur im +-Menü
-        EditorOnly {
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
-                    Icon(Icons.Default.Groups, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Mannschaften")
-                }
-                OutlinedButton(onClick = onOpenNewOpponentDialog) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Gegner")
-                }
-            }
-        }
-
-        if (showManageLeagueTeams && activeSeason != null) {
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Teilnehmende Vereine (${activeSeason.division})",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        snapshot.opponentTeams.forEach { opp ->
-                            val isAssigned = snapshot.seasonOpponents.any {
-                                it.seasonId == activeSeason.seasonId && it.opponentTeamId == opp.opponentTeamId
-                            }
-                            FilterChip(
-                                selected = isAssigned,
-                                onClick = {
-                                    repository.toggleOpponentSeasonAssignment(activeSeason.seasonId, opp.opponentTeamId)
-                                },
-                                label = { Text("${opp.opponentName} (${opp.opponentLocation})") }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
         // Ligatabelle: Auf Smartphone horizontal scrollbar für saubere, ungeschnittene Spalten
         Card(
             shape = RoundedCornerShape(16.dp),

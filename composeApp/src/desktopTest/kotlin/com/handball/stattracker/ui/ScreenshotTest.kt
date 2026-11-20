@@ -2,7 +2,9 @@ package com.handball.stattracker.ui
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import com.handball.stattracker.model.AuthActionResult
 import com.handball.stattracker.model.UserProfile
 import com.handball.stattracker.model.UserRole
@@ -93,4 +95,36 @@ class ScreenshotTest {
         "mobil-hell-spieler-profil", 390, 800, 2f, dark = false, screen = MainNavScreen.ROSTER,
         role = UserRole.SPIELER, playerId = 4, ownPlayerId = 4
     )
+
+    @Test
+    fun desktopRosterGameHistory() = render(
+        "desktop-hell-kader-spiele", 1180, 1100, 1f, dark = false, screen = MainNavScreen.ROSTER, playerId = 15
+    )
+
+    /** Inhalt des Vereins-Dialogs (der Dialog selbst braucht ein Fenster). */
+    @Test
+    fun clubManagementContent() {
+        val repo = HandballRepository(persistLocally = false, canEdit = true)
+        val snapshot = DemoDataSeed.createDemoSnapshot()
+        repo.replaceSnapshot(snapshot)
+        val scene = ImageComposeScene(420, 300, Density(1f)) {
+            com.handball.stattracker.ui.theme.HandballTheme(darkTheme = false) {
+                androidx.compose.material3.Surface {
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(16.dp)) {
+                        com.handball.stattracker.ui.screens.ClubManagementContent(repo, snapshot, snapshot.seasons.first().seasonId)
+                    }
+                }
+            }
+        }
+        try {
+            var image = scene.render(0)
+            for (i in 1..3) image = scene.render(i * 100_000_000L)
+            val file = File(outDir, "desktop-hell-verein.png").also {
+                it.writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            }
+            assertTrue(file.length() > 3_000)
+        } finally {
+            scene.close()
+        }
+    }
 }
