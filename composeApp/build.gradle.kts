@@ -111,3 +111,17 @@ tasks.withType<Test>().configureEach {
     systemProperty("java.awt.headless", "true")
     systemProperty("screenshot.dir", layout.buildDirectory.dir("screenshots").get().asFile.absolutePath)
 }
+
+// Zeichnet die Screens neu und kopiert die für das README gewählten nach docs/screenshots/
+val docScreenshots = listOf(
+    "desktop-hell-home", "desktop-dunkel-home", "desktop-hell-spiel", "desktop-hell-kader",
+    "desktop-hell-tabelle", "mobil-hell-home", "mobil-dunkel-home", "mobil-hell-spieler-profil",
+    "dialog-admin-konto", "dialog-admin-verein", "dialog-admin-benutzer"
+)
+tasks.register<Copy>("updateDocScreenshots") {
+    group = "documentation"
+    description = "Rendert die Screens (desktopTest) und kopiert die README-Bilder nach docs/screenshots"
+    dependsOn("desktopTest")
+    from(layout.buildDirectory.dir("screenshots")) { include(docScreenshots.map { "$it.png" }) }
+    into(rootProject.layout.projectDirectory.dir("docs/screenshots"))
+}
