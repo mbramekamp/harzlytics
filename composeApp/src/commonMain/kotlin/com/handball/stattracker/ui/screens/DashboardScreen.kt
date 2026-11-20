@@ -30,22 +30,12 @@ fun DashboardScreen(
     snapshot: DatabaseSnapshot,
     isWideScreen: Boolean = true,
     selectedSeasonId: Int,
-    onSelectSeason: (Int) -> Unit,
     onNavigateToPlayer: (Int) -> Unit,
     onNavigateToGame: (Int) -> Unit,
-    onNavigateToStandings: () -> Unit,
-    onOpenPlusMenu: () -> Unit
+    onNavigateToStandings: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    val syncStatus by repository.syncStatus.collectAsState()
     var editingClubName by remember { mutableStateOf(false) }
     var clubNameDraft by remember(snapshot.ownClubName) { mutableStateOf(snapshot.ownClubName) }
-    var serverUrlDraft by remember {
-        mutableStateOf(SupabaseConfig.resolvedProjectUrl().ifBlank { "https://<project-ref>.supabase.co" })
-    }
-    var supabaseAnonKeyDraft by remember {
-        mutableStateOf(SupabaseConfig.resolvedApiKey())
-    }
 
     val activeSeason = snapshot.seasons.find { it.seasonId == selectedSeasonId } ?: snapshot.seasons.firstOrNull()
     val standings = remember(snapshot, activeSeason) {
@@ -86,89 +76,34 @@ fun DashboardScreen(
             .padding(if (isWideScreen) 20.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Obere Vereins- & Saison-Leiste
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        // Vereinsname (Änderung nur für Trainer/Admin)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        if (editingClubName) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(top = 4.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = clubNameDraft,
-                                    onValueChange = { clubNameDraft = it },
-                                    singleLine = true,
-                                    label = { Text("Vereinsname") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Button(onClick = {
-                                    repository.updateClubName(clubNameDraft)
-                                    editingClubName = false
-                                }) {
-                                    Text("Speichern")
-                                }
-                            }
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = snapshot.ownClubName,
-                                    style = if (isWideScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                EditorOnly {
-                                    IconButton(onClick = { editingClubName = true }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Vereinsnamen ändern",
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    EditorOnly {
-                        Button(onClick = onOpenPlusMenu) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Neu")
-                        }
-                    }
+            if (editingClubName) {
+                OutlinedTextField(
+                    value = clubNameDraft,
+                    onValueChange = { clubNameDraft = it },
+                    singleLine = true,
+                    label = { Text("Vereinsname") },
+                    modifier = Modifier.weight(1f)
+                )
+                Button(onClick = {
+                    repository.updateClubName(clubNameDraft)
+                    editingClubName = false
+                }) {
+                    Text("Speichern")
                 }
-
-                // Saison-Schnellauswahl
-                if (snapshot.seasons.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        snapshot.seasons.forEach { season ->
-                            FilterChip(
-                                selected = season.seasonId == activeSeason?.seasonId,
-                                onClick = { onSelectSeason(season.seasonId) },
-                                label = { Text(season.division) },
-                                colors = seasonChipColors()
-                            )
-                        }
+            } else {
+                Text(
+                    text = snapshot.ownClubName,
+                    style = if (isWideScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                EditorOnly {
+                    IconButton(onClick = { editingClubName = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Vereinsnamen ändern")
                     }
                 }
             }
@@ -183,21 +118,18 @@ fun DashboardScreen(
                 modifier = Modifier.weight(1f).clickable { onNavigateToStandings() },
                 title = "Tabellenplatz",
                 value = ownStanding?.let { "${it.rank}. Platz" } ?: "-",
-                subtitle = activeSeason?.division ?: "",
                 isWideScreen = isWideScreen
             )
             KpiStatCard(
                 modifier = Modifier.weight(1f).clickable { onNavigateToStandings() },
-                title = "Punkte & Tore",
+                title = "Punkte",
                 value = ownStanding?.pointsFormatted ?: "0:0",
-                subtitle = ownStanding?.let { "Tore ${it.goalsFormatted}" } ?: "0:0",
                 isWideScreen = isWideScreen
             )
             KpiStatCard(
                 modifier = Modifier.weight(1f),
                 title = "Kader",
                 value = "${snapshot.players.count { it.role != PlayerRole.COACH }} Spieler",
-                subtitle = "${snapshot.players.count { it.role == PlayerRole.COACH }} Trainer",
                 isWideScreen = isWideScreen
             )
         }
@@ -242,106 +174,6 @@ fun DashboardScreen(
                     snapshot = snapshot,
                     onNavigateToPlayer = onNavigateToPlayer
                 )
-            }
-        }
-
-        // Synchronisation & Cloud-Status
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Synchronisation (Supabase Cloud)",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Text(
-                    text = syncStatus,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                if (isWideScreen) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = serverUrlDraft,
-                            onValueChange = { serverUrlDraft = it },
-                            label = { Text("Supabase URL") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = supabaseAnonKeyDraft,
-                            onValueChange = { supabaseAnonKeyDraft = it },
-                            label = { Text("Supabase Public Key") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    repository.syncWithBackend(serverUrlDraft, supabaseAnonKeyDraft)
-                                }
-                            }
-                        ) {
-                            Icon(Icons.Default.Sync, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Sync")
-                        }
-                    }
-                } else {
-                    // Auf Mobile sauber untereinander für ergonomische Touch-Bedienung
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = serverUrlDraft,
-                            onValueChange = { serverUrlDraft = it },
-                            label = { Text("Supabase Project URL") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = supabaseAnonKeyDraft,
-                            onValueChange = { supabaseAnonKeyDraft = it },
-                            label = { Text("Supabase API Key (public)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    scope.launch {
-                                        repository.syncWithBackend(serverUrlDraft, supabaseAnonKeyDraft)
-                                    }
-                                }
-                            ) {
-                                Icon(Icons.Default.Sync, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Sync")
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -396,7 +228,7 @@ private fun RecentGamesCard(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${game.gameDate} • ${game.location} • ${game.gameType}",
+                                    text = game.gameDate,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -522,7 +354,6 @@ private fun KpiStatCard(
     modifier: Modifier = Modifier,
     title: String,
     value: String,
-    subtitle: String,
     isWideScreen: Boolean = true
 ) {
     Card(
@@ -546,13 +377,6 @@ private fun KpiStatCard(
                 style = if (isWideScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

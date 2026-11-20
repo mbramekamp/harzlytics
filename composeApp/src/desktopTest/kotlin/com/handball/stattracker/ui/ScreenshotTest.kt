@@ -24,24 +24,28 @@ class ScreenshotTest {
 
     private val profile = UserProfile(id = "u1", email = "trainer@club.de", fullName = "Tina Trainer", role = UserRole.ADMIN, status = "ACTIVE")
 
-    private fun render(name: String, width: Int, height: Int, density: Float, dark: Boolean, screen: MainNavScreen, gameId: Int? = null) {
-        val repo = HandballRepository(persistLocally = false, canEdit = true)
+    private fun render(
+        name: String, width: Int, height: Int, density: Float, dark: Boolean, screen: MainNavScreen,
+        gameId: Int? = null, role: UserRole = UserRole.ADMIN, playerId: Int? = null, ownPlayerId: Int? = null
+    ) {
+        val repo = HandballRepository(persistLocally = false, canEdit = role != UserRole.SPIELER)
         repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
         // width/height sind in dp; die Szene misst in Pixeln
         val scene = ImageComposeScene((width * density).toInt(), (height * density).toInt(), Density(density)) {
-            androidx.compose.runtime.CompositionLocalProvider(LocalUserRole provides UserRole.ADMIN) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalUserRole provides role) {
                 MainAppContent(
                     repository = repo,
                     darkTheme = dark,
                     onToggleDarkTheme = {},
-                    profile = profile,
+                    profile = profile.copy(role = role, playerId = ownPlayerId),
                     email = profile.email,
                     offline = false,
                     onRequestClaim = { AuthActionResult.Success },
                     adminRepository = null,
                     onSignOut = {},
                     initialScreen = screen,
-                    initialGameId = gameId
+                    initialGameId = gameId,
+                    initialPlayerId = playerId
                 )
             }
         }
@@ -83,4 +87,10 @@ class ScreenshotTest {
 
     @Test
     fun mobileLightRoster() = render("mobil-hell-kader", 390, 800, 2f, dark = false, screen = MainNavScreen.ROSTER)
+
+    @Test
+    fun mobilePlayerOwnProfile() = render(
+        "mobil-hell-spieler-profil", 390, 800, 2f, dark = false, screen = MainNavScreen.ROSTER,
+        role = UserRole.SPIELER, playerId = 4, ownPlayerId = 4
+    )
 }

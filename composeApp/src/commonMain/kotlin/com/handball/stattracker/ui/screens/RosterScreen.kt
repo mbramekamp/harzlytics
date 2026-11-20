@@ -1,6 +1,9 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.model.UserRole
 import com.handball.stattracker.ui.EditorOnly
+import com.handball.stattracker.ui.LocalUserRole
+import com.handball.stattracker.ui.theme.amberContainer
 import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -107,7 +110,7 @@ fun RosterScreen(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Spieler oder Trainer auswählen",
+                                text = "Person auswählen",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -174,7 +177,7 @@ private fun RosterListPanel(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Kader (${snapshot.players.size})",
+                text = "Kader (${snapshot.players.count { it.role != PlayerRole.COACH }})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -241,7 +244,7 @@ private fun RosterListPanel(
             if (coaches.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(6.dp))
-                    SectionHeaderBadge("TRAINERTEAM (${coaches.size})")
+                    SectionHeaderBadge("STAFF (${coaches.size})")
                 }
                 items(coaches, key = { it.playerId }) { coach ->
                     RosterPersonRow(
@@ -316,14 +319,14 @@ private fun RosterPersonRow(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                val kitInfo = if (player.role != PlayerRole.COACH && player.jerseyNumberAwayKit != null) {
-                    " • Ausw. #${player.jerseyNumberAwayKit}"
-                } else ""
-                Text(
-                    text = "$positionName$kitInfo",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Torhüter und Staff stehen schon in ihrer Gruppe; nur Feldspieler brauchen die Position
+                if (player.role == PlayerRole.FIELD_PLAYER) {
+                    Text(
+                        text = positionName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -406,7 +409,7 @@ private fun PlayerProfileDetailPanel(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${player.role.label} • $positionName",
+                                text = if (player.role == PlayerRole.COACH) player.role.label else positionName,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                                 maxLines = 1,
@@ -458,16 +461,8 @@ private fun PlayerProfileDetailPanel(
                             onClick = {},
                             label = { Text("Heim: #${player.jerseyNumberHomeKit ?: "-"} / Ausw.: #${player.jerseyNumberAwayKit ?: "-"}") }
                         )
-                        AssistChip(
-                            onClick = {},
-                            label = { Text("Gesamt +/-: ${stats.plusMinusFormatted}") }
-                        )
-                        AssistChip(
-                            onClick = {},
-                            label = { Text("Einsatzzeit: ${stats.totalPlayingTimeFormatted}") }
-                        )
                     }
-                    if (player.email.isNotBlank()) {
+                    if (player.email.isNotBlank() && LocalUserRole.current == UserRole.ADMIN) {
                         AssistChip(
                             onClick = {},
                             label = { Text("E-Mail: ${player.email}") }
@@ -895,7 +890,7 @@ private fun PlayerGameHistoryCard(
                             shape = RoundedCornerShape(8.dp),
                             color = when (entry.outcomeBadge) {
                                 "S" -> MaterialTheme.colorScheme.tertiaryContainer
-                                "U" -> MaterialTheme.colorScheme.secondaryContainer
+                                "U" -> amberContainer()
                                 else -> MaterialTheme.colorScheme.errorContainer
                             }
                         ) {
@@ -937,7 +932,7 @@ private fun PlayerGameHistoryCard(
                                 shape = RoundedCornerShape(8.dp),
                                 color = when (entry.outcomeBadge) {
                                     "S" -> MaterialTheme.colorScheme.tertiaryContainer
-                                    "U" -> MaterialTheme.colorScheme.secondaryContainer
+                                    "U" -> amberContainer()
                                     else -> MaterialTheme.colorScheme.errorContainer
                                 }
                             ) {

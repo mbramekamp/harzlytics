@@ -775,7 +775,7 @@ private fun NewGameModal(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Kader (${nominatedIds.size}/${snapshot.players.size})",
+                            text = "Aufgebot (${nominatedIds.size}/${snapshot.players.size})",
                             fontWeight = FontWeight.Bold
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

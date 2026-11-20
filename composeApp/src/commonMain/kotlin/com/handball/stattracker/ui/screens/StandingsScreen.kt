@@ -1,7 +1,6 @@
 package com.handball.stattracker.ui.screens
 
 import com.handball.stattracker.ui.EditorOnly
-import com.handball.stattracker.ui.theme.seasonChipColors
 import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -30,9 +29,7 @@ fun StandingsScreen(
     snapshot: DatabaseSnapshot,
     isWideScreen: Boolean = true,
     selectedSeasonId: Int,
-    onSelectSeason: (Int) -> Unit,
-    onOpenNewOpponentDialog: () -> Unit,
-    onOpenNewGameDialog: () -> Unit
+    onOpenNewOpponentDialog: () -> Unit
 ) {
     val activeSeason = snapshot.seasons.find { it.seasonId == selectedSeasonId } ?: snapshot.seasons.firstOrNull()
     val standings = remember(snapshot, activeSeason) {
@@ -47,122 +44,21 @@ fun StandingsScreen(
             .padding(if (isWideScreen) 20.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+        // Saison wählt das Menü in der Kopfzeile; "Neues Spiel" gibt es nur im +-Menü
+        EditorOnly {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (isWideScreen) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = activeSeason?.division ?: "Ligatabelle",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            EditorOnly {
-                                OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
-                                    Icon(Icons.Default.Groups, contentDescription = null)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Mannschaften")
-                                }
-                            }
-                            EditorOnly {
-                                OutlinedButton(onClick = onOpenNewOpponentDialog) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Gegner")
-                                }
-                            }
-                            EditorOnly {
-                                Button(onClick = onOpenNewGameDialog) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Spiel")
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Mobile: Titel oben, Aktionen darunter in ergonomischer Leiste
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = activeSeason?.division ?: "Ligatabelle",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        EditorOnly {
-                            OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
-                                Icon(Icons.Default.Groups, contentDescription = null)
-                                Spacer(Modifier.width(4.dp))
-                                Text("Mannschaften")
-                            }
-                        }
-                        EditorOnly {
-                            OutlinedButton(onClick = onOpenNewOpponentDialog) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(Modifier.width(4.dp))
-                                Text("Gegner")
-                            }
-                        }
-                        EditorOnly {
-                            Button(onClick = onOpenNewGameDialog) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(Modifier.width(4.dp))
-                                Text("Spiel")
-                            }
-                        }
-                    }
+                OutlinedButton(onClick = { showManageLeagueTeams = !showManageLeagueTeams }) {
+                    Icon(Icons.Default.Groups, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Mannschaften")
                 }
-
-                // Saison-Filter Chips
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    snapshot.seasons.forEach { season ->
-                        FilterChip(
-                            selected = season.seasonId == activeSeason?.seasonId,
-                            onClick = { onSelectSeason(season.seasonId) },
-                            label = { Text(season.division) },
-                            colors = seasonChipColors()
-                        )
-                    }
+                OutlinedButton(onClick = onOpenNewOpponentDialog) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Gegner")
                 }
             }
         }
@@ -262,11 +158,14 @@ fun StandingsScreen(
                                     fontWeight = if (row.isOwnTeam) FontWeight.ExtraBold else FontWeight.SemiBold,
                                     color = if (row.isOwnTeam) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                 )
-                                Text(
-                                    text = row.location,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                // Für den eigenen Verein steht dort sonst nur "Heimverein"
+                                if (!row.isOwnTeam && row.location.isNotBlank()) {
+                                    Text(
+                                        text = row.location,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                             Text("${row.gamesPlayed}", modifier = Modifier.width(42.dp), textAlign = TextAlign.Center)
                             Text("${row.wins}", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)

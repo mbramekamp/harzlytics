@@ -16,9 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.automirrored.filled.Logout
 import com.handball.stattracker.model.AuthActionResult
 import com.handball.stattracker.model.AuthState
+import com.handball.stattracker.model.SyncState
+import com.handball.stattracker.repository.SeasonSelection
 import com.handball.stattracker.model.UserProfile
 import com.handball.stattracker.model.UserRole
 import com.handball.stattracker.repository.AdminRepository
@@ -94,7 +95,8 @@ internal fun MainAppContent(
     adminRepository: AdminRepository?,
     onSignOut: () -> Unit,
     initialScreen: MainNavScreen = MainNavScreen.HOME_DASHBOARD,
-    initialGameId: Int? = null
+    initialGameId: Int? = null,
+    initialPlayerId: Int? = null
 ) {
     val snapshot by repository.snapshot.collectAsState()
     val canEdit = rememberCanEdit()
@@ -102,24 +104,32 @@ internal fun MainAppContent(
     var showAdmin by remember { mutableStateOf(false) }
 
     var currentScreen by remember { mutableStateOf(initialScreen) }
-    var selectedSeasonId by remember(snapshot.seasons) {
-        mutableStateOf(snapshot.seasons.firstOrNull()?.seasonId ?: 1)
+    // Beim Start die aktuelle Saison; eine gewählte bleibt, solange es sie gibt
+    var chosenSeasonId by remember { mutableStateOf<Int?>(null) }
+    val currentSeasonId = remember(snapshot.seasons) {
+        SeasonSelection.currentSeasonId(snapshot.seasons, SeasonSelection.today())
     }
-    var selectedPlayerId by remember { mutableStateOf<Int?>(null) }
+    val selectedSeasonId = chosenSeasonId?.takeIf { id -> snapshot.seasons.any { it.seasonId == id } }
+        ?: currentSeasonId ?: 1
+    val syncState by repository.syncState.collectAsState()
+    val syncScope = rememberCoroutineScope()
+    val onSync: () -> Unit = { syncScope.launch { repository.syncWithBackend() } }
+    var selectedPlayerId by remember { mutableStateOf(initialPlayerId) }
+    // Spieler mit verknüpftem Kadereintrag: der zweite Tab unten ist ihr eigenes Profil statt der Kaderliste
+    val ownPlayerId = profile.playerId?.takeIf { id -> snapshot.players.any { it.playerId == id } }
+    val ownProfileTab = profile.role == UserRole.SPIELER && ownPlayerId != null
     var selectedGameId by remember { mutableStateOf(initialGameId) }
+    val showSeasonPicker = currentScreen == MainNavScreen.HOME_DASHBOARD ||
+        currentScreen == MainNavScreen.STANDINGS ||
+        (currentScreen == MainNavScreen.SEASON && selectedGameId == null)
     var creationModal by remember { mutableStateOf(CreationModalType.NONE) }
     // Spieler dürfen nichts anlegen; die Buttons sind ohnehin ausgeblendet, dies ist die zweite Absicherung
     val openModal: (CreationModalType) -> Unit = { if (canEdit) creationModal = it }
 
-    val staticHeaderTitle = remember(currentScreen, selectedPlayerId, selectedSeasonId, selectedGameId, snapshot) {
-        computeHeaderTitle(
-            currentScreen = currentScreen,
-            selectedPlayerId = selectedPlayerId,
-            selectedSeasonId = selectedSeasonId,
-            selectedGameId = selectedGameId,
-            snapshot = snapshot,
-            repository = repository
-        )
+    val staticHeaderTitle = if (ownProfileTab && currentScreen == MainNavScreen.ROSTER && selectedPlayerId == ownPlayerId) {
+        "Profil"
+    } else {
+        headerTitle(currentScreen, selectedGameId)
     }
 
     HandballTheme(darkTheme = darkTheme) {
@@ -133,7 +143,7 @@ internal fun MainAppContent(
                 // Auf Desktop/Tablet: Falls kein Spieler gewählt ist, ersten vorwählen für Master-Detail
                 LaunchedEffect(isWideScreen, snapshot.players) {
                     if (isWideScreen && selectedPlayerId == null && snapshot.players.isNotEmpty()) {
-                        selectedPlayerId = snapshot.players.firstOrNull()?.playerId
+                        selectedPlayerId = ownPlayerId ?: snapshot.players.firstOrNull()?.playerId
                     }
                 }
 
@@ -144,15 +154,13 @@ internal fun MainAppContent(
                     ) {
                         VerticalRoundedNavbar(
                             currentScreen = currentScreen,
-                            darkTheme = darkTheme,
                             onSelectScreen = { screen ->
                                 currentScreen = screen
                                 if (screen != MainNavScreen.SEASON) {
                                     selectedGameId = null
                                 }
                             },
-                            onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) },
-                            onToggleDarkTheme = onToggleDarkTheme
+                            onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) }
                         )
 
                         Column(
@@ -161,12 +169,15 @@ internal fun MainAppContent(
                         ) {
                             StaticTopHeaderBox(
                                 title = staticHeaderTitle,
-                                subtitle = snapshot.ownClubName,
+                                seasonPicker = if (showSeasonPicker) {
+                                    { SeasonPicker(snapshot.seasons, selectedSeasonId, { chosenSeasonId = it }) }
+                                } else null,
+                                syncState = syncState,
+                                onSync = onSync,
                                 profile = profile,
                                 email = email,
                                 offline = offline,
-                                onOpenAccount = { showAccount = true },
-                                onSignOut = onSignOut
+                                onOpenAccount = { showAccount = true }
                             )
 
                             Surface(
@@ -184,7 +195,6 @@ internal fun MainAppContent(
                                     selectedSeasonId = selectedSeasonId,
                                     selectedPlayerId = selectedPlayerId,
                                     selectedGameId = selectedGameId,
-                                    onSelectSeason = { selectedSeasonId = it },
                                     onSelectPlayer = { playerId ->
                                         selectedPlayerId = playerId
                                         currentScreen = MainNavScreen.ROSTER
@@ -203,22 +213,16 @@ internal fun MainAppContent(
                     }
                 } else {
                     // Mobile Ansicht: Native App Bar mit Status-Bar Insets & ergonomische Bottom Navigation
-                    val showMobileBack = (currentScreen == MainNavScreen.ROSTER && selectedPlayerId != null) ||
-                            (currentScreen == MainNavScreen.SEASON && selectedGameId != null)
-
                     Column(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         MobileTopHeaderBar(
                             title = staticHeaderTitle,
-                            subtitle = snapshot.ownClubName,
-                            showBackButton = showMobileBack,
-                            onBack = {
-                                if (currentScreen == MainNavScreen.ROSTER) selectedPlayerId = null
-                                if (currentScreen == MainNavScreen.SEASON) selectedGameId = null
-                            },
-                            darkTheme = darkTheme,
-                            onToggleDarkTheme = onToggleDarkTheme,
+                            seasonPicker = if (showSeasonPicker) {
+                                { SeasonPicker(snapshot.seasons, selectedSeasonId, { chosenSeasonId = it }, compact = true) }
+                            } else null,
+                            syncState = syncState,
+                            onSync = onSync,
                             onOpenAccount = { showAccount = true }
                         )
 
@@ -235,7 +239,6 @@ internal fun MainAppContent(
                                 selectedSeasonId = selectedSeasonId,
                                 selectedPlayerId = selectedPlayerId,
                                 selectedGameId = selectedGameId,
-                                onSelectSeason = { selectedSeasonId = it },
                                 onSelectPlayer = { playerId ->
                                     selectedPlayerId = playerId
                                     currentScreen = MainNavScreen.ROSTER
@@ -259,7 +262,14 @@ internal fun MainAppContent(
                                     selectedGameId = null
                                 }
                             },
-                            onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) }
+                            onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) },
+                            onOpenOwnProfile = if (ownProfileTab) {
+                                {
+                                    selectedPlayerId = ownPlayerId
+                                    selectedGameId = null
+                                    currentScreen = MainNavScreen.ROSTER
+                                }
+                            } else null
                         )
                     }
                 }
@@ -273,6 +283,8 @@ internal fun MainAppContent(
                     players = snapshot.players,
                     onRequestClaim = onRequestClaim,
                     onSignOut = { showAccount = false; onSignOut() },
+                    darkTheme = darkTheme,
+                    onToggleDarkTheme = onToggleDarkTheme,
                     onOpenAdmin = if (profile.role == UserRole.ADMIN && adminRepository != null) {
                         { showAccount = false; showAdmin = true }
                     } else null,
@@ -297,7 +309,7 @@ internal fun MainAppContent(
                 onSelectModal = { creationModal = it },
                 onDismiss = { creationModal = CreationModalType.NONE },
                 onGameCreated = { newGame ->
-                    selectedSeasonId = newGame.seasonId
+                    chosenSeasonId = newGame.seasonId
                     selectedGameId = newGame.gameId
                     currentScreen = MainNavScreen.SEASON
                 },
@@ -306,7 +318,7 @@ internal fun MainAppContent(
                     currentScreen = MainNavScreen.ROSTER
                 },
                 onSeasonCreated = { newSeason ->
-                    selectedSeasonId = newSeason.seasonId
+                    chosenSeasonId = newSeason.seasonId
                     selectedGameId = null
                     currentScreen = MainNavScreen.SEASON
                 }
@@ -315,51 +327,20 @@ internal fun MainAppContent(
     }
 }
 
-private fun computeHeaderTitle(
-    currentScreen: MainNavScreen,
-    selectedPlayerId: Int?,
-    selectedSeasonId: Int,
-    selectedGameId: Int?,
-    snapshot: DatabaseSnapshot,
-    repository: HandballRepository
-): String {
-    val activeSeason = snapshot.seasons.find { it.seasonId == selectedSeasonId } ?: snapshot.seasons.firstOrNull()
-    return when (currentScreen) {
-        MainNavScreen.HOME_DASHBOARD -> {
-            activeSeason?.division ?: "Übersicht"
-        }
-        MainNavScreen.ROSTER -> {
-            val player = snapshot.players.find { it.playerId == selectedPlayerId }
-            if (player != null) {
-                val pos = snapshot.positions.find { it.positionId == player.positionId }?.positionName ?: player.role.label
-                val nr = player.jerseyNumberHomeKit?.let { "#$it • " } ?: ""
-                "$nr${player.fullName} ($pos)"
-            } else {
-                "Kader (${snapshot.players.size})"
-            }
-        }
-        MainNavScreen.SEASON -> {
-            val game = snapshot.games.find { it.gameId == selectedGameId }
-            if (game != null) {
-                "${repository.formatGameMatchup(game, snapshot)} (${game.homeTeamScore}:${game.awayTeamScore})"
-            } else {
-                activeSeason?.division ?: "Saison"
-            }
-        }
-        MainNavScreen.STANDINGS -> {
-            "Tabelle • ${activeSeason?.division ?: "Liga"}"
-        }
-    }
+/** Titel der Kopfzeile = Name des Bereichs. Saison und Details zeigen das Saison-Menü bzw. die Ansicht selbst. */
+private fun headerTitle(currentScreen: MainNavScreen, selectedGameId: Int?): String = when (currentScreen) {
+    MainNavScreen.HOME_DASHBOARD -> "Übersicht"
+    MainNavScreen.ROSTER -> "Kader"
+    MainNavScreen.SEASON -> if (selectedGameId != null) "Spiel" else "Saison"
+    MainNavScreen.STANDINGS -> "Tabelle"
 }
 
 @Composable
 private fun MobileTopHeaderBar(
     title: String,
-    subtitle: String,
-    showBackButton: Boolean,
-    onBack: () -> Unit,
-    darkTheme: Boolean,
-    onToggleDarkTheme: () -> Unit,
+    seasonPicker: (@Composable () -> Unit)?,
+    syncState: SyncState,
+    onSync: () -> Unit,
     onOpenAccount: () -> Unit
 ) {
     Surface(
@@ -374,32 +355,6 @@ private fun MobileTopHeaderBar(
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (showBackButton) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Zurück",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier
-                        .size(38.dp)
-                        .padding(start = 4.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "H",
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-                Spacer(Modifier.width(10.dp))
-            }
 
             Column(
                 modifier = Modifier
@@ -413,22 +368,10 @@ private fun MobileTopHeaderBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                seasonPicker?.invoke()
             }
 
-            IconButton(onClick = onToggleDarkTheme) {
-                Icon(
-                    imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                    contentDescription = "Theme wechseln",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            SyncIndicator(syncState, onSync)
             IconButton(onClick = onOpenAccount) {
                 Icon(
                     imageVector = Icons.Default.AccountCircle,
@@ -443,12 +386,13 @@ private fun MobileTopHeaderBar(
 @Composable
 private fun StaticTopHeaderBox(
     title: String,
-    subtitle: String,
+    seasonPicker: (@Composable () -> Unit)?,
+    syncState: SyncState,
+    onSync: () -> Unit,
     profile: UserProfile,
     email: String,
     offline: Boolean,
-    onOpenAccount: () -> Unit,
-    onSignOut: () -> Unit
+    onOpenAccount: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().height(74.dp),
@@ -470,12 +414,9 @@ private fun StaticTopHeaderBox(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
+            seasonPicker?.invoke()
+            SyncIndicator(syncState, onSync)
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -490,9 +431,6 @@ private fun StaticTopHeaderBox(
                     Spacer(Modifier.width(8.dp))
                     RoleBadge(profile.role, offline)
                 }
-                IconButton(onClick = onSignOut) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Abmelden")
-                }
             }
         }
     }
@@ -501,10 +439,8 @@ private fun StaticTopHeaderBox(
 @Composable
 private fun VerticalRoundedNavbar(
     currentScreen: MainNavScreen,
-    darkTheme: Boolean,
     onSelectScreen: (MainNavScreen) -> Unit,
-    onOpenPlusMenu: () -> Unit,
-    onToggleDarkTheme: () -> Unit
+    onOpenPlusMenu: () -> Unit
 ) {
     Surface(
         modifier = Modifier.width(88.dp).fillMaxHeight(),
@@ -591,13 +527,6 @@ private fun VerticalRoundedNavbar(
                     }
                 }
             }
-
-            IconButton(onClick = onToggleDarkTheme) {
-                Icon(
-                    imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                    contentDescription = "Design wechseln"
-                )
-            }
         }
     }
 }
@@ -652,7 +581,9 @@ private fun NavbarIconItem(
 private fun BottomMobileNavbar(
     currentScreen: MainNavScreen,
     onSelectScreen: (MainNavScreen) -> Unit,
-    onOpenPlusMenu: () -> Unit
+    onOpenPlusMenu: () -> Unit,
+    /** Gesetzt für Spieler mit verknüpftem Kadereintrag: ersetzt den Kader-Tab durch das eigene Profil. */
+    onOpenOwnProfile: (() -> Unit)?
 ) {
     NavigationBar(
         modifier = Modifier.fillMaxWidth(),
@@ -663,15 +594,20 @@ private fun BottomMobileNavbar(
             selected = currentScreen == MainNavScreen.HOME_DASHBOARD,
             colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.HOME_DASHBOARD) },
-            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-            label = { Text("Home") }
+            icon = { Icon(Icons.Default.Home, contentDescription = "Übersicht") },
+            label = { Text("Übersicht") }
         )
         NavigationBarItem(
             selected = currentScreen == MainNavScreen.ROSTER,
             colors = navigationItemColors(),
-            onClick = { onSelectScreen(MainNavScreen.ROSTER) },
-            icon = { Icon(Icons.Default.Groups, contentDescription = "Kader") },
-            label = { Text("Kader") }
+            onClick = { if (onOpenOwnProfile != null) onOpenOwnProfile() else onSelectScreen(MainNavScreen.ROSTER) },
+            icon = {
+                Icon(
+                    if (onOpenOwnProfile != null) Icons.Default.Person else Icons.Default.Groups,
+                    contentDescription = if (onOpenOwnProfile != null) "Profil" else "Kader"
+                )
+            },
+            label = { Text(if (onOpenOwnProfile != null) "Profil" else "Kader") }
         )
 
         // Prominenter Plus-Button (nur Trainer/Admin)
@@ -725,7 +661,6 @@ private fun MainContentRouter(
     selectedSeasonId: Int,
     selectedPlayerId: Int?,
     selectedGameId: Int?,
-    onSelectSeason: (Int) -> Unit,
     onSelectPlayer: (Int?) -> Unit,
     onSelectGame: (Int?) -> Unit,
     onNavigateToStandings: () -> Unit,
@@ -738,11 +673,9 @@ private fun MainContentRouter(
                 snapshot = snapshot,
                 isWideScreen = isWideScreen,
                 selectedSeasonId = selectedSeasonId,
-                onSelectSeason = onSelectSeason,
                 onNavigateToPlayer = { onSelectPlayer(it) },
                 onNavigateToGame = { onSelectGame(it) },
-                onNavigateToStandings = onNavigateToStandings,
-                onOpenPlusMenu = { onOpenModal(CreationModalType.CHOOSER) }
+                onNavigateToStandings = onNavigateToStandings
             )
         }
 
@@ -766,11 +699,8 @@ private fun MainContentRouter(
                 selectedSeasonId = selectedSeasonId,
                 selectedGameId = selectedGameId,
                 isWideScreen = isWideScreen,
-                onSelectSeason = onSelectSeason,
                 onSelectGame = onSelectGame,
-                onNavigateToPlayer = { onSelectPlayer(it) },
-                onOpenNewSeasonDialog = { onOpenModal(CreationModalType.NEW_SEASON) },
-                onOpenNewGameDialog = { onOpenModal(CreationModalType.NEW_GAME) }
+                onNavigateToPlayer = { onSelectPlayer(it) }
             )
         }
 
@@ -780,9 +710,7 @@ private fun MainContentRouter(
                 snapshot = snapshot,
                 isWideScreen = isWideScreen,
                 selectedSeasonId = selectedSeasonId,
-                onSelectSeason = onSelectSeason,
-                onOpenNewOpponentDialog = { onOpenModal(CreationModalType.NEW_OPPONENT) },
-                onOpenNewGameDialog = { onOpenModal(CreationModalType.NEW_GAME) }
+                onOpenNewOpponentDialog = { onOpenModal(CreationModalType.NEW_OPPONENT) }
             )
         }
     }

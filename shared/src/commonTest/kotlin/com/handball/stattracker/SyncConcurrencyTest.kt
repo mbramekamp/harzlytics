@@ -1,6 +1,7 @@
 package com.handball.stattracker
 
 import com.handball.stattracker.model.DatabaseSnapshot
+import com.handball.stattracker.model.SyncState
 import com.handball.stattracker.repository.DemoDataSeed
 import com.handball.stattracker.repository.HandballRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -16,7 +17,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -56,7 +56,7 @@ class SyncConcurrencyTest {
         sync.await()
 
         assertEquals("Während des Syncs geändert", repo.snapshot.value.ownClubName)
-        assertTrue(repo.syncStatus.value.startsWith("Sync erfolgreich"), repo.syncStatus.value)
+        assertEquals(SyncState.SYNCED_PENDING, repo.syncState.value, "Neuere lokale Änderungen müssen als ausstehend gelten")
     }
 
     @Test
@@ -69,6 +69,7 @@ class SyncConcurrencyTest {
         repo.syncWithBackend(url, key)
 
         assertEquals("Stand vom Server", repo.snapshot.value.ownClubName)
+        assertEquals(SyncState.SYNCED, repo.syncState.value)
     }
 
     @Test
@@ -104,9 +105,9 @@ class SyncConcurrencyTest {
         job.join()
 
         assertTrue(job.isCancelled)
-        assertFalse(
-            repo.syncStatus.value.startsWith("Offline-Modus"),
-            "Ein abgebrochener Sync ist kein Netzwerkfehler, Status war: ${repo.syncStatus.value}"
+        assertEquals(
+            SyncState.IDLE, repo.syncState.value,
+            "Ein abgebrochener Sync ist kein Netzwerkfehler und darf weder SYNCING noch OFFLINE hinterlassen"
         )
     }
 }

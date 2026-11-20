@@ -17,6 +17,7 @@ For the full history, design decisions and roadmap, read `AGENT_BRIEFING.md`. Th
 - Screenshots ohne Fenster: `.\gradlew.bat :composeApp:desktopTest` rendert die Hauptscreens (Desktop/Mobil, hell/dunkel) nach `composeApp/build/screenshots/` (`ScreenshotTest`). Nach UI-Änderungen ansehen.
 
 ## Conventions
+- UI-Inhalt: so wenig wie möglich, so viel wie nötig. Ein Element = ein Zweck; nichts doppelt (Titel, Karten, Chips, Knöpfe); keine Technikbegriffe, URLs oder Schlüssel für Nutzer. Begriffe: **Kader = Torhüter + Feldspieler**, Trainer gehören zum **Staff**; Spielaufgebot = **Aufgebot**. Saison-Auswahl nur im Menü der Kopfzeile (beim Start die aktuelle Saison, `SeasonSelection`). Neues Spiel/Saison/Spieler nur über das `+`-Menü. Sync-Zustand nur als Symbol (`SyncIndicator`, `SyncState`). Spieler mit verknüpftem Kadereintrag haben mobil statt "Kader" den Tab "Profil".
 - Theme: Lila (leichter Magenta-Einschlag) auf Weiß, Dunkelmodus bleibt. `secondary` ist bewusst Bernstein (Gegenfarbe: Gast-Serien, Gelbe Karten, Auszeiten), `tertiary` Grün = "gut/positiv". Farben nur in `ui/theme/HandballTheme.kt` ändern, Text-Paare mindestens WCAG 4,5:1. Gemeinsame Komponentenfarben in `ui/theme/ComponentColors.kt`.
 - All UI text is **German**. Keep the UI clean: no explanatory help text, no redundant badges, no DB table names in labels.
 - Handball lineup rule: at most 7 on court, either 6 field + 1 TW or 7 field + 0 TW, never 2 TW at once. It is enforced in `isValidActiveCourtLineup` / `canSubstituteOrEnterCourt`. Changes to lineup logic need tests.

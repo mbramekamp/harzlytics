@@ -21,3 +21,7 @@ fun seasonChipColors() = FilterChipDefaults.filterChipColors(
     selectedContainerColor = MaterialTheme.colorScheme.primary,
     selectedLabelColor = MaterialTheme.colorScheme.onPrimary
 )
+
+/** Bernstein-Fläche für Hinweise mit fester Bedeutung (Gelbe Karte, 2-Minuten-Strafe, Unentschieden, Auszeit). */
+@Composable
+fun amberContainer() = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)

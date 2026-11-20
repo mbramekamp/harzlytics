@@ -14,6 +14,7 @@ import com.handball.stattracker.model.RankingSortCriterion
 import com.handball.stattracker.model.Season
 import com.handball.stattracker.model.StartingSevenSlotType
 import com.handball.stattracker.model.StartingSevenWeights
+import com.handball.stattracker.model.SyncState
 import com.handball.stattracker.repository.DemoDataSeed
 import com.handball.stattracker.repository.HandballRepository
 import kotlinx.coroutines.runBlocking
@@ -450,10 +451,7 @@ class HandballRepositoryTest {
             )
             if (SupabaseAuthSession.isAuthenticated()) {
                 repo.syncWithBackend()
-                assertTrue(
-                    repo.syncStatus.value.startsWith("Sync erfolgreich"),
-                    "Supabase Sync sollte erfolgreich sein, Status war: ${repo.syncStatus.value}"
-                )
+                assertEquals(SyncState.SYNCED, repo.syncState.value, "Supabase Sync sollte erfolgreich sein")
             }
         }
     }
@@ -471,10 +469,7 @@ class HandballRepositoryTest {
             supabaseAnonKey = "sb_publishable_test"
         )
 
-        assertFalse(
-            repo.syncStatus.value.startsWith("Sync erfolgreich"),
-            "Ohne Login darf kein erfolgreicher Sync gemeldet werden, Status war: ${repo.syncStatus.value}"
-        )
+        assertEquals(SyncState.UNAVAILABLE, repo.syncState.value, "Ohne Login darf kein erfolgreicher Sync gemeldet werden")
         assertEquals(before, repo.snapshot.value, "Lokaler Snapshot muss unverändert bleiben")
     }
 

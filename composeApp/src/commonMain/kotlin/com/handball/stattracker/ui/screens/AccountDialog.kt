@@ -48,6 +48,8 @@ fun AccountDialog(
     players: List<Player>,
     onRequestClaim: suspend (Int?) -> AuthActionResult,
     onSignOut: () -> Unit,
+    darkTheme: Boolean,
+    onToggleDarkTheme: () -> Unit,
     onOpenAdmin: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
@@ -115,8 +117,12 @@ fun AccountDialog(
                 message?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
+                HorizontalDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Dunkles Design", modifier = Modifier.weight(1f))
+                    Switch(checked = darkTheme, onCheckedChange = { onToggleDarkTheme() })
+                }
                 if (onOpenAdmin != null) {
-                    HorizontalDivider()
                     FilledTonalButton(enabled = !offline, onClick = onOpenAdmin) { Text("Benutzer verwalten") }
                 }
             }

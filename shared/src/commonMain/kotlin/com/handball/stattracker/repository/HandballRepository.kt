@@ -52,8 +52,8 @@ class HandballRepository(
     private val _snapshot = MutableStateFlow(loadInitialSnapshot())
     val snapshot: StateFlow<DatabaseSnapshot> = _snapshot.asStateFlow()
 
-    private val _syncStatus = MutableStateFlow("Offline-First bereit (${PlatformStorage.platformName()})")
-    val syncStatus: StateFlow<String> = _syncStatus.asStateFlow()
+    private val _syncState = MutableStateFlow(SyncState.IDLE)
+    val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
     private fun loadInitialSnapshot(): DatabaseSnapshot {
         if (!persistLocally) return DefaultClubData.emptySnapshot()
@@ -2173,7 +2173,7 @@ class HandballRepository(
         val normalizedUrl = supabaseUrl.trim().trimEnd('/').ifBlank { SupabaseConfig.resolvedProjectUrl() }
 
         if (normalizedUrl.isEmpty() || cleanAnonKey.isEmpty()) {
-            _syncStatus.value = "Bitte SUPABASE_URL und SUPABASE_PUBLIC_KEY in .env oder im Feld eintragen."
+            _syncState.value = SyncState.UNAVAILABLE
             return
         }
 
@@ -2183,7 +2183,8 @@ class HandballRepository(
     }
 
     private suspend fun syncOnce(normalizedUrl: String, cleanAnonKey: String) {
-        _syncStatus.value = "Synchronisiere mit $normalizedUrl ..."
+        val stateBefore = _syncState.value
+        _syncState.value = SyncState.SYNCING
         try {
             val sent = _snapshot.value
             val response: DatabaseSnapshot = syncTransport(normalizedUrl, cleanAnonKey, sent)
@@ -2193,20 +2194,19 @@ class HandballRepository(
             // Die neueren lokalen Änderungen gehen mit dem nächsten Sync raus.
             if (_snapshot.compareAndSet(sent, response)) {
                 persist(response)
-                _syncStatus.value = "Sync erfolgreich mit $normalizedUrl (${response.games.size} Spiele, ${response.players.size} Kader)"
+                _syncState.value = SyncState.SYNCED
             } else {
-                _syncStatus.value = if (autoSync) {
-                    "Sync erfolgreich mit $normalizedUrl – neuere lokale Änderungen werden nachgesendet"
-                } else {
-                    "Sync erfolgreich mit $normalizedUrl – neuere lokale Änderungen bitte erneut synchronisieren"
-                }
+                // neuere lokale Änderungen: Auto-Sync sendet sie nach, sonst beim nächsten Sync
+                _syncState.value = SyncState.SYNCED_PENDING
             }
         } catch (e: CancellationException) {
+            // Abbruch ist kein Netzwerkfehler und darf nicht als "wird synchronisiert" stehen bleiben
+            _syncState.value = stateBefore
             throw e
         } catch (e: SupabaseAuthRequiredException) {
-            _syncStatus.value = "Cloud-Sync nicht möglich: nicht angemeldet oder Konto nicht freigeschaltet (lokal gespeichert)"
+            _syncState.value = SyncState.UNAVAILABLE
         } catch (e: Exception) {
-            _syncStatus.value = "Offline-Modus aktiv (Server unter $normalizedUrl nicht erreichbar – lokal gespeichert)"
+            _syncState.value = SyncState.OFFLINE
         }
     }
 

@@ -297,9 +297,9 @@ fun AuthLoadingScreen() {
 @Composable
 fun NotConfiguredScreen() {
     AuthScaffold {
-        Text("Supabase nicht konfiguriert", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("App nicht eingerichtet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
-            "SUPABASE_URL und SUPABASE_PUBLIC_KEY fehlen in der .env-Datei im Projektordner.",
+            "Die Verbindung zum Verein fehlt. Bitte wende dich an den Administrator.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant

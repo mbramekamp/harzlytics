@@ -1,6 +1,8 @@
 package com.handball.stattracker.ui.screens
 
 import com.handball.stattracker.ui.EditorOnly
+import com.handball.stattracker.ui.theme.amberContainer
+import com.handball.stattracker.ui.theme.seasonChipColors
 import com.handball.stattracker.ui.rememberCanEdit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -53,11 +55,8 @@ fun SeasonScreen(
     selectedSeasonId: Int,
     selectedGameId: Int?,
     isWideScreen: Boolean = true,
-    onSelectSeason: (Int) -> Unit,
     onSelectGame: (Int?) -> Unit,
-    onNavigateToPlayer: (Int) -> Unit,
-    onOpenNewSeasonDialog: () -> Unit,
-    onOpenNewGameDialog: () -> Unit
+    onNavigateToPlayer: (Int) -> Unit
 ) {
     val activeGame = snapshot.games.find { it.gameId == selectedGameId }
     if (activeGame != null) {
@@ -95,134 +94,29 @@ fun SeasonScreen(
             .padding(if (isWideScreen) 20.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Saison-Auswahlleiste + Neue Saison / Neues Spiel Buttons
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+        // Spiel-Filter (die Saison wählt das Menü in der Kopfzeile; Neues Spiel/Saison über das +-Menü)
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(if (isWideScreen) 16.dp else 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (isWideScreen) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = activeSeason?.division ?: "Saison-Übersicht",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (activeSeason != null) {
-                                Text(
-                                    text = "${activeSeason.startOfSeason} – ${activeSeason.endOfSeason}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            EditorOnly {
-                                OutlinedButton(onClick = onOpenNewSeasonDialog) {
-                                    Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Saison")
-                                }
-                            }
-                            EditorOnly {
-                                Button(onClick = onOpenNewGameDialog) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Spiel")
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Column {
-                            Text(
-                                text = activeSeason?.division ?: "Saison-Übersicht",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (activeSeason != null) {
-                                Text(
-                                    text = "${activeSeason.startOfSeason} – ${activeSeason.endOfSeason}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            EditorOnly {
-                                OutlinedButton(
-                                    modifier = Modifier.weight(1f),
-                                    onClick = onOpenNewSeasonDialog
-                                ) {
-                                    Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Saison")
-                                }
-                            }
-                            EditorOnly {
-                                Button(
-                                    modifier = Modifier.weight(1f),
-                                    onClick = onOpenNewGameDialog
-                                ) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Spiel")
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Saison-Chips
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    snapshot.seasons.forEach { season ->
-                        FilterChip(
-                            selected = season.seasonId == activeSeason?.seasonId,
-                            onClick = { onSelectSeason(season.seasonId) },
-                            label = { Text(season.division) }
-                        )
-                    }
-                }
-
-                // Spiel-Filter
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = filterMode == 0,
-                        onClick = { filterMode = 0 },
-                        label = { Text("Alle") }
-                    )
-                    FilterChip(
-                        selected = filterMode == 1,
-                        onClick = { filterMode = 1 },
-                        label = { Text("Eigene Spiele") }
-                    )
-                    FilterChip(
-                        selected = filterMode == 2,
-                        onClick = { filterMode = 2 },
-                        label = { Text("Liga-Spiele") }
-                    )
-                }
-            }
+            FilterChip(
+                selected = filterMode == 0,
+                onClick = { filterMode = 0 },
+                label = { Text("Alle") },
+                colors = seasonChipColors()
+            )
+            FilterChip(
+                selected = filterMode == 1,
+                onClick = { filterMode = 1 },
+                label = { Text("Eigene Spiele") },
+                colors = seasonChipColors()
+            )
+            FilterChip(
+                selected = filterMode == 2,
+                onClick = { filterMode = 2 },
+                label = { Text("Liga-Spiele") },
+                colors = seasonChipColors()
+            )
         }
 
         // Spiele-Liste
@@ -240,22 +134,10 @@ fun SeasonScreen(
                         text = "Noch keine Spiele in dieser Ansicht vorhanden.",
                         style = MaterialTheme.typography.titleMedium
                     )
-                    EditorOnly {
-                        Button(onClick = onOpenNewGameDialog) {
-                            Text("Erstes Spiel für diese Saison anlegen")
-                        }
-                    }
                 }
             }
         } else {
             gamesInSeason.forEach { game ->
-                val gamePgs = snapshot.playerGames.filter { it.gameId == game.gameId }
-                val squadCount = gamePgs.size
-                val onCourtCount = gamePgs.count { pg ->
-                    pg.isOnCourt && snapshot.players.find { it.playerId == pg.playerId }?.role != PlayerRole.COACH
-                }
-                val logCount = snapshot.gameLogs.count { it.gameId == game.gameId }
-
                 Card(
                     shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
@@ -276,25 +158,22 @@ fun SeasonScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = if (game.isOwnTeamGame) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.secondaryContainer
+                                // Heim/Auswärts nur bei eigenen Spielen; Fremdpaarungen brauchen keine Marke
+                                if (game.isOwnTeamGame) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer
+                                    ) {
+                                        Text(
+                                            text = if (game.isHomeGame) "HEIM" else "AUSWÄRTS",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
-                                ) {
-                                    Text(
-                                        text = if (game.isOwnTeamGame) {
-                                            if (game.isHomeGame) "HEIM" else "AUSWÄRTS"
-                                        } else "LIGA",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
                                 }
                                 Text(
-                                    text = "${game.gameDate} • ${game.location} • ${game.gameType}",
+                                    text = "${game.gameDate} • ${game.location}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -304,13 +183,6 @@ fun SeasonScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
-                            if (game.isOwnTeamGame) {
-                                Text(
-                                    text = "$onCourtCount/7 aktiv • $squadCount Kader • $logCount Events",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
                         }
 
                         Column(horizontalAlignment = Alignment.End) {
@@ -493,23 +365,23 @@ private fun GameInteractiveDashboard(
                         Tab(
                             selected = activeTab == 0,
                             onClick = { activeTab = 0 },
-                            text = { Text("Aufstellung (${onCourtParticipants.size}/7)") }
+                            text = { Text("Aufstellung") }
                         )
                         Tab(
                             selected = activeTab == 1,
                             onClick = { activeTab = 1 },
-                            text = { Text("Verlauf & Protokoll (${gameLogs.size})") }
+                            text = { Text("Verlauf (${gameLogs.size})") }
                         )
                         Tab(
                             selected = activeTab == 2,
                             onClick = { activeTab = 2 },
-                            text = { Text("Trainer & Auszeiten (${coachParticipants.size})") }
+                            text = { Text("Staff (${coachParticipants.size})") }
                         )
                         if (isEditMode) {
                             Tab(
                                 selected = activeTab == 3,
                                 onClick = { activeTab = 3 },
-                                text = { Text("Kader (${gamePlayerGames.size})") }
+                                text = { Text("Aufgebot") }
                             )
                         }
                     }
@@ -521,23 +393,23 @@ private fun GameInteractiveDashboard(
                         Tab(
                             selected = activeTab == 0,
                             onClick = { activeTab = 0 },
-                            text = { Text("Aufstellung (${onCourtParticipants.size}/7)") }
+                            text = { Text("Aufstellung") }
                         )
                         Tab(
                             selected = activeTab == 1,
                             onClick = { activeTab = 1 },
-                            text = { Text("Verlauf & Protokoll (${gameLogs.size})") }
+                            text = { Text("Verlauf (${gameLogs.size})") }
                         )
                         Tab(
                             selected = activeTab == 2,
                             onClick = { activeTab = 2 },
-                            text = { Text("Trainer & Auszeiten (${coachParticipants.size})") }
+                            text = { Text("Staff (${coachParticipants.size})") }
                         )
                         if (isEditMode) {
                             Tab(
                                 selected = activeTab == 3,
                                 onClick = { activeTab = 3 },
-                                text = { Text("Kader (${gamePlayerGames.size})") }
+                                text = { Text("Aufgebot") }
                             )
                         }
                     }
@@ -1432,21 +1304,24 @@ private fun SideBySideLineupAndBenchSection(
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (activeFieldCount == 7 && activeKeeperCount == 0) {
-                                    MaterialTheme.colorScheme.tertiary
-                                } else {
-                                    MaterialTheme.colorScheme.primary
+                            // Nur der Sonderfall ohne Torwart ist eine Information; 6+1 ist der Normalfall
+                            if (activeFieldCount == 7 && activeKeeperCount == 0) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (activeFieldCount == 7 && activeKeeperCount == 0) {
+                                        MaterialTheme.colorScheme.tertiary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    }
+                                ) {
+                                    Text(
+                                        text = "$activeFieldCount Feld + $activeKeeperCount TW",
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
                                 }
-                            ) {
-                                Text(
-                                    text = "$activeFieldCount Feld + $activeKeeperCount TW",
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
                             }
                         }
 
@@ -1491,21 +1366,24 @@ private fun SideBySideLineupAndBenchSection(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (activeFieldCount == 7 && activeKeeperCount == 0) {
-                                    MaterialTheme.colorScheme.tertiary
-                                } else {
-                                    MaterialTheme.colorScheme.primary
+                            // Nur der Sonderfall ohne Torwart ist eine Information; 6+1 ist der Normalfall
+                            if (activeFieldCount == 7 && activeKeeperCount == 0) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (activeFieldCount == 7 && activeKeeperCount == 0) {
+                                        MaterialTheme.colorScheme.tertiary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    }
+                                ) {
+                                    Text(
+                                        text = "$activeFieldCount Feld + $activeKeeperCount TW",
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
                                 }
-                            ) {
-                                Text(
-                                    text = "$activeFieldCount Feld + $activeKeeperCount TW",
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
                             }
                         }
 
@@ -1784,7 +1662,7 @@ private fun SquadNominationTabSection(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Spieltagskader (${gamePlayerGames.size})",
+                text = "Aufgebot (${gamePlayerGames.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -2052,7 +1930,7 @@ private fun ScoreProgressionMiniChartCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Torverlauf (+3 / 0 / -3)",
+                    text = "Torverlauf",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -2316,7 +2194,7 @@ private fun EmptySquadHint(
             Text("Noch keine Personen dieser Kategorie für dieses Spiel nominiert.")
             EditorOnly {
                 Button(onClick = onEnterEditAndManageSquad) {
-                    Text(if (isEditMode) "Spieltagskader auswählen" else "Bearbeitungsmodus starten & Kader auswählen")
+                    Text("Aufgebot auswählen")
                 }
             }
         }
@@ -2564,7 +2442,7 @@ private fun FieldPlayerStatTrackerCard(
                         )
                         if (canEditStats) {
                             IconButton(onClick = { showDirectEdit = !showDirectEdit }) {
-                                Icon(Icons.Default.EditNote, contentDescription = "Direkte Zahleneingabe")
+                                Icon(Icons.Default.EditNote, contentDescription = "Spielstand ändern")
                             }
                         }
                     }
@@ -3417,7 +3295,7 @@ private fun CoachTimeoutTrackerCard(
                     val timeout = allTimeouts.find { it.timeoutId == cs.timeoutId }
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        color = amberContainer(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -3475,13 +3353,9 @@ private fun ReadOnlyDisciplinaryRow(playerGame: PlayerGame) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
+        if (playerGame.twoMinuteSuspensions > 0) Surface(
             shape = RoundedCornerShape(8.dp),
-            color = if (playerGame.twoMinuteSuspensions > 0) {
-                MaterialTheme.colorScheme.secondaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            }
+            color = amberContainer()
         ) {
             Text(
                 text = "2Min: ${playerGame.twoMinuteSuspensions}",
@@ -3493,7 +3367,7 @@ private fun ReadOnlyDisciplinaryRow(playerGame: PlayerGame) {
         if (playerGame.yellowCard) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+                color = amberContainer()
             ) {
                 Text(
                     text = "Gelb",
@@ -3624,7 +3498,7 @@ private fun DirectScoreEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Spielstand direkt bearbeiten") },
+        title = { Text("Spielstand") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
