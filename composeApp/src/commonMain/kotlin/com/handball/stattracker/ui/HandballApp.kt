@@ -138,7 +138,7 @@ internal fun MainAppContent(
     // Konto mit verknüpftem Kadereintrag: eigenes Profil direkt erreichbar
     // (Desktop: Eintrag in der Seitenleiste; mobil: Spieler-Tab bzw. Konto-Dialog)
     val ownPlayerId = profile.playerId?.takeIf { id -> snapshot.players.any { it.playerId == id } }
-    // Mobil ersetzt das Profil nur bei Spielern den Kader-Tab; Trainer/Admin brauchen die Kaderliste
+    // Mobil: Spieler bekommen einen eigenen Tab "Profil" (ohne +-Knopf ist Platz); Trainer/Admin über den Konto-Dialog
     val ownProfileTab = profile.role == UserRole.SPIELER && ownPlayerId != null
     var selectedGameId by remember { mutableStateOf(initialGameId) }
     // Breite des Layouts, auch für die Dialoge außerhalb von BoxWithConstraints
@@ -566,7 +566,7 @@ private fun BottomMobileNavbar(
     currentScreen: MainNavScreen,
     onSelectScreen: (MainNavScreen) -> Unit,
     onOpenPlusMenu: () -> Unit,
-    /** Gesetzt für Spieler mit verknüpftem Kadereintrag: ersetzt den Kader-Tab durch das eigene Profil. */
+    /** Gesetzt für Spieler mit verknüpftem Kadereintrag: zusätzlicher Tab "Profil" am Ende. */
     onOpenOwnProfile: (() -> Unit)?
 ) {
     NavigationBar(
@@ -582,16 +582,11 @@ private fun BottomMobileNavbar(
             label = { Text("Übersicht") }
         )
         NavigationBarItem(
-            selected = currentScreen == MainNavScreen.ROSTER || currentScreen == MainNavScreen.PROFILE,
+            selected = currentScreen == MainNavScreen.ROSTER,
             colors = navigationItemColors(),
-            onClick = { if (onOpenOwnProfile != null) onOpenOwnProfile() else onSelectScreen(MainNavScreen.ROSTER) },
-            icon = {
-                Icon(
-                    if (onOpenOwnProfile != null) Icons.Default.Person else Icons.Default.Groups,
-                    contentDescription = if (onOpenOwnProfile != null) "Profil" else "Kader"
-                )
-            },
-            label = { Text(if (onOpenOwnProfile != null) "Profil" else "Kader") }
+            onClick = { onSelectScreen(MainNavScreen.ROSTER) },
+            icon = { Icon(Icons.Default.Groups, contentDescription = "Kader") },
+            label = { Text("Kader") }
         )
 
         // Prominenter Plus-Button (nur Trainer/Admin)
@@ -633,6 +628,15 @@ private fun BottomMobileNavbar(
             icon = { Icon(Icons.Default.FormatListNumbered, contentDescription = "Tabelle") },
             label = { Text("Tabelle") }
         )
+        if (onOpenOwnProfile != null) {
+            NavigationBarItem(
+                selected = currentScreen == MainNavScreen.PROFILE,
+                colors = navigationItemColors(),
+                onClick = onOpenOwnProfile,
+                icon = { Icon(Icons.Default.Person, contentDescription = "Profil") },
+                label = { Text("Profil") }
+            )
+        }
     }
 }
 
