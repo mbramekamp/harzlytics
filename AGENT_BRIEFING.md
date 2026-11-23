@@ -149,14 +149,14 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - **Branches:** Arbeitsbranch `claude/repository-status-o99lyd`, `main` wird nur per Fast-Forward nachgezogen.
 - **Konto ↔ Kadereintrag verknüpfen** (drei Wege): (1) automatisch per E-Mail: Trainer trägt die E-Mail beim Spieler ein, der Spieler registriert sich mit derselben Adresse und bestätigt sie → sofort aktiv und verknüpft (DB-Trigger `handle_auth_user_change`); (2) **Admin wählt beim Freigeben** im Benutzer-Dialog ("Kader: …", Vorschlag aus Antrag → E-Mail → Name, `AdminRepository.suggestPlayerId`, nur freie Spieler); (3) Antrag im Konto-Dialog, Bestätigung unter "Kader-Anträge". Ein Konto sieht die Kaderliste erst nach der Freischaltung (RLS, Datenschutz): deshalb wählt nicht der Spieler selbst bei der Registrierung. Einladungscodes für einen bestimmten Spieler gehen weiterhin nur per SQL.
 - **Profil wird nachgeladen** (Rolle/Verknüpfung nach Admin-Änderung): beim Öffnen des Konto-Dialogs, beim Tippen auf das Wolken-Symbol und alle 5 Minuten (`onRefreshAccount` → `AuthRepository.reloadProfile`).
-- **Tests:** 69 Logik-Tests (`:shared:desktopTest`) + 23 Screenshot-Tests (`:composeApp:desktopTest`; zuletzt +6 für den Profil-Zugang und schmale Handys).
+- **Tests:** 69 Logik-Tests (`:shared:desktopTest`) + 25 Screenshot-Tests (`:composeApp:desktopTest`; zuletzt +2 `GameCardScreenshotTest`: Spielerkarten zu/auf, Dateien `karte-*`).
 
-### 6.2 Offene Entscheidungen des Nutzers (nicht eigenmächtig ändern)
-1. **Filter "Alle / Eigene Spiele / Liga-Spiele"** in der Saison-Liste: behalten oder streichen?
-2. **Spielerkarten in der Spielansicht** (`SeasonScreen.kt`, `FieldPlayerStatTrackerCard`/`GoalKeeperStatTrackerCard`) zeigen sehr viele Zahlen. Größter Hebel für "so wenig wie möglich", aber Kernfunktion am Spielfeldrand: erst fragen, welche Werte im Spiel wirklich gebraucht werden.
-3. **Profil-Kennzahlen** (`ProfileStatBox`) kombinieren je zwei Werte ("Assists & Abwehr", "Tore / Würfe"): aufteilen?
-4. **Staff** steht als eigene Gruppe in der Kaderliste (Annahme aus einer mehrdeutigen Antwort); Alternative wäre ein eigener Menüpunkt.
-5. Das "H"-Zeichen in der mobilen Kopfzeile wurde entfernt (Desktop-Seitenleiste behält es); auf Wunsch zurückholen.
+### 6.2 Entscheidungen des Nutzers (2026-11-23 getroffen, nicht eigenmächtig ändern)
+1. **Filter "Alle / Eigene Spiele / Liga-Spiele"** in der Saison-Liste bleibt.
+2. **Spielerkarten in der Spielansicht:** Feldspieler behalten alle Zähler sichtbar (Tore, Würfe, 7m, Assists, Steals, Blocks, Tech. Fehler). Torhüter: Paraden, Gegentore, 7m gehalten, 7m-Gegentore sichtbar; TG-Pass/TG-Vers. hinter dem Aufklapp-Pfeil ("Mehr", `CardMoreToggle` in `ui/screens/GameCardExtras.kt`). Strafen: nur der 2Min-Chip ist immer sichtbar; Gelb/Rot/Blau (TW nur Rot) liegen hinter "Mehr", vergebene Karten erscheinen zugeklappt als kleines Abzeichen (`AwardedCardBadges`).
+3. **Profil-Kennzahlen:** eine Kachel = ein Wert (`ui/screens/ProfileStatGrid.kt`, `profileStatTiles`); echte Paare (Tore / Würfe, 7-Meter, Paraden / Gegentore, Gegenstoßpässe) bleiben zusammen. Raster: Feldspieler 4 Spalten, TW/Staff 3, mobil 2.
+4. **Staff** bleibt als eigene Gruppe in der Kaderliste.
+5. Das "H"-Zeichen bleibt aus der mobilen Kopfzeile weg.
 
 ### 6.3 Nächster geplanter Schritt: UI Phase 3 "Bewegung" (noch nicht begonnen)
 `AnimatedContent` zwischen den Haupt-Tabs (Überblenden + kurzes Schieben in Tab-Richtung), Liste → Detail (Kader, Spiel) nach vorn/zurück schieben, gleitender Indikator in der unteren Navigation, weiches Überblenden bei Hell/Dunkel (`animateColorAsState`), Dialoge blenden ein/skalieren, Zahlen (Spielstand) zählen kurz hoch. Auf dem Altgerät leicht halten (kurze Dauer, nur Verschieben/Überblenden, keine Layout-Animationen in `SeasonScreen`). Standbilder können Bewegung nicht prüfen: der Nutzer testet auf dem Handy. Die Navigation ist bisher ein `when(currentScreen)` in `MainContentRouter` (`HandballApp.kt`).

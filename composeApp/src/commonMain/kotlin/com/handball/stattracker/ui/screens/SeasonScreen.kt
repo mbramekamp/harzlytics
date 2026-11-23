@@ -2197,7 +2197,7 @@ private fun EmptySquadHint(
 }
 
 @Composable
-private fun FieldPlayerStatTrackerCard(
+internal fun FieldPlayerStatTrackerCard(
     player: Player,
     positionName: String,
     playerGame: PlayerGame,
@@ -2220,9 +2220,13 @@ private fun FieldPlayerStatTrackerCard(
     // Nur aktive Spieler AUF DEM FELD (linke Seite) können im Bearbeitungsmodus Spielstatistiken hinzufügen!
     val canEditStats = isEditMode && isOnCourt
     var showDirectEdit by remember { mutableStateOf(false) }
+    var showMore by remember { mutableStateOf(false) }
 
     LaunchedEffect(canEditStats) {
         if (!canEditStats) showDirectEdit = false
+    }
+    LaunchedEffect(isEditMode) {
+        if (!isEditMode) showMore = false
     }
 
     val remainingSusp = playerGame.remainingSuspensionSeconds(gameElapsedSeconds)
@@ -2328,6 +2332,9 @@ private fun FieldPlayerStatTrackerCard(
                         }
                     }
                 }
+                if (isEditMode) {
+                    CardMoreToggle(expanded = showMore, onToggle = { showMore = !showMore })
+                }
             }
 
             // Aktions- & Disziplinar-Leiste (Wechsel-Buttons + 2Min, Gelb, Rot, Blau)
@@ -2399,42 +2406,7 @@ private fun FieldPlayerStatTrackerCard(
                             },
                             label = { Text("2Min: ${playerGame.twoMinuteSuspensions}") }
                         )
-                        FilterChip(
-                            selected = playerGame.yellowCard,
-                            onClick = {
-                                onUpdateDisciplinary(
-                                    playerGame.twoMinuteSuspensions,
-                                    !playerGame.yellowCard,
-                                    playerGame.redCard,
-                                    playerGame.blueCard
-                                )
-                            },
-                            label = { Text("Gelb") }
-                        )
-                        FilterChip(
-                            selected = playerGame.redCard,
-                            onClick = {
-                                onUpdateDisciplinary(
-                                    playerGame.twoMinuteSuspensions,
-                                    playerGame.yellowCard,
-                                    !playerGame.redCard,
-                                    playerGame.blueCard
-                                )
-                            },
-                            label = { Text("Rot") }
-                        )
-                        FilterChip(
-                            selected = playerGame.blueCard,
-                            onClick = {
-                                onUpdateDisciplinary(
-                                    playerGame.twoMinuteSuspensions,
-                                    playerGame.yellowCard,
-                                    playerGame.redCard,
-                                    !playerGame.blueCard
-                                )
-                            },
-                            label = { Text("Blau") }
-                        )
+                        if (!showMore) AwardedCardBadges(playerGame)
                         if (canEditStats) {
                             IconButton(onClick = { showDirectEdit = !showDirectEdit }) {
                                 Icon(Icons.Default.EditNote, contentDescription = "Spielstand ändern")
@@ -2696,6 +2668,14 @@ private fun FieldPlayerStatTrackerCard(
                 }
             }
 
+            if (isEditMode && showMore) {
+                CardToggleChips(
+                    playerGame = playerGame,
+                    includeYellowAndBlue = true,
+                    onUpdateDisciplinary = onUpdateDisciplinary
+                )
+            }
+
             if (canEditStats && showDirectEdit) {
                 var goalsText by remember(stats) { mutableStateOf(stats.goalsScored.toString()) }
                 var shotsText by remember(stats) { mutableStateOf(stats.goalesAttempted.toString()) }
@@ -2763,7 +2743,7 @@ private fun FieldPlayerStatTrackerCard(
 }
 
 @Composable
-private fun GoalKeeperStatTrackerCard(
+internal fun GoalKeeperStatTrackerCard(
     keeper: Player,
     positionName: String,
     playerGame: PlayerGame,
@@ -2786,6 +2766,7 @@ private fun GoalKeeperStatTrackerCard(
     val canEditStats = isEditMode && isOnCourt
     val remainingSusp = playerGame.remainingSuspensionSeconds(gameElapsedSeconds)
     val isBlockedFromSubIn = playerGame.isDisqualified || remainingSusp > 0
+    var showMore by remember { mutableStateOf(false) }
 
     val borderStroke = when {
         isSelectedForSubIn -> BorderStroke(2.5.dp, MaterialTheme.colorScheme.tertiary)
@@ -2887,6 +2868,7 @@ private fun GoalKeeperStatTrackerCard(
                         }
                     }
                 }
+                CardMoreToggle(expanded = showMore, onToggle = { showMore = !showMore })
             }
 
             Row(
@@ -2957,18 +2939,7 @@ private fun GoalKeeperStatTrackerCard(
                             },
                             label = { Text("2Min: ${playerGame.twoMinuteSuspensions}") }
                         )
-                        FilterChip(
-                            selected = playerGame.redCard,
-                            onClick = {
-                                onUpdateDisciplinary(
-                                    playerGame.twoMinuteSuspensions,
-                                    playerGame.yellowCard,
-                                    !playerGame.redCard,
-                                    playerGame.blueCard
-                                )
-                            },
-                            label = { Text("Rot") }
-                        )
+                        if (!showMore) AwardedCardBadges(playerGame)
                     }
                 } else {
                     ReadOnlyDisciplinaryRow(playerGame = playerGame)
@@ -3012,37 +2983,6 @@ private fun GoalKeeperStatTrackerCard(
                         isEditMode = canEditStats,
                         onIncrement = { onUpdateStats { it.copy(penaltiesConceded = it.penaltiesConceded + 1, goalesConceded = it.goalesConceded + 1) } },
                         onDecrement = { onUpdateStats { it.copy(penaltiesConceded = (it.penaltiesConceded - 1).coerceAtLeast(0)) } }
-                    )
-                    StatStepperBox(
-                        modifier = Modifier.weight(1f),
-                        label = "TG-Pass",
-                        value = stats.sucessfulFastBreakPasses,
-                        isEditMode = canEditStats,
-                        onIncrement = {
-                            onUpdateStats {
-                                it.copy(
-                                    sucessfulFastBreakPasses = it.sucessfulFastBreakPasses + 1,
-                                    attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1
-                                )
-                            }
-                        },
-                        onDecrement = {
-                            onUpdateStats {
-                                it.copy(sucessfulFastBreakPasses = (it.sucessfulFastBreakPasses - 1).coerceAtLeast(0))
-                            }
-                        }
-                    )
-                    StatStepperBox(
-                        modifier = Modifier.weight(1f),
-                        label = "TG-Vers.",
-                        value = stats.attemptedFastBreakPasses,
-                        isEditMode = canEditStats,
-                        onIncrement = { onUpdateStats { it.copy(attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1) } },
-                        onDecrement = {
-                            onUpdateStats {
-                                it.copy(attemptedFastBreakPasses = (it.attemptedFastBreakPasses - 1).coerceAtLeast(it.sucessfulFastBreakPasses))
-                            }
-                        }
                     )
                 }
             } else {
@@ -3089,42 +3029,52 @@ private fun GoalKeeperStatTrackerCard(
                             onDecrement = { onUpdateStats { it.copy(penaltiesConceded = (it.penaltiesConceded - 1).coerceAtLeast(0)) } }
                         )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        StatStepperBox(
-                            modifier = Modifier.weight(1f),
-                            label = "TG-Pass",
-                            value = stats.sucessfulFastBreakPasses,
-                            isEditMode = canEditStats,
-                            onIncrement = {
-                                onUpdateStats {
-                                    it.copy(
-                                        sucessfulFastBreakPasses = it.sucessfulFastBreakPasses + 1,
-                                        attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1
-                                    )
-                                }
-                            },
-                            onDecrement = {
-                                onUpdateStats {
-                                    it.copy(sucessfulFastBreakPasses = (it.sucessfulFastBreakPasses - 1).coerceAtLeast(0))
-                                }
+                }
+            }
+
+            if (showMore) {
+                if (isEditMode) {
+                    CardToggleChips(
+                        playerGame = playerGame,
+                        includeYellowAndBlue = false,
+                        onUpdateDisciplinary = onUpdateDisciplinary
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "TG-Pass",
+                        value = stats.sucessfulFastBreakPasses,
+                        isEditMode = canEditStats,
+                        onIncrement = {
+                            onUpdateStats {
+                                it.copy(
+                                    sucessfulFastBreakPasses = it.sucessfulFastBreakPasses + 1,
+                                    attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1
+                                )
                             }
-                        )
-                        StatStepperBox(
-                            modifier = Modifier.weight(1f),
-                            label = "TG-Vers.",
-                            value = stats.attemptedFastBreakPasses,
-                            isEditMode = canEditStats,
-                            onIncrement = { onUpdateStats { it.copy(attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1) } },
-                            onDecrement = {
-                                onUpdateStats {
-                                    it.copy(attemptedFastBreakPasses = (it.attemptedFastBreakPasses - 1).coerceAtLeast(it.sucessfulFastBreakPasses))
-                                }
+                        },
+                        onDecrement = {
+                            onUpdateStats {
+                                it.copy(sucessfulFastBreakPasses = (it.sucessfulFastBreakPasses - 1).coerceAtLeast(0))
                             }
-                        )
-                    }
+                        }
+                    )
+                    StatStepperBox(
+                        modifier = Modifier.weight(1f),
+                        label = "TG-Vers.",
+                        value = stats.attemptedFastBreakPasses,
+                        isEditMode = canEditStats,
+                        onIncrement = { onUpdateStats { it.copy(attemptedFastBreakPasses = it.attemptedFastBreakPasses + 1) } },
+                        onDecrement = {
+                            onUpdateStats {
+                                it.copy(attemptedFastBreakPasses = (it.attemptedFastBreakPasses - 1).coerceAtLeast(it.sucessfulFastBreakPasses))
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -3348,58 +3298,10 @@ private fun ReadOnlyDisciplinaryRow(playerGame: PlayerGame) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (playerGame.twoMinuteSuspensions > 0) Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = amberContainer()
-        ) {
-            Text(
-                text = "2Min: ${playerGame.twoMinuteSuspensions}",
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold
-            )
+        if (playerGame.twoMinuteSuspensions > 0) {
+            PenaltyBadge("2Min: ${playerGame.twoMinuteSuspensions}", amberContainer(), MaterialTheme.colorScheme.onSurface)
         }
-        if (playerGame.yellowCard) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = amberContainer()
-            ) {
-                Text(
-                    text = "Gelb",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        if (playerGame.redCard) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.errorContainer
-            ) {
-                Text(
-                    text = "Rot",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-        if (playerGame.blueCard) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
-            ) {
-                Text(
-                    text = "Blau",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-        }
+        AwardedCardBadges(playerGame)
     }
 }
 
