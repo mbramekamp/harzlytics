@@ -319,7 +319,8 @@ internal fun GameInteractiveDashboard(
         if (options == null || tapped == null || !options.hasAnyOption) {
             LaunchedEffect(playerId) { substitutionPlayerId = null }
         } else {
-            SubstitutionPickerDialog(
+            SubstitutionPicker(
+                asBottomSheet = !isWideScreen,
                 tappedPlayer = tapped,
                 options = options,
                 snapshot = snapshot,

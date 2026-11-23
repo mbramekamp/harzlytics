@@ -20,7 +20,7 @@ import com.handball.stattracker.model.PlayerGame
 import com.handball.stattracker.model.PlayerRole
 import com.handball.stattracker.ui.screens.FieldPlayerStatTrackerCard
 import com.handball.stattracker.ui.screens.GoalKeeperStatTrackerCard
-import com.handball.stattracker.ui.screens.SubstitutionPickerDialog
+import com.handball.stattracker.ui.screens.SubstitutionPicker
 import com.handball.stattracker.repository.DemoDataSeed
 import com.handball.stattracker.repository.HandballRepository
 import com.handball.stattracker.ui.theme.HandballTheme
@@ -105,16 +105,21 @@ class GameCardScreenshotTest {
         )
     }
 
-    /** Wechsel-Auswahl nach Tipp auf einen Feldspieler (Demo-Spiel 1, #15) und auf einen Bank-Spieler. */
+    /** Wechsel-Auswahl (Demo-Spiel 1): mobil als Bottom Sheet für Feld- und Bank-Spieler, breit als Pop-up. */
     @Test
     fun substitutionPicker() {
         val repo = HandballRepository(persistLocally = false)
         repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
         val snapshot = repo.snapshot.value
-        listOf(3 to "wechsel-feldspieler", 13 to "wechsel-bankspieler").forEach { (playerId, name) ->
-            val scene = ImageComposeScene((width * density).toInt(), (720 * density).toInt(), Density(density)) {
+        listOf(
+            Triple(3, "wechsel-feldspieler-mobil", true),
+            Triple(13, "wechsel-bankspieler-mobil", true),
+            Triple(3, "wechsel-feldspieler-desktop", false)
+        ).forEach { (playerId, name, asSheet) ->
+            val scene = ImageComposeScene((width * density).toInt(), (800 * density).toInt(), Density(density)) {
                 HandballTheme(darkTheme = false) {
-                    SubstitutionPickerDialog(
+                    SubstitutionPicker(
+                        asBottomSheet = asSheet,
                         tappedPlayer = snapshot.players.first { it.playerId == playerId },
                         options = repo.substitutionOptions(1, playerId)!!,
                         snapshot = snapshot,
