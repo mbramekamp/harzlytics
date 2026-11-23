@@ -150,6 +150,32 @@ class HandballRepositoryTest {
     }
 
     @Test
+    fun testGoalConcededWithoutKeeperOnlyWithSevenFieldPlayers() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        val game = repo.snapshot.value.games.first { it.gameId == 1 }
+        val opponentScore = { g: com.handball.stattracker.model.Game -> if (g.isHomeGame) g.awayTeamScore else g.homeTeamScore }
+
+        // TW (playerId 1) auf dem Feld: kein Gegentor "ins leere Tor"
+        assertFalse(repo.recordGoalConcededWithoutKeeper(gameId = 1))
+        assertEquals(opponentScore(game), opponentScore(repo.snapshot.value.games.first { it.gameId == 1 }))
+
+        // 7 Feldspieler: Feldspieler 9 kommt für den TW
+        assertTrue(repo.substitutePlayer(gameId = 1, playerInId = 9, playerOutId = 1))
+        val pmBefore = repo.snapshot.value.playerGames.filter { it.gameId == 1 && it.isOnCourt }.associate { it.playerGameId to it.plusMinus }
+        val logsBefore = repo.getGameLogs(1).size
+        assertTrue(repo.recordGoalConcededWithoutKeeper(gameId = 1))
+
+        val after = repo.snapshot.value
+        assertEquals(opponentScore(game) + 1, opponentScore(after.games.first { it.gameId == 1 }), "Gegner +1")
+        after.playerGames.filter { it.gameId == 1 && it.isOnCourt }.forEach {
+            assertEquals(pmBefore.getValue(it.playerGameId) - 1, it.plusMinus, "Alle 7 auf dem Feld −1")
+        }
+        assertEquals(logsBefore + 1, repo.getGameLogs(1).size)
+        assertEquals(GameLogEventType.GOAL_CONCEDED, repo.getGameLogs(1).first().eventType)
+    }
+
+    @Test
     fun testCourtEntryCandidatesForFreeSlot() {
         val repo = HandballRepository(persistLocally = false)
         repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())

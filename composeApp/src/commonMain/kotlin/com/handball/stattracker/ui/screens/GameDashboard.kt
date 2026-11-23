@@ -408,6 +408,9 @@ internal fun GameInteractiveDashboard(
                         repository.updateGoalKeeperStats(pg.playerGameId, autoSyncOpponentScore = autoSyncScore) { action.apply(it) }
                     }
                 },
+                onGoalConcededWithoutKeeper = if (onCourtParticipants.none { it.second.role == PlayerRole.GOALKEEPER }) {
+                    { track("Gegentor (leeres Tor)") { repository.recordGoalConcededWithoutKeeper(game.gameId, autoSyncScore) } }
+                } else null,
                 onSubstitute = { selectedPair?.let { substitutionPlayerId = it.second.playerId } },
                 onTwoMinutes = {
                     val (pg, p) = selectedPair ?: return@MobileActionBar

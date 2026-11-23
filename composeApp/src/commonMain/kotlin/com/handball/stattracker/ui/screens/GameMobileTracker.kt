@@ -246,6 +246,8 @@ internal fun MobileActionBar(
     canUndo: Boolean,
     onFieldAction: (FieldAction) -> Unit,
     onKeeperAction: (KeeperAction) -> Unit,
+    // Nur bei 7 Feldspielern ohne TW: Gegentor für die Mannschaft
+    onGoalConcededWithoutKeeper: (() -> Unit)? = null,
     onSubstitute: () -> Unit,
     onTwoMinutes: () -> Unit,
     onMore: () -> Unit,
@@ -272,20 +274,22 @@ internal fun MobileActionBar(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
-            val buttons: List<Triple<String, Int?, () -> Unit>> = if (isKeeper && keeperStats != null) {
-                KeeperAction.entries.map { a -> Triple(a.label, a.count(keeperStats), { onKeeperAction(a) }) }
+            val buttons: List<BarButton> = if (isKeeper && keeperStats != null) {
+                KeeperAction.entries.map { a -> BarButton(a.label, a.count(keeperStats)) { onKeeperAction(a) } }
             } else {
-                BAR_FIELD_ACTIONS.map { a -> Triple(a.label, fieldStats?.let { a.count(it) }, { onFieldAction(a) }) }
+                BAR_FIELD_ACTIONS.map { a -> BarButton(a.label, fieldStats?.let { a.count(it) }) { onFieldAction(a) } } +
+                    listOfNotNull(onGoalConcededWithoutKeeper?.let { BarButton("Gegentor", null, opponent = true, onClick = it) })
             }
             buttons.chunked(4).forEachIndexed { rowIdx, rowButtons ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    rowButtons.forEachIndexed { idx, (label, count, action) ->
+                    rowButtons.forEachIndexed { idx, b ->
                         ActionTile(
-                            label = label,
-                            count = count,
+                            label = b.label,
+                            count = b.count,
                             primary = rowIdx == 0 && idx == 0,
-                            enabled = enabled,
-                            onClick = action,
+                            opponent = b.opponent,
+                            enabled = enabled || b.opponent,
+                            onClick = b.onClick,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -302,13 +306,24 @@ internal fun MobileActionBar(
     }
 }
 
+/** Ein Knopf der Aktionsleiste; [opponent] = Aktion für die gegnerische Seite (Bernstein). */
+private class BarButton(val label: String, val count: Int?, val opponent: Boolean = false, val onClick: () -> Unit)
+
 @Composable
-private fun ActionTile(label: String, count: Int?, primary: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    val container = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
-    val content = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+private fun ActionTile(label: String, count: Int?, primary: Boolean, opponent: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    val container = when {
+        primary -> MaterialTheme.colorScheme.primary
+        opponent -> amberContainer()
+        else -> MaterialTheme.colorScheme.secondaryContainer
+    }
+    val content = when {
+        primary -> MaterialTheme.colorScheme.onPrimary
+        opponent -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSecondaryContainer
+    }
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = container.copy(alpha = if (enabled) 1f else 0.4f),
+        color = container.copy(alpha = container.alpha * (if (enabled) 1f else 0.4f)),
         modifier = modifier.heightIn(min = 54.dp).clickable(enabled = enabled, onClick = onClick)
     ) {
         Column(

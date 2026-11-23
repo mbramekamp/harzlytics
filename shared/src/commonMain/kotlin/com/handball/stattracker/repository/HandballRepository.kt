@@ -1396,6 +1396,44 @@ class HandballRepository(
         }
     }
 
+    /**
+     * Gegentor, während kein Torwart auf dem Feld steht (7 Feldspieler): Gegner +1 (bei [autoSyncOpponentScore]),
+     * alle Spieler auf dem Feld −1 auf +/-, Eintrag im Spielprotokoll. Steht ein TW auf dem Feld, passiert nichts
+     * (dann zählt das Gegentor beim Torwart). Gibt zurück, ob etwas erfasst wurde.
+     */
+    fun recordGoalConcededWithoutKeeper(gameId: Int, autoSyncOpponentScore: Boolean = true): Boolean {
+        var recorded = false
+        mutate { state ->
+            val game = state.games.find { it.gameId == gameId && it.isOwnTeamGame } ?: return@mutate state
+            val onCourt = state.playerGames.filter { it.gameId == gameId && it.isOnCourt }
+            val roles = onCourt.associate { pg -> pg.playerGameId to state.players.find { it.playerId == pg.playerId }?.role }
+            if (onCourt.isEmpty() || roles.values.any { it == PlayerRole.GOALKEEPER }) return@mutate state
+
+            var home = game.homeTeamScore
+            var away = game.awayTeamScore
+            if (autoSyncOpponentScore) {
+                if (game.isHomeGame) away += 1 else home += 1
+            }
+            recorded = true
+            state.copy(
+                games = state.games.map { if (it.gameId == gameId) it.copy(homeTeamScore = home, awayTeamScore = away) else it },
+                playerGames = state.playerGames.map { pg ->
+                    if (pg.gameId == gameId && pg.isOnCourt && roles[pg.playerGameId] != PlayerRole.COACH) pg.copy(plusMinus = pg.plusMinus - 1) else pg
+                },
+                gameLogs = state.gameLogs + GameLogEntry(
+                    logId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1,
+                    gameId = gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.GOAL_CONCEDED,
+                    homeScoreAtEvent = home,
+                    awayScoreAtEvent = away,
+                    description = "Gegentor ins leere Tor"
+                )
+            )
+        }
+        return recorded
+    }
+
     // --- COACH_GAMESTATS & TIMEOUT ---
     fun addCoachTimeout(playerGameId: Int, timeoutReason: String) {
         val reason = timeoutReason.trim().ifEmpty { "Team-Timeout (TTO)" }

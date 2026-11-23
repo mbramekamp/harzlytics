@@ -203,11 +203,18 @@ class GameCardScreenshotTest {
         repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
         val pg3 = repo.snapshot.value.playerGames.first { it.gameId == 1 && it.playerId == 3 }
         repo.updateFieldPlayerStats(pg3.playerGameId, autoSyncTeamScore = true) { FieldAction.GOAL.apply(it) }
+        mobileTrackerShots(repo, listOf(3 to "mobil-erfassung-feldspieler", 1 to "mobil-erfassung-torwart"))
+        // 7 Feldspieler ohne TW: Knopf "Gegentor" erscheint
+        repo.substitutePlayer(gameId = 1, playerInId = 9, playerOutId = 1)
+        mobileTrackerShots(repo, listOf(9 to "mobil-erfassung-ohne-torwart"))
+    }
+
+    private fun mobileTrackerShots(repo: HandballRepository, shots: List<Pair<Int, String>>) {
         val snapshot = repo.snapshot.value
         val onCourt = snapshot.playerGames.filter { it.gameId == 1 && it.isOnCourt }.mapNotNull { pg ->
             snapshot.players.find { it.playerId == pg.playerId && it.role != PlayerRole.COACH }?.let { pg to it }
         }.sortedWith(compareBy({ it.second.role != PlayerRole.GOALKEEPER }, { it.second.jerseyNumberHomeKit ?: 99 }))
-        listOf(3 to "mobil-erfassung-feldspieler", 1 to "mobil-erfassung-torwart").forEach { (selectedId, name) ->
+        shots.forEach { (selectedId, name) ->
             val (selPg, selPlayer) = onCourt.first { it.second.playerId == selectedId }
             val scene = ImageComposeScene((width * density).toInt(), (820 * density).toInt(), Density(density)) {
                 HandballTheme(darkTheme = false) {
@@ -240,7 +247,8 @@ class GameCardScreenshotTest {
                             keeperStats = snapshot.goalKeeperStats.find { it.playerGameId == selPg.playerGameId },
                             status = if (selectedId == 3) "Tor · ${selPlayer.shortLabel()}" else "Für ${selPlayer.shortLabel()}",
                             canUndo = true,
-                            onFieldAction = {}, onKeeperAction = {}, onSubstitute = {}, onTwoMinutes = {}, onMore = {}, onUndo = {}
+                            onFieldAction = {}, onKeeperAction = {},
+                            onGoalConcededWithoutKeeper = if (onCourt.none { it.second.role == PlayerRole.GOALKEEPER }) ({}) else null, onSubstitute = {}, onTwoMinutes = {}, onMore = {}, onUndo = {}
                         )
                     }
                 }
