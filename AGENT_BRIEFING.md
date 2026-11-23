@@ -70,7 +70,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/DashboardScreen.kt` – `[H]` Home-Dashboard
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/RosterScreen.kt` – Kader-Ansicht & Spieler-/Trainerprofil mit Reitern (*Übersicht & Spiele* sowie *Performance & Ranking*)
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/PlayerPerformanceTab.kt` – Performance-Graphen (Formkurve & 6-Achsen-Radar), Positionsvergleich & Spieler-Ranking
-  - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/SeasonScreen.kt` – Saison-Ansicht & Spiel-Dashboard (Spieluhr, Links: 7 Aktive Spieler vs. Rechts: Bank, 2-Klick-Wechsel mit `6+1`/`7+0`-Check, eigener Tab `Verlauf & Protokoll` mit `+3/0/-3` Torverlauf)
+  - `ui/screens/SeasonScreen.kt` – Saison-Liste; Spiel-Dashboard aufgeteilt in `GameDashboard.kt` (Rahmen, Tabs, Trainer/Auszeiten), `GameScoreboard.kt` (Spielstand, Uhr), `GameLineupSection.kt` (Feld/Bank, Kader nominieren), `GameLogSection.kt` (Protokoll, Torverlauf), `GamePlayerCards.kt` + `GameCardExtras.kt` (Spielerkarten) (Spieluhr, Links: 7 Aktive Spieler vs. Rechts: Bank, 2-Klick-Wechsel mit `6+1`/`7+0`-Check, eigener Tab `Verlauf & Protokoll` mit `+3/0/-3` Torverlauf)
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/StandingsScreen.kt` – Ligatabelle
   - `composeApp/src/commonMain/kotlin/com/handball/stattracker/ui/screens/PlusCreationDialogs.kt` – `+`-Menü & Erstellungsdialoge
 
@@ -169,7 +169,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 1. Einladungscodes in der App erzeugen (bisher per SQL in `club_invitations`; braucht einen sicheren Zufallsgenerator pro Plattform).
 2. Sync-Konflikte (Review-Finding #6): zwei Geräte offline, das mit der späteren Uhrzeit überschreibt das ganze Snapshot; bräuchte Zusammenführen pro Entität oder Serverzeit.
 3. Release-APK mit eigenem Signaturschlüssel; Supabase-Einstellungen prüfen (E-Mail-Bestätigung, Passwort-Reset-Link).
-4. `SeasonScreen.kt` aufteilen (~3,7k Zeilen), README/Briefing von Windows-`file:///`-Links auf relative Links umstellen.
+4. ~~`SeasonScreen.kt` aufteilen~~ (erledigt 2026-11-23), README/Briefing von Windows-`file:///`-Links auf relative Links umstellen.
 5. Optional: Wurfbild/Tor-Zonen, Gegner-Scouting, Halbzeit- und Heim/Auswärts-Auswertung.
 
 ### 6.6 Arbeitsweise, die sich bewährt hat
