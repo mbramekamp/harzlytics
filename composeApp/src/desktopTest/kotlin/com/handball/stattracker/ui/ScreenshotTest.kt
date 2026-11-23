@@ -99,6 +99,20 @@ class ScreenshotTest {
         role = UserRole.SPIELER, playerId = 4, ownPlayerId = 4
     )
 
+    /** Trainer mit eigenem Kadereintrag: "Profil" in der Seitenleiste, eigenes Profil offen. */
+    @Test
+    fun desktopCoachOwnProfile() = render(
+        "desktop-hell-eigenes-profil", 1180, 780, 1f, dark = false, screen = MainNavScreen.ROSTER,
+        role = UserRole.TRAINER, playerId = 9, ownPlayerId = 9
+    )
+
+    /** Trainer mit eigenem Kadereintrag, fremder Spieler offen: "Kader" markiert, "Profil" nicht. */
+    @Test
+    fun desktopCoachOtherPlayer() = render(
+        "desktop-hell-kader-mit-profil", 1180, 780, 1f, dark = false, screen = MainNavScreen.ROSTER,
+        role = UserRole.TRAINER, playerId = 4, ownPlayerId = 9
+    )
+
     @Test
     fun desktopRosterGameHistory() = render(
         "desktop-hell-kader-spiele", 1180, 1100, 1f, dark = false, screen = MainNavScreen.ROSTER, playerId = 15
@@ -182,6 +196,23 @@ class ScreenshotTest {
                     onRequestClaim = { AuthActionResult.Success },
                     onSignOut = {}, darkTheme = false, onToggleDarkTheme = {},
                     onOpenClub = {}, onOpenAdmin = {}, onDismiss = {}
+                )
+            }
+        }
+    }
+
+    /** Mobil, Trainer mit verknüpftem Kadereintrag: Zugang zum eigenen Profil im Konto-Dialog. */
+    @Test
+    fun coachAccountDialogWithOwnProfile() {
+        val repo = adminRepo()
+        renderDialog("dialog-trainer-konto-profil", 390, 560) {
+            CompositionLocalProvider(LocalUserRole provides UserRole.TRAINER) {
+                com.handball.stattracker.ui.screens.AccountDialog(
+                    profile = profile.copy(role = UserRole.TRAINER, playerId = 9), email = profile.email, offline = false,
+                    players = repo.snapshot.value.players,
+                    onRequestClaim = { AuthActionResult.Success },
+                    onSignOut = {}, darkTheme = false, onToggleDarkTheme = {},
+                    onOpenClub = {}, onOpenOwnProfile = {}, onDismiss = {}
                 )
             }
         }

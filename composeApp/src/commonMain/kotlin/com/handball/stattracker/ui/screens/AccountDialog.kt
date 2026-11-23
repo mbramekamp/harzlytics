@@ -52,6 +52,8 @@ fun AccountDialog(
     onToggleDarkTheme: () -> Unit,
     onOpenClub: (() -> Unit)? = null,
     onOpenAdmin: (() -> Unit)? = null,
+    /** Öffnet das eigene Profil; nur gesetzt, wo es sonst keinen direkten Zugang gibt. */
+    onOpenOwnProfile: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -93,7 +95,12 @@ fun AccountDialog(
 
                 Text("Kadereintrag", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 when {
-                    linked != null -> Text("Verknüpft mit $linked")
+                    linked != null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Verknüpft mit $linked", modifier = Modifier.weight(1f))
+                        if (onOpenOwnProfile != null) {
+                            TextButton(onClick = onOpenOwnProfile) { Text("Mein Profil") }
+                        }
+                    }
                     requested != null -> {
                         Text("Angefragt: $requested (wartet auf Freigabe)")
                         TextButton(enabled = !busy && !offline, onClick = { claim(null) }) { Text("Antrag zurückziehen") }

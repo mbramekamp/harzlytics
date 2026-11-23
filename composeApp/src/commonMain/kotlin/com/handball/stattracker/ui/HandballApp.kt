@@ -133,10 +133,22 @@ internal fun MainAppContent(
     }
     LaunchedEffect(showAccount) { if (showAccount) onRefreshAccount() }
     var selectedPlayerId by remember { mutableStateOf(initialPlayerId) }
-    // Spieler mit verknüpftem Kadereintrag: der zweite Tab unten ist ihr eigenes Profil statt der Kaderliste
+    // Konto mit verknüpftem Kadereintrag: eigenes Profil direkt erreichbar
+    // (Desktop: Eintrag in der Seitenleiste; mobil: Spieler-Tab bzw. Konto-Dialog)
     val ownPlayerId = profile.playerId?.takeIf { id -> snapshot.players.any { it.playerId == id } }
+    // Mobil ersetzt das Profil nur bei Spielern den Kader-Tab; Trainer/Admin brauchen die Kaderliste
     val ownProfileTab = profile.role == UserRole.SPIELER && ownPlayerId != null
     var selectedGameId by remember { mutableStateOf(initialGameId) }
+    // Breite des Layouts, auch für die Dialoge außerhalb von BoxWithConstraints
+    var isWideScreenLayout by remember { mutableStateOf(false) }
+    val openOwnProfile: (() -> Unit)? = ownPlayerId?.let { id ->
+        {
+            selectedPlayerId = id
+            selectedGameId = null
+            currentScreen = MainNavScreen.ROSTER
+        }
+    }
+    val ownProfileOpen = ownPlayerId != null && currentScreen == MainNavScreen.ROSTER && selectedPlayerId == ownPlayerId
     val showSeasonPicker = currentScreen == MainNavScreen.HOME_DASHBOARD ||
         currentScreen == MainNavScreen.STANDINGS ||
         (currentScreen == MainNavScreen.SEASON && selectedGameId == null)
@@ -144,7 +156,7 @@ internal fun MainAppContent(
     // Spieler dürfen nichts anlegen; die Buttons sind ohnehin ausgeblendet, dies ist die zweite Absicherung
     val openModal: (CreationModalType) -> Unit = { if (canEdit) creationModal = it }
 
-    val staticHeaderTitle = if (ownProfileTab && currentScreen == MainNavScreen.ROSTER && selectedPlayerId == ownPlayerId) {
+    val staticHeaderTitle = if (ownProfileOpen) {
         "Profil"
     } else {
         headerTitle(currentScreen, selectedGameId)
@@ -157,6 +169,7 @@ internal fun MainAppContent(
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val isWideScreen = maxWidth >= 700.dp
+                SideEffect { isWideScreenLayout = isWideScreen }
 
                 // Auf Desktop/Tablet: Falls kein Spieler gewählt ist, ersten vorwählen für Master-Detail
                 LaunchedEffect(isWideScreen, snapshot.players) {
@@ -169,6 +182,8 @@ internal fun MainAppContent(
                     Row(modifier = Modifier.fillMaxSize()) {
                         SideNavigationRail(
                             currentScreen = currentScreen,
+                            ownProfileOpen = ownProfileOpen,
+                            onOpenOwnProfile = openOwnProfile,
                             onSelectScreen = { screen ->
                                 currentScreen = screen
                                 if (screen != MainNavScreen.SEASON) {
@@ -270,13 +285,7 @@ internal fun MainAppContent(
                                 }
                             },
                             onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) },
-                            onOpenOwnProfile = if (ownProfileTab) {
-                                {
-                                    selectedPlayerId = ownPlayerId
-                                    selectedGameId = null
-                                    currentScreen = MainNavScreen.ROSTER
-                                }
-                            } else null
+                            onOpenOwnProfile = if (ownProfileTab) openOwnProfile else null
                         )
                     }
                 }
@@ -298,6 +307,10 @@ internal fun MainAppContent(
                     onOpenAdmin = if (profile.role == UserRole.ADMIN && adminRepository != null) {
                         { showAccount = false; showAdmin = true }
                     } else null,
+                    // Desktop hat den Eintrag in der Seitenleiste, mobile Spieler den Tab: nur sonst hier anbieten
+                    onOpenOwnProfile = openOwnProfile?.takeIf { !isWideScreenLayout && !ownProfileTab }?.let { open ->
+                        { showAccount = false; open() }
+                    },
                     onDismiss = { showAccount = false }
                 )
             }
@@ -447,6 +460,10 @@ private fun DesktopHeader(
 @Composable
 private fun SideNavigationRail(
     currentScreen: MainNavScreen,
+    /** Eigener Kadereintrag ist gerade offen: dann ist "Profil" statt "Kader" markiert. */
+    ownProfileOpen: Boolean,
+    /** Gesetzt für Konten mit verknüpftem Kadereintrag. */
+    onOpenOwnProfile: (() -> Unit)?,
     onSelectScreen: (MainNavScreen) -> Unit,
     onOpenPlusMenu: () -> Unit
 ) {
@@ -483,7 +500,7 @@ private fun SideNavigationRail(
             NavbarIconItem("Übersicht", Icons.Default.Home, currentScreen == MainNavScreen.HOME_DASHBOARD) {
                 onSelectScreen(MainNavScreen.HOME_DASHBOARD)
             }
-            NavbarIconItem("Kader", Icons.Default.Groups, currentScreen == MainNavScreen.ROSTER) {
+            NavbarIconItem("Kader", Icons.Default.Groups, currentScreen == MainNavScreen.ROSTER && !ownProfileOpen) {
                 onSelectScreen(MainNavScreen.ROSTER)
             }
             NavbarIconItem("Saison", Icons.Default.SportsHandball, currentScreen == MainNavScreen.SEASON) {
@@ -491,6 +508,9 @@ private fun SideNavigationRail(
             }
             NavbarIconItem("Tabelle", Icons.Default.FormatListNumbered, currentScreen == MainNavScreen.STANDINGS) {
                 onSelectScreen(MainNavScreen.STANDINGS)
+            }
+            if (onOpenOwnProfile != null) {
+                NavbarIconItem("Profil", Icons.Default.Person, ownProfileOpen, onOpenOwnProfile)
             }
         }
     }

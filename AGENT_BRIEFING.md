@@ -97,6 +97,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - [x] **UI-Bereinigung & Professionalisierung**: Entfernung redundanter Labels, erklärender Hilfstexte und technischer Datenbank-Begriffe in der gesamten App.
 - [x] **Mobile-Ergonomie (Android) & Supabase Cloud-Sync** (Snapshot-Sync via `SupabaseSyncService.kt`, Konfiguration über `.env` / `SupabaseConfig.kt`).
 
+- [x] **Direkter Zugang zum eigenen Profil** (Branch `feat/own-profile-access`): Konten mit verknüpftem Kadereintrag (jede Rolle) haben auf dem Desktop den Eintrag "Profil" in der Seitenleiste (markiert, solange der eigene Eintrag offen ist; sonst "Kader"). Mobil: Spieler behalten den Tab "Profil" statt "Kader"; Trainer/Admin behalten "Kader" und öffnen ihr Profil über "Mein Profil" im Konto-Dialog (nur mobil, Desktop hat die Seitenleiste). Kopfzeile zeigt "Profil" für jede Rolle. Screenshots: `desktop-hell-eigenes-profil`, `desktop-hell-kader-mit-profil`, `dialog-trainer-konto-profil`.
 - [x] **UI-Welle 3 "Profi-Look & Logo"** (Details in §6.0): Theme Harz-Rot/Graphit statt Lila, Schrift Barlow, flache Hülle ohne verschachtelte Rahmen, Übersicht als Anzeigetafel, deutsche Datumsangaben, Logo-Zeichen und -Wortmarke in App, Fenster- und Android-Symbol.
 - [x] **UI-Überarbeitung Welle 1 & 2** (Details in §6): Lila/Weiß-Theme mit Dunkelmodus, Inhalts-Audit (ein Element = ein Zweck), Saison-Menü in der Kopfzeile, Sync-Symbol, Begriffe Kader/Staff/Aufgebot, Spieler-Profil-Tab mobil, Vereinsverwaltung (`ClubDialog`), Headless-Screenshot-Test.
 
@@ -148,7 +149,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - **Branches:** Arbeitsbranch `claude/repository-status-o99lyd`, `main` wird nur per Fast-Forward nachgezogen.
 - **Konto ↔ Kadereintrag verknüpfen** (drei Wege): (1) automatisch per E-Mail: Trainer trägt die E-Mail beim Spieler ein, der Spieler registriert sich mit derselben Adresse und bestätigt sie → sofort aktiv und verknüpft (DB-Trigger `handle_auth_user_change`); (2) **Admin wählt beim Freigeben** im Benutzer-Dialog ("Kader: …", Vorschlag aus Antrag → E-Mail → Name, `AdminRepository.suggestPlayerId`, nur freie Spieler); (3) Antrag im Konto-Dialog, Bestätigung unter "Kader-Anträge". Ein Konto sieht die Kaderliste erst nach der Freischaltung (RLS, Datenschutz): deshalb wählt nicht der Spieler selbst bei der Registrierung. Einladungscodes für einen bestimmten Spieler gehen weiterhin nur per SQL.
 - **Profil wird nachgeladen** (Rolle/Verknüpfung nach Admin-Änderung): beim Öffnen des Konto-Dialogs, beim Tippen auf das Wolken-Symbol und alle 5 Minuten (`onRefreshAccount` → `AuthRepository.reloadProfile`).
-- **Tests:** 67 Logik-Tests (`:shared:desktopTest`) + 15 Screenshot-Tests (`:composeApp:desktopTest`).
+- **Tests:** 69 Logik-Tests (`:shared:desktopTest`) + 20 Screenshot-Tests (`:composeApp:desktopTest`; zuletzt +3 für den Profil-Zugang).
 
 ### 6.2 Offene Entscheidungen des Nutzers (nicht eigenmächtig ändern)
 1. **Filter "Alle / Eigene Spiele / Liga-Spiele"** in der Saison-Liste: behalten oder streichen?
@@ -165,12 +166,11 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - iOS: nicht gebaut (kein Xcode-Projekt, Token unverschlüsselt in `NSUserDefaults`, Keychain fehlt). Der Nutzer hat kein Mac; Weg wäre GitHub-Actions-Mac + Sideloadly, aktuell zurückgestellt (Android-Altgerät vorhanden).
 
 ### 6.5 Weiteres Backlog (Reihenfolge nach Nutzen)
-1. **CI mit GitHub Actions** (`.github/` fehlt): Tests + `assembleDebug` auf `ubuntu-latest` (Android-SDK vorinstalliert); damit wird der Android-Build erstmals ohne Nutzer geprüft.
-2. Einladungscodes in der App erzeugen (bisher per SQL in `club_invitations`; braucht einen sicheren Zufallsgenerator pro Plattform).
-3. Sync-Konflikte (Review-Finding #6): zwei Geräte offline, das mit der späteren Uhrzeit überschreibt das ganze Snapshot; bräuchte Zusammenführen pro Entität oder Serverzeit.
-4. Release-APK mit eigenem Signaturschlüssel; Supabase-Einstellungen prüfen (E-Mail-Bestätigung, Passwort-Reset-Link).
-5. `SeasonScreen.kt` aufteilen (~3,7k Zeilen), README/Briefing von Windows-`file:///`-Links auf relative Links umstellen.
-6. Optional: Wurfbild/Tor-Zonen, Gegner-Scouting, Halbzeit- und Heim/Auswärts-Auswertung.
+1. Einladungscodes in der App erzeugen (bisher per SQL in `club_invitations`; braucht einen sicheren Zufallsgenerator pro Plattform).
+2. Sync-Konflikte (Review-Finding #6): zwei Geräte offline, das mit der späteren Uhrzeit überschreibt das ganze Snapshot; bräuchte Zusammenführen pro Entität oder Serverzeit.
+3. Release-APK mit eigenem Signaturschlüssel; Supabase-Einstellungen prüfen (E-Mail-Bestätigung, Passwort-Reset-Link).
+4. `SeasonScreen.kt` aufteilen (~3,7k Zeilen), README/Briefing von Windows-`file:///`-Links auf relative Links umstellen.
+5. Optional: Wurfbild/Tor-Zonen, Gegner-Scouting, Halbzeit- und Heim/Auswärts-Auswertung.
 
 ### 6.6 Arbeitsweise, die sich bewährt hat
 - Erst Audit/Plan mit Befunden und Empfehlung, dann umsetzen; subjektive Entscheidungen (Farben, Informationen streichen) vorher abstimmen.
