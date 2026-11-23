@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.handball.stattracker.model.AuthActionResult
 import com.handball.stattracker.model.AuthState
 import com.handball.stattracker.model.SyncState
@@ -140,6 +141,7 @@ internal fun MainAppContent(
     val ownPlayerId = profile.playerId?.takeIf { id -> snapshot.players.any { it.playerId == id } }
     // Mobil: Spieler bekommen einen eigenen Tab "Profil" (ohne +-Knopf ist Platz); Trainer/Admin über den Konto-Dialog
     val ownProfileTab = profile.role == UserRole.SPIELER && ownPlayerId != null
+    val ownJerseyNumber = snapshot.players.find { it.playerId == ownPlayerId }?.jerseyNumberHomeKit
     var selectedGameId by remember { mutableStateOf(initialGameId) }
     // Breite des Layouts, auch für die Dialoge außerhalb von BoxWithConstraints
     var isWideScreenLayout by remember { mutableStateOf(false) }
@@ -170,6 +172,7 @@ internal fun MainAppContent(
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val isWideScreen = maxWidth >= 700.dp
+                val narrowPhone = maxWidth < 360.dp
                 SideEffect { isWideScreenLayout = isWideScreen }
 
                 // Auf Desktop/Tablet: Falls kein Spieler gewählt ist, ersten vorwählen für Master-Detail
@@ -185,6 +188,7 @@ internal fun MainAppContent(
                             currentScreen = currentScreen,
                             ownProfileOpen = ownProfileOpen,
                             onOpenOwnProfile = openOwnProfile,
+                            ownJerseyNumber = ownJerseyNumber,
                             onSelectScreen = { screen ->
                                 currentScreen = screen
                                 if (screen != MainNavScreen.SEASON) {
@@ -288,7 +292,9 @@ internal fun MainAppContent(
                                 }
                             },
                             onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) },
-                            onOpenOwnProfile = if (ownProfileTab) openOwnProfile else null
+                            onOpenOwnProfile = if (ownProfileTab) openOwnProfile else null,
+                            ownJerseyNumber = ownJerseyNumber,
+                            narrow = narrowPhone
                         )
                     }
                 }
@@ -468,6 +474,7 @@ private fun SideNavigationRail(
     ownProfileOpen: Boolean,
     /** Gesetzt für Konten mit verknüpftem Kadereintrag. */
     onOpenOwnProfile: (() -> Unit)?,
+    ownJerseyNumber: Int?,
     onSelectScreen: (MainNavScreen) -> Unit,
     onOpenPlusMenu: () -> Unit
 ) {
@@ -514,7 +521,7 @@ private fun SideNavigationRail(
                 onSelectScreen(MainNavScreen.STANDINGS)
             }
             if (onOpenOwnProfile != null) {
-                NavbarIconItem("Profil", Icons.Default.Person, ownProfileOpen, onOpenOwnProfile)
+                NavbarIconItem("Profil", ownProfileOpen, onOpenOwnProfile) { ProfileNavIcon(ownJerseyNumber, ownProfileOpen) }
             }
         }
     }
@@ -526,6 +533,16 @@ private fun NavbarIconItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
     onClick: () -> Unit
+) = NavbarIconItem(label, selected, onClick) {
+    Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(22.dp))
+}
+
+@Composable
+private fun NavbarIconItem(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -545,11 +562,9 @@ private fun NavbarIconItem(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp)
+            CompositionLocalProvider(
+                LocalContentColor provides if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                content = icon
             )
         }
         Text(
@@ -567,10 +582,18 @@ private fun BottomMobileNavbar(
     onSelectScreen: (MainNavScreen) -> Unit,
     onOpenPlusMenu: () -> Unit,
     /** Gesetzt für Spieler mit verknüpftem Kadereintrag: zusätzlicher Tab "Profil" am Ende. */
-    onOpenOwnProfile: (() -> Unit)?
+    onOpenOwnProfile: (() -> Unit)?,
+    ownJerseyNumber: Int?,
+    /** Schmales Handy (< 360 dp): weniger Randabstand und kleinere Beschriftung, damit "Übersicht" passt. */
+    narrow: Boolean
 ) {
+    val labelStyle = if (narrow) MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp)
+        else MaterialTheme.typography.labelMedium
+    val tabLabel: @Composable (String) -> Unit = { Text(it, style = labelStyle, maxLines = 1, softWrap = false) }
+    // Fläche bis zum Rand, Tabs mit etwas Abstand davon ("Übersicht" klebte sonst am Rand)
+    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
     NavigationBar(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = if (narrow) 4.dp else 8.dp),
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp
     ) {
@@ -579,14 +602,14 @@ private fun BottomMobileNavbar(
             colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.HOME_DASHBOARD) },
             icon = { Icon(Icons.Default.Home, contentDescription = "Übersicht") },
-            label = { Text("Übersicht") }
+            label = { tabLabel("Übersicht") }
         )
         NavigationBarItem(
             selected = currentScreen == MainNavScreen.ROSTER,
             colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.ROSTER) },
             icon = { Icon(Icons.Default.Groups, contentDescription = "Kader") },
-            label = { Text("Kader") }
+            label = { tabLabel("Kader") }
         )
 
         // Prominenter Plus-Button (nur Trainer/Admin)
@@ -619,24 +642,25 @@ private fun BottomMobileNavbar(
             colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.SEASON) },
             icon = { Icon(Icons.Default.SportsHandball, contentDescription = "Saison") },
-            label = { Text("Saison") }
+            label = { tabLabel("Saison") }
         )
         NavigationBarItem(
             selected = currentScreen == MainNavScreen.STANDINGS,
             colors = navigationItemColors(),
             onClick = { onSelectScreen(MainNavScreen.STANDINGS) },
             icon = { Icon(Icons.Default.FormatListNumbered, contentDescription = "Tabelle") },
-            label = { Text("Tabelle") }
+            label = { tabLabel("Tabelle") }
         )
         if (onOpenOwnProfile != null) {
             NavigationBarItem(
                 selected = currentScreen == MainNavScreen.PROFILE,
                 colors = navigationItemColors(),
                 onClick = onOpenOwnProfile,
-                icon = { Icon(Icons.Default.Person, contentDescription = "Profil") },
-                label = { Text("Profil") }
+                icon = { ProfileNavIcon(ownJerseyNumber, currentScreen == MainNavScreen.PROFILE) },
+                label = { tabLabel("Profil") }
             )
         }
+    }
     }
 }
 

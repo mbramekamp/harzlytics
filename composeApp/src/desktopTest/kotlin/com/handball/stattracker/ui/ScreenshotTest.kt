@@ -99,6 +99,25 @@ class ScreenshotTest {
         role = UserRole.SPIELER, playerId = 4, ownPlayerId = 4
     )
 
+    /** Schmales Handy (320 dp): fünf Tabs mit Trikotnummer-Symbol, nichts klebt am Rand. */
+    @Test
+    fun mobileNarrowPlayerNav() = render(
+        "mobil-schmal-spieler-profil", 320, 568, 2f, dark = false, screen = MainNavScreen.PROFILE,
+        role = UserRole.SPIELER, ownPlayerId = 4
+    )
+
+    @Test
+    fun mobileNarrowPlayerNavDark() = render(
+        "mobil-schmal-spieler-kader-dunkel", 320, 568, 2f, dark = true, screen = MainNavScreen.ROSTER,
+        role = UserRole.SPIELER, ownPlayerId = 4
+    )
+
+    @Test
+    fun mobileNarrowCoachNav() = render(
+        "mobil-schmal-trainer-kader", 320, 568, 2f, dark = false, screen = MainNavScreen.ROSTER,
+        role = UserRole.TRAINER, ownPlayerId = 9
+    )
+
     /** Trainer mit eigenem Kadereintrag: "Profil" in der Seitenleiste, nur der eigene Eintrag (keine Kaderliste). */
     @Test
     fun desktopCoachOwnProfile() = render(
