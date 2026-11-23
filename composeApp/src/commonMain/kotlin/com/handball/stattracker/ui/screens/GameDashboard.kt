@@ -73,6 +73,25 @@ internal fun GameInteractiveDashboard(
     // Auswahl für einen freien Platz auf dem Feld (Handy, weniger als 7 aktiv)
     var showFreeSlotPicker by remember(game.gameId) { mutableStateOf(false) }
 
+    // Mobile Erfassung (Handy): gewählter Spieler, "Mehr"-Sheet, Rückgängig-Stapel und kurze Bestätigung
+    var selectedPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
+    var showMoreSheet by remember(game.gameId) { mutableStateOf(false) }
+    val undoStack = remember(game.gameId) { mutableStateListOf<DatabaseSnapshot>() }
+    var lastActionText by remember(game.gameId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(lastActionText) {
+        if (lastActionText != null) {
+            delay(1800L)
+            lastActionText = null
+        }
+    }
+    // Merkt den Stand vor einer Eingabe für "Rückgängig" und zeigt danach kurz, was erfasst wurde
+    fun track(confirmation: String, change: () -> Unit) {
+        undoStack.add(repository.snapshot.value)
+        if (undoStack.size > 30) undoStack.removeAt(0)
+        change()
+        lastActionText = confirmation
+    }
+
     // Live-Spieluhr-Ticker (läuft im Sekundentakt, solange aktiv und < 60:00)
     LaunchedEffect(isClockRunning, game.gameId) {
         while (isClockRunning) {
@@ -91,6 +110,7 @@ internal fun GameInteractiveDashboard(
             isClockRunning = false
             substitutionPlayerId = null
             showFreeSlotPicker = false
+            showMoreSheet = false
             if (activeTab == 3) activeTab = 0
         }
     }
@@ -137,12 +157,26 @@ internal fun GameInteractiveDashboard(
         allPlayerParticipants.filter { (pg, _) -> pg.hasActiveSuspension(game.elapsedSeconds) }
     }
 
+    // Handy: Zeilen + feste Aktionsleiste statt großer Karten
+    val useMobileTracker = !isWideScreen && game.isOwnTeamGame
+    val selectedPair = onCourtParticipants.find { it.second.playerId == selectedPlayerId }
+        ?: onCourtParticipants.firstOrNull { it.second.role == PlayerRole.FIELD_PLAYER }
+        ?: onCourtParticipants.firstOrNull()
+    val selectedFieldStats = selectedPair?.let { (pg, _) ->
+        snapshot.fieldPlayerStats.find { it.playerGameId == pg.playerGameId } ?: FieldPlayerGameStats(0, pg.playerGameId)
+    }
+    val selectedKeeperStats = selectedPair?.let { (pg, _) ->
+        snapshot.goalKeeperStats.find { it.playerGameId == pg.playerGameId } ?: GoalKeeperGameStats(0, pg.playerGameId)
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isSideBySideColumns = maxWidth >= 780.dp
 
+        Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(if (isWideScreen) 18.dp else 10.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -239,7 +273,24 @@ internal fun GameInteractiveDashboard(
 
                 // 3. Inhalt je nach ausgewähltem Tab
                 when (activeTab.coerceIn(0, maxTabIdx)) {
-                    0 -> {
+                    0 -> if (useMobileTracker) {
+                        MobileCourtList(
+                            onCourt = onCourtParticipants,
+                            positionName = { p ->
+                                snapshot.positions.find { it.positionId == p.positionId }?.positionName?.substringBefore(" ")
+                                    ?: p.role.label
+                            },
+                            fieldStats = { pg -> snapshot.fieldPlayerStats.find { it.playerGameId == pg.playerGameId } ?: FieldPlayerGameStats(0, pg.playerGameId) },
+                            keeperStats = { pg -> snapshot.goalKeeperStats.find { it.playerGameId == pg.playerGameId } ?: GoalKeeperGameStats(0, pg.playerGameId) },
+                            isEditMode = isEditMode,
+                            selectedPlayerId = selectedPair?.second?.playerId,
+                            showFreeSlot = isEditMode && onCourtParticipants.size in 1..6 && courtEntryCandidates.isNotEmpty(),
+                            onSelect = { selectedPlayerId = it },
+                            onOpenProfile = onNavigateToPlayer,
+                            onOpenFreeSlot = { showFreeSlotPicker = true },
+                            onOpenStartingSeven = { startingSevenDialogVariant = false }
+                        )
+                    } else {
                         SideBySideLineupAndBenchSection(
                             repository = repository,
                             snapshot = snapshot,
@@ -321,6 +372,83 @@ internal fun GameInteractiveDashboard(
                 Spacer(Modifier.height(24.dp))
             }
         }
+
+        if (useMobileTracker && isEditMode && activeTab == 0 && onCourtParticipants.isNotEmpty()) {
+            val selected = selectedPair?.second
+            MobileActionBar(
+                player = selected,
+                fieldStats = selectedFieldStats,
+                keeperStats = selectedKeeperStats,
+                status = lastActionText ?: selected?.let { "Für ${it.shortLabel()}" } ?: "Spieler wählen",
+                canUndo = undoStack.isNotEmpty(),
+                onFieldAction = { action ->
+                    val (pg, p) = selectedPair ?: return@MobileActionBar
+                    track("${action.label} · ${p.shortLabel()}") {
+                        repository.updateFieldPlayerStats(pg.playerGameId, autoSyncTeamScore = autoSyncScore) { action.apply(it) }
+                    }
+                },
+                onKeeperAction = { action ->
+                    val (pg, p) = selectedPair ?: return@MobileActionBar
+                    track("${action.label} · ${p.shortLabel()}") {
+                        repository.updateGoalKeeperStats(pg.playerGameId, autoSyncOpponentScore = autoSyncScore) { action.apply(it) }
+                    }
+                },
+                onSubstitute = { selectedPair?.let { substitutionPlayerId = it.second.playerId } },
+                onTwoMinutes = {
+                    val (pg, p) = selectedPair ?: return@MobileActionBar
+                    track("2 Min · ${p.shortLabel()}") {
+                        repository.updatePlayerDisciplinary(pg.playerGameId, pg.twoMinuteSuspensions + 1, pg.yellowCard, pg.redCard, pg.blueCard)
+                    }
+                },
+                onMore = { showMoreSheet = true },
+                onUndo = {
+                    if (undoStack.isNotEmpty()) {
+                        repository.restoreGameState(game.gameId, undoStack.removeAt(undoStack.lastIndex))
+                        lastActionText = "Rückgängig"
+                    }
+                }
+            )
+        }
+        }
+    }
+
+    if (showMoreSheet) {
+        val pair = selectedPair
+        if (pair == null) {
+            LaunchedEffect(Unit) { showMoreSheet = false }
+        } else {
+            val (pg, p) = pair
+            MobileMoreSheet(
+                player = p,
+                playerGame = pg,
+                fieldStats = selectedFieldStats,
+                onPenaltyDrawn = {
+                    showMoreSheet = false
+                    track("${FieldAction.PENALTY_DRAWN.label} · ${p.shortLabel()}") {
+                        repository.updateFieldPlayerStats(pg.playerGameId) { FieldAction.PENALTY_DRAWN.apply(it) }
+                    }
+                },
+                onToggleYellow = {
+                    showMoreSheet = false
+                    track("${if (pg.yellowCard) "Gelb zurück" else "Gelb"} · ${p.shortLabel()}") {
+                        repository.updatePlayerDisciplinary(pg.playerGameId, pg.twoMinuteSuspensions, !pg.yellowCard, pg.redCard, pg.blueCard)
+                    }
+                },
+                onRed = {
+                    showMoreSheet = false
+                    track("Rot · ${p.shortLabel()}") {
+                        repository.updatePlayerDisciplinary(pg.playerGameId, pg.twoMinuteSuspensions, pg.yellowCard, true, pg.blueCard)
+                    }
+                },
+                onBlue = {
+                    showMoreSheet = false
+                    track("Blau · ${p.shortLabel()}") {
+                        repository.updatePlayerDisciplinary(pg.playerGameId, pg.twoMinuteSuspensions, pg.yellowCard, pg.redCard, true)
+                    }
+                },
+                onDismiss = { showMoreSheet = false }
+            )
+        }
     }
 
     substitutionPlayerId?.let { playerId ->
@@ -337,18 +465,25 @@ internal fun GameInteractiveDashboard(
                 gameId = game.gameId,
                 onCourtCount = onCourtParticipants.size,
                 onPickPartner = { partnerId ->
-                    if (options.isOnCourt) {
-                        repository.substitutePlayer(game.gameId, playerInId = partnerId, playerOutId = playerId)
-                    } else {
-                        repository.substitutePlayer(game.gameId, playerInId = playerId, playerOutId = partnerId)
+                    val inId = if (options.isOnCourt) partnerId else playerId
+                    val outId = if (options.isOnCourt) playerId else partnerId
+                    val inLabel = snapshot.players.find { it.playerId == inId }?.shortLabel() ?: ""
+                    val outNr = snapshot.players.find { it.playerId == outId }?.jerseyNumberHomeKit?.let { "#$it" } ?: ""
+                    track("$inLabel für $outNr") {
+                        repository.substitutePlayer(game.gameId, playerInId = inId, playerOutId = outId)
                     }
+                    // Der Eingewechselte ist gleich für die nächste Eingabe gewählt
+                    selectedPlayerId = inId
                     substitutionPlayerId = null
                 },
                 onActAlone = {
                     if (options.isOnCourt) {
-                        repository.movePlayerToBench(game.gameId, playerId)
+                        track("${tapped.shortLabel()} auf die Bank") { repository.movePlayerToBench(game.gameId, playerId) }
                     } else {
-                        repository.substitutePlayer(game.gameId, playerInId = playerId, playerOutId = null)
+                        track("${tapped.shortLabel()} aufs Feld") {
+                            repository.substitutePlayer(game.gameId, playerInId = playerId, playerOutId = null)
+                        }
+                        selectedPlayerId = playerId
                     }
                     substitutionPlayerId = null
                 },
@@ -370,7 +505,11 @@ internal fun GameInteractiveDashboard(
                 snapshot = snapshot,
                 gameId = game.gameId,
                 onPickPartner = { playerId ->
-                    repository.substitutePlayer(game.gameId, playerInId = playerId, playerOutId = null)
+                    val label = snapshot.players.find { it.playerId == playerId }?.shortLabel() ?: ""
+                    track("$label aufs Feld") {
+                        repository.substitutePlayer(game.gameId, playerInId = playerId, playerOutId = null)
+                    }
+                    selectedPlayerId = playerId
                     showFreeSlotPicker = false
                 },
                 onActAlone = {},

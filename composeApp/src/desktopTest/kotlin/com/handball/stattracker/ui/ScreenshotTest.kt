@@ -85,6 +85,9 @@ class ScreenshotTest {
     fun desktopLightGame() = render("desktop-hell-spiel", 1180, 1000, 1f, dark = false, screen = MainNavScreen.SEASON, gameId = DemoDataSeed.createDemoSnapshot().games.first { it.isOwnTeamGame }.gameId)
 
     @Test
+    fun mobileLightGame() = render("mobil-hell-spiel", 390, 800, 2f, dark = false, screen = MainNavScreen.SEASON, gameId = DemoDataSeed.createDemoSnapshot().games.first { it.isOwnTeamGame }.gameId)
+
+    @Test
     fun mobileLightHome() = render("mobil-hell-home", 390, 800, 2f, dark = false, screen = MainNavScreen.HOME_DASHBOARD)
 
     @Test

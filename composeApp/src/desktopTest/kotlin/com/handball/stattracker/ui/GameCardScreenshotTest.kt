@@ -21,6 +21,10 @@ import com.handball.stattracker.model.PlayerRole
 import com.handball.stattracker.ui.screens.FieldPlayerStatTrackerCard
 import com.handball.stattracker.ui.screens.GoalKeeperStatTrackerCard
 import com.handball.stattracker.ui.screens.SubstitutionPicker
+import com.handball.stattracker.ui.screens.MobileCourtList
+import com.handball.stattracker.ui.screens.MobileActionBar
+import com.handball.stattracker.ui.screens.shortLabel
+import com.handball.stattracker.model.FieldAction
 import com.handball.stattracker.ui.screens.SideBySideLineupAndBenchSection
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -188,6 +192,58 @@ class GameCardScreenshotTest {
             assertTrue(f.length() > 5_000)
         } finally {
             scene.close()
+        }
+    }
+
+    /** Handy-Erfassung (Variante B) im Bearbeitungsmodus: Zeilen + feste Aktionsleiste, Feldspieler bzw. Torwart gewählt. */
+    @Test
+    fun mobileTracker() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        val pg3 = repo.snapshot.value.playerGames.first { it.gameId == 1 && it.playerId == 3 }
+        repo.updateFieldPlayerStats(pg3.playerGameId, autoSyncTeamScore = true) { FieldAction.GOAL.apply(it) }
+        val snapshot = repo.snapshot.value
+        val onCourt = snapshot.playerGames.filter { it.gameId == 1 && it.isOnCourt }.mapNotNull { pg ->
+            snapshot.players.find { it.playerId == pg.playerId && it.role != PlayerRole.COACH }?.let { pg to it }
+        }.sortedWith(compareBy({ it.second.role != PlayerRole.GOALKEEPER }, { it.second.jerseyNumberHomeKit ?: 99 }))
+        listOf(3 to "mobil-erfassung-feldspieler", 1 to "mobil-erfassung-torwart").forEach { (selectedId, name) ->
+            val (selPg, selPlayer) = onCourt.first { it.second.playerId == selectedId }
+            val scene = ImageComposeScene((width * density).toInt(), (820 * density).toInt(), Density(density)) {
+                HandballTheme(darkTheme = false) {
+                    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        androidx.compose.foundation.layout.Column(
+                            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(10.dp)
+                        ) {
+                            MobileCourtList(
+                                onCourt = onCourt,
+                                positionName = { p -> snapshot.positions.find { it.positionId == p.positionId }?.positionName?.substringBefore(" ") ?: p.role.label },
+                                fieldStats = { pg -> snapshot.fieldPlayerStats.find { it.playerGameId == pg.playerGameId } ?: FieldPlayerGameStats(0, pg.playerGameId) },
+                                keeperStats = { pg -> snapshot.goalKeeperStats.find { it.playerGameId == pg.playerGameId } ?: GoalKeeperGameStats(0, pg.playerGameId) },
+                                isEditMode = true,
+                                selectedPlayerId = selectedId,
+                                showFreeSlot = false,
+                                onSelect = {}, onOpenProfile = {}, onOpenFreeSlot = {}, onOpenStartingSeven = {}
+                            )
+                        }
+                        MobileActionBar(
+                            player = selPlayer,
+                            fieldStats = snapshot.fieldPlayerStats.find { it.playerGameId == selPg.playerGameId },
+                            keeperStats = snapshot.goalKeeperStats.find { it.playerGameId == selPg.playerGameId },
+                            status = if (selectedId == 3) "Tor · ${selPlayer.shortLabel()}" else "Für ${selPlayer.shortLabel()}",
+                            canUndo = true,
+                            onFieldAction = {}, onKeeperAction = {}, onSubstitute = {}, onTwoMinutes = {}, onMore = {}, onUndo = {}
+                        )
+                    }
+                }
+            }
+            try {
+                var image = scene.render(0)
+                for (i in 1..4) image = scene.render(i * 100_000_000L)
+                val f = File(outDir, "$name.png").also { it.writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes) }
+                assertTrue(f.length() > 5_000)
+            } finally {
+                scene.close()
+            }
         }
     }
 }

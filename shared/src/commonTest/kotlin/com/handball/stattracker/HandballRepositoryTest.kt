@@ -114,6 +114,42 @@ class HandballRepositoryTest {
     }
 
     @Test
+    fun testRestoreGameStateUndoesGoalAndSubstitutionButKeepsClock() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        repo.setGameClockSeconds(gameId = 1, targetSeconds = 600)
+        val before = repo.snapshot.value
+        val game1Before = before.games.first { it.gameId == 1 }
+        val pg3 = before.playerGames.first { it.gameId == 1 && it.playerId == 3 }
+        val goalsBefore = before.fieldPlayerStats.first { it.playerGameId == pg3.playerGameId }.goalsScored
+        val otherGameBefore = before.games.first { it.gameId != 1 }
+
+        // Tor + Wechsel + Uhr läuft weiter
+        repo.updateFieldPlayerStats(pg3.playerGameId, autoSyncTeamScore = true) {
+            it.copy(goalsScored = it.goalsScored + 1, goalesAttempted = it.goalesAttempted + 1)
+        }
+        assertTrue(repo.substitutePlayer(gameId = 1, playerInId = 13, playerOutId = 3))
+        repo.advanceGameClock(gameId = 1, deltaSeconds = 30)
+
+        repo.restoreGameState(gameId = 1, before = before)
+        val after = repo.snapshot.value
+        val game1After = after.games.first { it.gameId == 1 }
+        assertEquals(game1Before.homeTeamScore, game1After.homeTeamScore, "Spielstand zurück")
+        assertEquals(goalsBefore, after.fieldPlayerStats.first { it.playerGameId == pg3.playerGameId }.goalsScored, "Tor zurück")
+        assertTrue(after.playerGames.first { it.gameId == 1 && it.playerId == 3 }.isOnCourt, "Wechsel zurück")
+        assertFalse(after.playerGames.first { it.gameId == 1 && it.playerId == 13 }.isOnCourt)
+        assertEquals(before.gameLogs.count { it.gameId == 1 }, after.gameLogs.count { it.gameId == 1 }, "Protokoll zurück")
+        assertEquals(630, game1After.elapsedSeconds, "Die Uhr bleibt stehen, wo sie ist")
+        // #13 stand nach dem Wechsel 30 s auf dem Feld; diese Spielzeit bleibt erhalten
+        assertEquals(
+            before.playerGames.first { it.gameId == 1 && it.playerId == 13 }.secondsPlayed + 30,
+            after.playerGames.first { it.gameId == 1 && it.playerId == 13 }.secondsPlayed,
+            "Spielzeit bleibt erhalten"
+        )
+        assertEquals(otherGameBefore, after.games.first { it.gameId == otherGameBefore.gameId }, "Andere Spiele unberührt")
+    }
+
+    @Test
     fun testCourtEntryCandidatesForFreeSlot() {
         val repo = HandballRepository(persistLocally = false)
         repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())

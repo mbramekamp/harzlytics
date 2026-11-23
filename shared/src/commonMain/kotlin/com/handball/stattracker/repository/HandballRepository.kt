@@ -1047,6 +1047,32 @@ class HandballRepository(
         }
     }
 
+    /**
+     * "Rückgängig" für die Spielerfassung: setzt Spiel [gameId] auf den Stand aus [before] zurück
+     * (Spielstand, Aufstellung, Strafen, Spieler-/Torwart-Statistik, Spielprotokoll). Die Spieluhr und die
+     * Spielzeiten bleiben auf dem aktuellen Stand, weil die Zeit seitdem weitergelaufen ist.
+     * Andere Spiele und alle übrigen Daten bleiben unberührt.
+     */
+    fun restoreGameState(gameId: Int, before: DatabaseSnapshot) {
+        mutate { state ->
+            val oldGame = before.games.find { it.gameId == gameId } ?: return@mutate state
+            val currentGame = state.games.find { it.gameId == gameId } ?: return@mutate state
+            val currentSeconds = state.playerGames.filter { it.gameId == gameId }.associate { it.playerGameId to it.secondsPlayed }
+            val oldPgs = before.playerGames.filter { it.gameId == gameId }
+                .map { pg -> pg.copy(secondsPlayed = currentSeconds[pg.playerGameId] ?: pg.secondsPlayed) }
+            val pgIds = (oldPgs.map { it.playerGameId } + state.playerGames.filter { it.gameId == gameId }.map { it.playerGameId }).toSet()
+            state.copy(
+                games = state.games.map { if (it.gameId == gameId) oldGame.copy(elapsedSeconds = currentGame.elapsedSeconds) else it },
+                playerGames = state.playerGames.filterNot { it.gameId == gameId } + oldPgs,
+                fieldPlayerStats = state.fieldPlayerStats.filterNot { it.playerGameId in pgIds } +
+                    before.fieldPlayerStats.filter { it.playerGameId in pgIds },
+                goalKeeperStats = state.goalKeeperStats.filterNot { it.playerGameId in pgIds } +
+                    before.goalKeeperStats.filter { it.playerGameId in pgIds },
+                gameLogs = state.gameLogs.filterNot { it.gameId == gameId } + before.gameLogs.filter { it.gameId == gameId }
+            )
+        }
+    }
+
     // --- PLAYER_GAME DISCIPLINARY (INKL. AUTOMATISCHEM BANK-WECHSEL BEI 2-MIN & ROT/BLAU) ---
     fun updatePlayerDisciplinary(
         playerGameId: Int,
