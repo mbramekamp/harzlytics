@@ -95,18 +95,18 @@ class ScreenshotTest {
 
     @Test
     fun mobilePlayerOwnProfile() = render(
-        "mobil-hell-spieler-profil", 390, 800, 2f, dark = false, screen = MainNavScreen.ROSTER,
+        "mobil-hell-spieler-profil", 390, 800, 2f, dark = false, screen = MainNavScreen.PROFILE,
         role = UserRole.SPIELER, playerId = 4, ownPlayerId = 4
     )
 
-    /** Trainer mit eigenem Kadereintrag: "Profil" in der Seitenleiste, eigenes Profil offen. */
+    /** Trainer mit eigenem Kadereintrag: "Profil" in der Seitenleiste, nur der eigene Eintrag (keine Kaderliste). */
     @Test
     fun desktopCoachOwnProfile() = render(
-        "desktop-hell-eigenes-profil", 1180, 780, 1f, dark = false, screen = MainNavScreen.ROSTER,
+        "desktop-hell-eigenes-profil", 1180, 780, 1f, dark = false, screen = MainNavScreen.PROFILE,
         role = UserRole.TRAINER, playerId = 9, ownPlayerId = 9
     )
 
-    /** Trainer mit eigenem Kadereintrag, fremder Spieler offen: "Kader" markiert, "Profil" nicht. */
+    /** Trainer mit eigenem Kadereintrag in der Kaderliste: "Kader" markiert, "Profil" nicht. */
     @Test
     fun desktopCoachOtherPlayer() = render(
         "desktop-hell-kader-mit-profil", 1180, 780, 1f, dark = false, screen = MainNavScreen.ROSTER,

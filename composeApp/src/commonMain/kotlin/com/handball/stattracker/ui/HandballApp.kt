@@ -38,7 +38,9 @@ enum class MainNavScreen(val label: String) {
     HOME_DASHBOARD("Home"),
     ROSTER("Kader"),
     SEASON("Saison"),
-    STANDINGS("Tabelle")
+    STANDINGS("Tabelle"),
+    /** Nur der eigene Kadereintrag, ohne Kaderliste. */
+    PROFILE("Profil")
 }
 
 @Composable
@@ -141,14 +143,17 @@ internal fun MainAppContent(
     var selectedGameId by remember { mutableStateOf(initialGameId) }
     // Breite des Layouts, auch für die Dialoge außerhalb von BoxWithConstraints
     var isWideScreenLayout by remember { mutableStateOf(false) }
-    val openOwnProfile: (() -> Unit)? = ownPlayerId?.let { id ->
+    val openOwnProfile: (() -> Unit)? = ownPlayerId?.let {
         {
-            selectedPlayerId = id
             selectedGameId = null
-            currentScreen = MainNavScreen.ROSTER
+            currentScreen = MainNavScreen.PROFILE
         }
     }
-    val ownProfileOpen = ownPlayerId != null && currentScreen == MainNavScreen.ROSTER && selectedPlayerId == ownPlayerId
+    // Verknüpfung weg (z. B. vom Admin gelöst oder Eintrag gelöscht): Profil gibt es nicht mehr
+    LaunchedEffect(ownPlayerId, currentScreen) {
+        if (currentScreen == MainNavScreen.PROFILE && ownPlayerId == null) currentScreen = MainNavScreen.HOME_DASHBOARD
+    }
+    val ownProfileOpen = currentScreen == MainNavScreen.PROFILE
     val showSeasonPicker = currentScreen == MainNavScreen.HOME_DASHBOARD ||
         currentScreen == MainNavScreen.STANDINGS ||
         (currentScreen == MainNavScreen.SEASON && selectedGameId == null)
@@ -156,11 +161,7 @@ internal fun MainAppContent(
     // Spieler dürfen nichts anlegen; die Buttons sind ohnehin ausgeblendet, dies ist die zweite Absicherung
     val openModal: (CreationModalType) -> Unit = { if (canEdit) creationModal = it }
 
-    val staticHeaderTitle = if (ownProfileOpen) {
-        "Profil"
-    } else {
-        headerTitle(currentScreen, selectedGameId)
-    }
+    val staticHeaderTitle = headerTitle(currentScreen, selectedGameId)
 
     HandballTheme(darkTheme = darkTheme) {
         Surface(
@@ -174,7 +175,7 @@ internal fun MainAppContent(
                 // Auf Desktop/Tablet: Falls kein Spieler gewählt ist, ersten vorwählen für Master-Detail
                 LaunchedEffect(isWideScreen, snapshot.players) {
                     if (isWideScreen && selectedPlayerId == null && snapshot.players.isNotEmpty()) {
-                        selectedPlayerId = ownPlayerId ?: snapshot.players.firstOrNull()?.playerId
+                        selectedPlayerId = snapshot.players.firstOrNull()?.playerId
                     }
                 }
 
@@ -217,6 +218,7 @@ internal fun MainAppContent(
                                     selectedSeasonId = selectedSeasonId,
                                     selectedPlayerId = selectedPlayerId,
                                     selectedGameId = selectedGameId,
+                                    ownPlayerId = ownPlayerId,
                                     onSelectPlayer = { playerId ->
                                         selectedPlayerId = playerId
                                         currentScreen = MainNavScreen.ROSTER
@@ -261,6 +263,7 @@ internal fun MainAppContent(
                                 selectedSeasonId = selectedSeasonId,
                                 selectedPlayerId = selectedPlayerId,
                                 selectedGameId = selectedGameId,
+                                ownPlayerId = ownPlayerId,
                                 onSelectPlayer = { playerId ->
                                     selectedPlayerId = playerId
                                     currentScreen = MainNavScreen.ROSTER
@@ -365,6 +368,7 @@ private fun headerTitle(currentScreen: MainNavScreen, selectedGameId: Int?): Str
     MainNavScreen.ROSTER -> "Kader"
     MainNavScreen.SEASON -> if (selectedGameId != null) "Spiel" else "Saison"
     MainNavScreen.STANDINGS -> "Tabelle"
+    MainNavScreen.PROFILE -> "Profil"
 }
 
 @Composable
@@ -500,7 +504,7 @@ private fun SideNavigationRail(
             NavbarIconItem("Übersicht", Icons.Default.Home, currentScreen == MainNavScreen.HOME_DASHBOARD) {
                 onSelectScreen(MainNavScreen.HOME_DASHBOARD)
             }
-            NavbarIconItem("Kader", Icons.Default.Groups, currentScreen == MainNavScreen.ROSTER && !ownProfileOpen) {
+            NavbarIconItem("Kader", Icons.Default.Groups, currentScreen == MainNavScreen.ROSTER) {
                 onSelectScreen(MainNavScreen.ROSTER)
             }
             NavbarIconItem("Saison", Icons.Default.SportsHandball, currentScreen == MainNavScreen.SEASON) {
@@ -578,7 +582,7 @@ private fun BottomMobileNavbar(
             label = { Text("Übersicht") }
         )
         NavigationBarItem(
-            selected = currentScreen == MainNavScreen.ROSTER,
+            selected = currentScreen == MainNavScreen.ROSTER || currentScreen == MainNavScreen.PROFILE,
             colors = navigationItemColors(),
             onClick = { if (onOpenOwnProfile != null) onOpenOwnProfile() else onSelectScreen(MainNavScreen.ROSTER) },
             icon = {
@@ -641,6 +645,7 @@ private fun MainContentRouter(
     selectedSeasonId: Int,
     selectedPlayerId: Int?,
     selectedGameId: Int?,
+    ownPlayerId: Int?,
     onSelectPlayer: (Int?) -> Unit,
     onSelectGame: (Int?) -> Unit,
     onNavigateToStandings: () -> Unit,
@@ -690,6 +695,17 @@ private fun MainContentRouter(
                 snapshot = snapshot,
                 isWideScreen = isWideScreen,
                 selectedSeasonId = selectedSeasonId
+            )
+        }
+
+        MainNavScreen.PROFILE -> {
+            OwnProfileScreen(
+                repository = repository,
+                snapshot = snapshot,
+                playerId = ownPlayerId,
+                isWideScreen = isWideScreen,
+                onSelectPlayer = { onSelectPlayer(it) },
+                onNavigateToGame = { onSelectGame(it) }
             )
         }
     }

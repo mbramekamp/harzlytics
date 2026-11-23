@@ -148,6 +148,44 @@ fun RosterScreen(
     }
 }
 
+/** Eigenes Profil: nur der verknüpfte Kadereintrag, ohne Kaderliste und ohne Zurück-Pfeil. */
+@Composable
+fun OwnProfileScreen(
+    repository: HandballRepository,
+    snapshot: DatabaseSnapshot,
+    playerId: Int?,
+    isWideScreen: Boolean,
+    onSelectPlayer: (Int) -> Unit,
+    onNavigateToGame: (Int) -> Unit
+) {
+    val player = snapshot.players.find { it.playerId == playerId } ?: return
+    var activeProfileTab by remember { mutableStateOf(PlayerProfileTab.OVERVIEW) }
+    val panel: @Composable () -> Unit = {
+        PlayerProfileDetailPanel(
+            repository = repository,
+            snapshot = snapshot,
+            player = player,
+            activeTab = activeProfileTab,
+            onSelectTab = { activeProfileTab = it },
+            isWideScreen = isWideScreen,
+            showBackButton = false,
+            onBack = {},
+            onSelectPlayer = onSelectPlayer,
+            onNavigateToGame = onNavigateToGame,
+            onDeleted = {}
+        )
+    }
+    if (isWideScreen) {
+        Card(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) { panel() }
+    } else {
+        panel()
+    }
+}
+
 @Composable
 private fun RosterListPanel(
     snapshot: DatabaseSnapshot,
