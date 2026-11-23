@@ -213,62 +213,32 @@ internal fun FieldPlayerStatTrackerCard(
                         label = "Tore",
                         value = stats.goalsScored,
                         isEditMode = canEditStats,
-                        onIncrement = {
-                            onUpdateStats {
-                                it.copy(
-                                    goalsScored = it.goalsScored + 1,
-                                    goalesAttempted = it.goalesAttempted + 1
-                                )
-                            }
-                        },
-                        onDecrement = {
-                            onUpdateStats {
-                                it.copy(
-                                    goalsScored = (it.goalsScored - 1).coerceAtLeast(0),
-                                    goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(0)
-                                )
-                            }
-                        }
+                        onIncrement = { onUpdateStats { FieldAction.GOAL.apply(it) } },
+                        onDecrement = { onUpdateStats { FieldAction.GOAL.revert(it) } }
                     )
                     StatStepperBox(
                         modifier = Modifier.weight(1f),
                         label = "Würfe",
                         value = stats.goalesAttempted,
                         isEditMode = canEditStats,
-                        onIncrement = { onUpdateStats { it.copy(goalesAttempted = it.goalesAttempted + 1) } },
-                        onDecrement = { onUpdateStats { it.copy(goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(it.goalsScored)) } }
+                        onIncrement = { onUpdateStats { FieldAction.MISS.apply(it) } },
+                        onDecrement = { onUpdateStats { FieldAction.MISS.revert(it) } }
                     )
                     StatStepperBox(
                         modifier = Modifier.weight(1f),
                         label = "7m-Tore",
                         value = stats.penaltiesScored,
                         isEditMode = canEditStats,
-                        onIncrement = {
-                            onUpdateStats {
-                                it.copy(
-                                    penaltiesScored = it.penaltiesScored + 1,
-                                    penaltiesAttempted = it.penaltiesAttempted + 1,
-                                    goalsScored = it.goalsScored + 1,
-                                    goalesAttempted = it.goalesAttempted + 1
-                                )
-                            }
-                        },
-                        onDecrement = {
-                            onUpdateStats {
-                                it.copy(
-                                    penaltiesScored = (it.penaltiesScored - 1).coerceAtLeast(0),
-                                    penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(0)
-                                )
-                            }
-                        }
+                        onIncrement = { onUpdateStats { FieldAction.PENALTY_GOAL.apply(it) } },
+                        onDecrement = { onUpdateStats { FieldAction.PENALTY_GOAL.revert(it) } }
                     )
                     StatStepperBox(
                         modifier = Modifier.weight(1f),
                         label = "7m-Vers.",
                         value = stats.penaltiesAttempted,
                         isEditMode = canEditStats,
-                        onIncrement = { onUpdateStats { it.copy(penaltiesAttempted = it.penaltiesAttempted + 1) } },
-                        onDecrement = { onUpdateStats { it.copy(penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(it.penaltiesScored)) } }
+                        onIncrement = { onUpdateStats { FieldAction.PENALTY_MISS.apply(it) } },
+                        onDecrement = { onUpdateStats { FieldAction.PENALTY_MISS.revert(it) } }
                     )
                     StatStepperBox(
                         modifier = Modifier.weight(1f),
@@ -330,30 +300,16 @@ internal fun FieldPlayerStatTrackerCard(
                             label = "Tore",
                             value = stats.goalsScored,
                             isEditMode = canEditStats,
-                            onIncrement = {
-                                onUpdateStats {
-                                    it.copy(
-                                        goalsScored = it.goalsScored + 1,
-                                        goalesAttempted = it.goalesAttempted + 1
-                                    )
-                                }
-                            },
-                            onDecrement = {
-                                onUpdateStats {
-                                    it.copy(
-                                        goalsScored = (it.goalsScored - 1).coerceAtLeast(0),
-                                        goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(0)
-                                    )
-                                }
-                            }
+                            onIncrement = { onUpdateStats { FieldAction.GOAL.apply(it) } },
+                            onDecrement = { onUpdateStats { FieldAction.GOAL.revert(it) } }
                         )
                         StatStepperBox(
                             modifier = Modifier.weight(1f),
                             label = "Würfe",
                             value = stats.goalesAttempted,
                             isEditMode = canEditStats,
-                            onIncrement = { onUpdateStats { it.copy(goalesAttempted = it.goalesAttempted + 1) } },
-                            onDecrement = { onUpdateStats { it.copy(goalesAttempted = (it.goalesAttempted - 1).coerceAtLeast(it.goalsScored)) } }
+                            onIncrement = { onUpdateStats { FieldAction.MISS.apply(it) } },
+                            onDecrement = { onUpdateStats { FieldAction.MISS.revert(it) } }
                         )
                     }
 
@@ -367,32 +323,16 @@ internal fun FieldPlayerStatTrackerCard(
                             label = "7m-Tore",
                             value = stats.penaltiesScored,
                             isEditMode = canEditStats,
-                            onIncrement = {
-                                onUpdateStats {
-                                    it.copy(
-                                        penaltiesScored = it.penaltiesScored + 1,
-                                        penaltiesAttempted = it.penaltiesAttempted + 1,
-                                        goalsScored = it.goalsScored + 1,
-                                        goalesAttempted = it.goalesAttempted + 1
-                                    )
-                                }
-                            },
-                            onDecrement = {
-                                onUpdateStats {
-                                    it.copy(
-                                        penaltiesScored = (it.penaltiesScored - 1).coerceAtLeast(0),
-                                        penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(0)
-                                    )
-                                }
-                            }
+                            onIncrement = { onUpdateStats { FieldAction.PENALTY_GOAL.apply(it) } },
+                            onDecrement = { onUpdateStats { FieldAction.PENALTY_GOAL.revert(it) } }
                         )
                         StatStepperBox(
                             modifier = Modifier.weight(1f),
                             label = "7m-Vers.",
                             value = stats.penaltiesAttempted,
                             isEditMode = canEditStats,
-                            onIncrement = { onUpdateStats { it.copy(penaltiesAttempted = it.penaltiesAttempted + 1) } },
-                            onDecrement = { onUpdateStats { it.copy(penaltiesAttempted = (it.penaltiesAttempted - 1).coerceAtLeast(it.penaltiesScored)) } }
+                            onIncrement = { onUpdateStats { FieldAction.PENALTY_MISS.apply(it) } },
+                            onDecrement = { onUpdateStats { FieldAction.PENALTY_MISS.revert(it) } }
                         )
                         StatStepperBox(
                             modifier = Modifier.weight(1f),

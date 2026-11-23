@@ -26,6 +26,19 @@ class TrackerActionsTest {
     }
 
     @Test
+    fun revertUndoesApplyAndNeverGoesNegative() {
+        val start = FieldPlayerGameStats(1, 1, goalsScored = 3, goalesAttempted = 7, penaltiesScored = 1, penaltiesAttempted = 2)
+        FieldAction.entries.forEach { action ->
+            assertEquals(start, action.revert(action.apply(start)), "${action.name}: Minus hebt Plus auf")
+        }
+        val empty = FieldPlayerGameStats(1, 1)
+        FieldAction.entries.forEach { assertEquals(empty, it.revert(empty), "${it.name}: nichts zum Zurücknehmen") }
+        // 7m vorbei zählt als Wurf: Plus und Minus bewegen Würfe mit
+        val miss = FieldAction.PENALTY_MISS.apply(start)
+        assertEquals(start.goalesAttempted + 1, miss.goalesAttempted)
+    }
+
+    @Test
     fun keeperActionsIncludePenaltiesInSavesAndGoals() {
         var s = GoalKeeperGameStats(1, 1)
         KeeperAction.entries.forEach { s = it.apply(s) }

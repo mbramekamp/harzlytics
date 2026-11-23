@@ -31,6 +31,31 @@ enum class FieldAction(val countsAsGoal: Boolean = false) {
         PENALTY_DRAWN -> s.copy(penaltiesDrawn = s.penaltiesDrawn + 1)
     }
 
+    /**
+     * Gegenstück zu [apply] für die Minus-Knöpfe der großen Karten (Tablet/Desktop): nimmt eine Aktion zurück,
+     * wenn sie gezählt ist ([count] > 0), und hält dabei Tore ≤ Würfe und 7m-Tore ≤ 7m-Versuche ein.
+     */
+    fun revert(s: FieldPlayerGameStats): FieldPlayerGameStats {
+        if (count(s) <= 0) return s
+        return when (this) {
+            GOAL -> s.copy(goalsScored = s.goalsScored - 1, goalesAttempted = s.goalesAttempted - 1)
+            MISS -> s.copy(goalesAttempted = s.goalesAttempted - 1)
+            PENALTY_GOAL -> s.copy(
+                penaltiesScored = s.penaltiesScored - 1, penaltiesAttempted = s.penaltiesAttempted - 1,
+                goalsScored = (s.goalsScored - 1).coerceAtLeast(0), goalesAttempted = (s.goalesAttempted - 1).coerceAtLeast(0)
+            )
+            PENALTY_MISS -> s.copy(
+                penaltiesAttempted = s.penaltiesAttempted - 1,
+                goalesAttempted = (s.goalesAttempted - 1).coerceAtLeast(s.goalsScored)
+            )
+            ASSIST -> s.copy(assists = s.assists - 1)
+            TECHNICAL_FAULT -> s.copy(technicalMistakes = s.technicalMistakes - 1)
+            STEAL -> s.copy(steals = s.steals - 1)
+            BLOCK -> s.copy(blocks = s.blocks - 1)
+            PENALTY_DRAWN -> s.copy(penaltiesDrawn = s.penaltiesDrawn - 1)
+        }
+    }
+
     /** Bisheriger Zählerstand dieser Aktion (z. B. Fehlwürfe = Würfe − Tore). */
     fun count(s: FieldPlayerGameStats): Int = when (this) {
         GOAL -> s.goalsScored
