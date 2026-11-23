@@ -1,4 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.security.MessageDigest
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -29,6 +31,18 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
         }
+    }
+
+    // Web-Version als installierbare PWA: ./gradlew :composeApp:wasmJsBrowserDistribution
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        outputModuleName.set("composeApp")
+        browser {
+            commonWebpackConfig {
+                outputFileName = "composeApp.js"
+            }
+        }
+        binaries.executable()
     }
 
     sourceSets {
@@ -130,3 +144,31 @@ compose.resources {
     packageOfResClass = "com.handball.stattracker.resources"
     publicResClass = false
 }
+
+// PWA: erzeugt nach dem Web-Build sw.js mit der Liste aller App-Dateien und einer Versionskennung aus deren Inhalt,
+// damit die App offline startet und Updates vollständig auf einmal kommen.
+val pwaDistDir = layout.buildDirectory.dir("dist/wasmJs/productionExecutable")
+val pwaTemplate = file("src/wasmJsMain/pwa/sw.template.js")
+val pwaServiceWorker = tasks.register("pwaServiceWorker") {
+    group = "build"
+    description = "Erzeugt den Service Worker (sw.js) der Web-Version"
+    inputs.file(pwaTemplate)
+    doLast {
+        val dir = pwaDistDir.get().asFile
+        val files = dir.walkTopDown()
+            .filter { it.isFile && it.name != "sw.js" && !it.name.endsWith(".map") && !it.name.endsWith(".LICENSE.txt") }
+            .map { it.relativeTo(dir).invariantSeparatorsPath }
+            .sorted()
+            .toList()
+        val digest = MessageDigest.getInstance("SHA-256")
+        files.forEach { path ->
+            digest.update(path.toByteArray())
+            digest.update(dir.resolve(path).readBytes())
+        }
+        val version = digest.digest().joinToString("") { "%02x".format(it) }.take(12)
+        val assets = files.joinToString(",\n  ") { "\"./$it\"" }
+        dir.resolve("sw.js").writeText(pwaTemplate.readText().replace("__VERSION__", version).replace("__ASSETS__", assets))
+    }
+}
+tasks.matching { it.name == "wasmJsBrowserDistribution" }.configureEach { finalizedBy(pwaServiceWorker) }
+

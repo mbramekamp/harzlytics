@@ -2,7 +2,7 @@
 
 # Harzlytics – Handball Stat Tracker
 
-Statistik-App für Handball-Mannschaften, gebaut mit **Kotlin Multiplatform** und **Compose Multiplatform**. Sie läuft auf **Android** und **Desktop (JVM)** (iOS ist vorbereitet, aber noch nicht gebaut). Die Daten liegen zuerst lokal (**Offline-First**) und werden über **Supabase** synchronisiert, damit mehrere Geräte denselben Stand haben. Gedacht für den Einsatz am Spielfeldrand: Spiel mitzählen, Aufstellung wechseln, danach auswerten.
+Statistik-App für Handball-Mannschaften, gebaut mit **Kotlin Multiplatform** und **Compose Multiplatform**. Sie läuft auf **Android**, **Desktop (JVM)** und als **Web-App im Browser**, die man aufs Handy legen kann (PWA, auch iPhone). iOS nativ ist vorbereitet, aber noch nicht gebaut. Die Daten liegen zuerst lokal (**Offline-First**) und werden über **Supabase** synchronisiert, damit mehrere Geräte denselben Stand haben. Gedacht für den Einsatz am Spielfeldrand: Spiel mitzählen, Aufstellung wechseln, danach auswerten.
 
 ## Funktionen
 
@@ -78,6 +78,18 @@ Voraussetzungen: JDK 21 oder neuer; für Android zusätzlich das Android SDK (z.
 ```
 Unter Windows `.\gradlew.bat` statt `./gradlew`. Die APK installierst du mit `adb install -r <datei>.apk` oder durch Kopieren aufs Gerät.
 
+### Web-Version (PWA)
+
+```bash
+./gradlew :composeApp:wasmJsBrowserDistribution   # Ergebnis: composeApp/build/dist/wasmJs/productionExecutable
+```
+Die Web-Version wird bei jedem Push auf `main` automatisch gebaut und auf **GitHub Pages** veröffentlicht ([`.github/workflows/web.yml`](.github/workflows/web.yml)). Einmalig einrichten:
+1. Repository → *Settings → Pages → Source*: **GitHub Actions**.
+2. *Settings → Secrets and variables → Actions*: `SUPABASE_URL` und `SUPABASE_PUBLIC_KEY` als Secrets anlegen (öffentlicher Schlüssel).
+3. In Supabase unter *Authentication → URL Configuration* die Seitenadresse als *Site URL* eintragen, damit Links aus Bestätigungs-Mails dort landen.
+
+Auf dem Handy die Seite öffnen und *Zum Startbildschirm hinzufügen* wählen (Android: Chrome-Menü, iPhone: Safari → Teilen). Die App startet dann im Vollbild und auch ohne Netz. Sie braucht einen aktuellen Browser (Chrome ab ca. 119, Safari ab iOS 18.2), weil sie Kotlin/Wasm nutzt. Die Daten liegen im Browser-Speicher und werden wie in der App mit Supabase abgeglichen.
+
 ## Tests
 
 ```bash
@@ -97,7 +109,7 @@ Vollständige Prüfung vor einem Commit: `:shared:compileKotlinDesktop :composeA
 ## Stand und Grenzen
 
 - Desktop-Logik und Bildschirme sind getestet. Der **Android-Build und alles Android-Spezifische** (Schlüsselspeicher, Datenumzug) wurden noch nicht auf einem Gerät geprüft; **iOS** ist nicht gebaut (kein Xcode-Projekt, Token noch unverschlüsselt).
-- Offen: Einladungscodes in der App erzeugen, Zusammenführen bei gleichzeitiger Offline-Bearbeitung auf zwei Geräten, weiche Übergänge in der Navigation, automatische Prüfung bei jedem Push (CI).
+- Offen: Einladungscodes in der App erzeugen, Zusammenführen bei gleichzeitiger Offline-Bearbeitung auf zwei Geräten, weiche Übergänge in der Navigation, Passwort-Reset-Link in der Web-Version direkt verarbeiten.
 
 ## Weitere Dokumente
 

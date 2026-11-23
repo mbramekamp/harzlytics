@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Harzlytics</title>
+  <meta name="theme-color" content="#F3F4F6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1114" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Harzlytics">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; background: #F3F4F6; }
+    @media (prefers-color-scheme: dark) { html, body { background: #0F1114; } }
+    /* Logo, bis die App gezeichnet ist; Compose legt seine Zeichenfläche darüber */
+    #splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+              font: 500 16px system-ui, sans-serif; color: #5b636d; text-align: center; padding: 24px; box-sizing: border-box; }
+    #splash img { width: 96px; height: 96px; }
+    #splash p { max-width: 320px; margin: 0; }
+  </style>
+</head>
+<body>
+  <div id="splash"><img src="./icons/icon-192.png" alt="Harzlytics"><p id="splash-text" hidden></p></div>
+  <script>
+    // Ältere Browser können Kotlin/Wasm (WebAssembly mit Garbage Collection) nicht ausführen
+    function showUnsupported() {
+      var t = document.getElementById('splash-text');
+      t.textContent = 'Dieser Browser ist zu alt für Harzlytics. Bitte Chrome oder Safari aktualisieren.';
+      t.hidden = false;
+    }
+    window.addEventListener('unhandledrejection', function (e) {
+      if (e.reason instanceof WebAssembly.CompileError || e.reason instanceof WebAssembly.LinkError) showUnsupported();
+    });
+    if (!('WebAssembly' in window)) showUnsupported();
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () { navigator.serviceWorker.register('./sw.js').catch(function () {}); });
+    }
+  </script>
+  <script src="./composeApp.js"></script>
+</body>
+</html>

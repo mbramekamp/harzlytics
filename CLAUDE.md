@@ -1,7 +1,7 @@
 # Harzlytics – Handball Stat Tracker (KMP)
 
 Kotlin Multiplatform + Compose Multiplatform app for tracking handball game, lineup and player statistics.
-Targets: Android, Desktop (JVM), iOS. Offline-first storage with sync to Supabase (the only backend; the Ktor `:server` and the web/JS target were removed). Primary use: an Android phone or desktop at the sideline during a game.
+Targets: Android, Desktop (JVM), iOS, Web (Kotlin/Wasm as an installable PWA on GitHub Pages; the old JS target was replaced by it). Offline-first storage with sync to Supabase (the only backend; the Ktor `:server` was removed). Primary use: a phone (Android app or the PWA) or desktop at the sideline during a game.
 
 Full history, decisions, roadmap and the **hand-over state** (what is done, what is open, how to resume): `AGENT_BRIEFING.md` §5 and §6. RBAC/auth design: `USER_FEATURE.md`. **Start a new session by reading §6 of the briefing.**
 
@@ -18,8 +18,9 @@ Full history, decisions, roadmap and the **hand-over state** (what is done, what
 - Full check: `.\gradlew.bat :shared:compileKotlinDesktop :composeApp:compileKotlinDesktop :shared:desktopTest :composeApp:desktopTest`
 - Desktop app: `.\gradlew.bat :composeApp:run`; Android APK: `.\gradlew.bat :composeApp:assembleDebug` (needs `.env` with the Supabase keys at build time)
 - `:composeApp:desktopTest` renders the main screens headless (desktop/mobile, light/dark, player profile, account/club/user dialogs) to `composeApp/build/screenshots/` (`ScreenshotTest`). **Look at the PNGs after every UI change.** Pass `width`/`height` in dp (the helper multiplies by density).
+- Web/PWA: `.\gradlew.bat :composeApp:wasmJsBrowserDistribution` → `composeApp/build/dist/wasmJs/productionExecutable` (index.html, manifest, icons in `composeApp/src/wasmJsMain/resources`; `sw.js` is generated from `src/wasmJsMain/pwa/sw.template.js` by `pwaServiceWorker`). Browser storage: `shared/src/wasmJsMain/.../PlatformStorage.wasmJs.kt` (localStorage). Deployed by `.github/workflows/web.yml` on push to `main` (secrets `SUPABASE_URL`, `SUPABASE_PUBLIC_KEY`). Check UI in a real browser with Playwright (serve the dist under `/harzlytics/`).
 - `.\gradlew.bat :composeApp:updateDocScreenshots` re-renders and copies the README images to `docs/screenshots/` (commit them after UI changes).
-- Cloud sessions (Linux): Gradle works, but there is **no Android SDK** (installing it needs license acceptance, which the sandbox blocks), so Android code (`androidMain`, `MainActivity`) is not compiled there. A Kotlin incremental-compile bug sometimes appears after changes in `:shared` ("FqNames can't be derived"): `rm -rf composeApp/build/kotlin composeApp/build/classes` and rebuild. Maven Central may answer 429; just retry.
+- Cloud sessions (Linux): Gradle works, but there is **no Android SDK** (installing it needs license acceptance, which the sandbox blocks), so Android code (`androidMain`, `MainActivity`) is not compiled there. A Kotlin incremental-compile bug sometimes appears after changes in `:shared` ("FqNames can't be derived"): `rm -rf composeApp/build/kotlin composeApp/build/classes` and rebuild. Maven Central may answer 429; just retry (`--max-workers=1` helps). The wasm tooling setup downloads `karma` from codeload.github.com, which the session's GitHub proxy blocks; workaround in the sandbox only: in `~/.kotlin/kotlin-npm-tooling/yarn/<hash>/` install with `"karma": "6.4.4"` from npm, then rename the yarn.lock entry to `"karma@github:Kotlin/karma#6.4.5"` and restore package.json. CI is not affected.
 
 ## Conventions
 - All UI text is **German**. UI content: as little as possible, as much as necessary. One element = one purpose; nothing duplicated (titles, cards, chips, buttons); no technical terms, URLs or keys visible to users; no explanatory help text, no DB table names.
