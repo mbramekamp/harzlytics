@@ -114,6 +114,47 @@ class HandballRepositoryTest {
     }
 
     @Test
+    fun testSubstitutionOptionsForTappedPlayer() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        // Spiel 1: 6 Feld + TW (playerId 1) auf dem Feld; auf der Bank u. a. TW 2 sowie Feldspieler 9 und 13
+
+        // Feldspieler auf dem Feld: Feldspieler von der Bank dürfen kommen, der zweite TW nicht (nie 2 TW)
+        val forFieldPlayer = repo.substitutionOptions(gameId = 1, playerId = 3)!!
+        assertTrue(forFieldPlayer.isOnCourt)
+        assertTrue(forFieldPlayer.partnerIds.containsAll(listOf(9, 13)))
+        assertFalse(2 in forFieldPlayer.partnerIds, "Zweiter Torwart darf nicht für einen Feldspieler kommen")
+        assertTrue(forFieldPlayer.canActAlone, "Vom Feld darf man immer allein auf die Bank")
+
+        // Torwart auf dem Feld: zuerst der andere TW, dann Feldspieler (7 Feldspieler ohne TW ist erlaubt)
+        val forKeeper = repo.substitutionOptions(gameId = 1, playerId = 1)!!
+        assertEquals(2, forKeeper.partnerIds.first(), "Gleiche Rolle steht oben")
+        assertTrue(forKeeper.partnerIds.containsAll(listOf(9, 13)))
+
+        // Torwart auf der Bank: nur gegen den aktiven TW, nicht allein aufs Feld (7 sind aktiv)
+        val forBenchKeeper = repo.substitutionOptions(gameId = 1, playerId = 2)!!
+        assertFalse(forBenchKeeper.isOnCourt)
+        assertEquals(listOf(1), forBenchKeeper.partnerIds)
+        assertFalse(forBenchKeeper.canActAlone)
+
+        // Feldspieler auf der Bank: darf jeden der 7 ersetzen; allein aufs Feld erst, wenn einer fehlt
+        val forBenchField = repo.substitutionOptions(gameId = 1, playerId = 13)!!
+        assertEquals(7, forBenchField.partnerIds.size)
+        assertFalse(forBenchField.canActAlone)
+        repo.movePlayerToBench(gameId = 1, playerOutId = 3)
+        assertTrue(repo.substitutionOptions(gameId = 1, playerId = 13)!!.canActAlone)
+
+        // Zeitstrafe: gesperrter Bank-Spieler hat keine Wechsel-Möglichkeit
+        repo.setGameClockSeconds(gameId = 1, targetSeconds = 1200)
+        val pg5 = repo.snapshot.value.playerGames.first { it.gameId == 1 && it.playerId == 5 }
+        repo.updatePlayerDisciplinary(pg5.playerGameId, pg5.twoMinuteSuspensions + 1, pg5.yellowCard, pg5.redCard, pg5.blueCard)
+        assertFalse(repo.substitutionOptions(gameId = 1, playerId = 5)!!.hasAnyOption)
+
+        // Spieler, der nicht im Spiel ist
+        assertEquals(null, repo.substitutionOptions(gameId = 1, playerId = 9999))
+    }
+
+    @Test
     fun testActiveOnCourtBenchLockSubstitutionsAndPlusMinus() {
         val repo = HandballRepository(persistLocally = false)
         repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())

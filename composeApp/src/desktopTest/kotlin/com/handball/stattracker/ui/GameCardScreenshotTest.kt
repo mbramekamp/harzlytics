@@ -20,6 +20,9 @@ import com.handball.stattracker.model.PlayerGame
 import com.handball.stattracker.model.PlayerRole
 import com.handball.stattracker.ui.screens.FieldPlayerStatTrackerCard
 import com.handball.stattracker.ui.screens.GoalKeeperStatTrackerCard
+import com.handball.stattracker.ui.screens.SubstitutionPickerDialog
+import com.handball.stattracker.repository.DemoDataSeed
+import com.handball.stattracker.repository.HandballRepository
 import com.handball.stattracker.ui.theme.HandballTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -74,13 +77,9 @@ class GameCardScreenshotTest {
             gameElapsedSeconds = 1500,
             isWideScreen = false,
             isEditMode = true,
-            pendingSubInPlayer = null,
-            canSwapWithPending = false,
-            isSelectedForSubIn = false,
-            canEnterDirectly = false,
+            canSubstitute = true,
             onOpenProfile = {},
             onSubstitutionClick = {},
-            onEnterCourtDirectly = {},
             onAdjustPlusMinus = {},
             onUpdateStats = {},
             onUpdateDisciplinary = { _, _, _, _ -> }
@@ -97,16 +96,44 @@ class GameCardScreenshotTest {
             gameElapsedSeconds = 1500,
             isWideScreen = false,
             isEditMode = true,
-            pendingSubInPlayer = null,
-            canSwapWithPending = false,
-            isSelectedForSubIn = false,
-            canEnterDirectly = false,
+            canSubstitute = true,
             onOpenProfile = {},
             onSubstitutionClick = {},
-            onEnterCourtDirectly = {},
             onAdjustPlusMinus = {},
             onUpdateStats = {},
             onUpdateDisciplinary = { _, _, _, _ -> }
         )
+    }
+
+    /** Wechsel-Auswahl nach Tipp auf einen Feldspieler (Demo-Spiel 1, #15) und auf einen Bank-Spieler. */
+    @Test
+    fun substitutionPicker() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        val snapshot = repo.snapshot.value
+        listOf(3 to "wechsel-feldspieler", 13 to "wechsel-bankspieler").forEach { (playerId, name) ->
+            val scene = ImageComposeScene((width * density).toInt(), (720 * density).toInt(), Density(density)) {
+                HandballTheme(darkTheme = false) {
+                    SubstitutionPickerDialog(
+                        tappedPlayer = snapshot.players.first { it.playerId == playerId },
+                        options = repo.substitutionOptions(1, playerId)!!,
+                        snapshot = snapshot,
+                        gameId = 1,
+                        onCourtCount = 7,
+                        onPickPartner = {},
+                        onActAlone = {},
+                        onDismiss = {}
+                    )
+                }
+            }
+            try {
+                var image = scene.render(0)
+                for (i in 1..4) image = scene.render(i * 100_000_000L)
+                val f = File(outDir, "$name.png").also { it.writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes) }
+                assertTrue(f.length() > 5_000, "$name ist (fast) leer")
+            } finally {
+                scene.close()
+            }
+        }
     }
 }

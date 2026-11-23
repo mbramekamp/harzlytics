@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -46,13 +45,9 @@ internal fun FieldPlayerStatTrackerCard(
     gameElapsedSeconds: Int,
     isWideScreen: Boolean = true,
     isEditMode: Boolean,
-    pendingSubInPlayer: Player?,
-    canSwapWithPending: Boolean,
-    isSelectedForSubIn: Boolean,
-    canEnterDirectly: Boolean,
+    canSubstitute: Boolean,
     onOpenProfile: () -> Unit,
     onSubstitutionClick: () -> Unit,
-    onEnterCourtDirectly: () -> Unit,
     onAdjustPlusMinus: (Int) -> Unit,
     onUpdateStats: ((FieldPlayerGameStats) -> FieldPlayerGameStats) -> Unit,
     onUpdateDisciplinary: (Int, Boolean, Boolean, Boolean) -> Unit
@@ -71,11 +66,8 @@ internal fun FieldPlayerStatTrackerCard(
     }
 
     val remainingSusp = playerGame.remainingSuspensionSeconds(gameElapsedSeconds)
-    val isBlockedFromSubIn = playerGame.isDisqualified || remainingSusp > 0
 
     val borderStroke = when {
-        isSelectedForSubIn -> BorderStroke(2.5.dp, MaterialTheme.colorScheme.tertiary)
-        isEditMode && isOnCourt && pendingSubInPlayer != null && canSwapWithPending -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         isOnCourt -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
         else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     }
@@ -85,21 +77,15 @@ internal fun FieldPlayerStatTrackerCard(
         border = borderStroke,
         colors = CardDefaults.cardColors(
             containerColor = when {
-                isSelectedForSubIn -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
                 isOnCourt -> MaterialTheme.colorScheme.surface
                 else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
             }
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (isOnCourt || isSelectedForSubIn) 1f else 0.76f)
-            .let { mod ->
-                if (isEditMode && !isOnCourt && !isBlockedFromSubIn) {
-                    mod.clickable { onSubstitutionClick() }
-                } else if (isEditMode && isOnCourt && pendingSubInPlayer != null && canSwapWithPending) {
-                    mod.clickable { onSubstitutionClick() }
-                } else mod
-            }
+            .alpha(if (isOnCourt) 1f else 0.76f)
+            // Bank-Spieler: ganze Karte antippen = Wechsel (ihre Werte sind ohnehin gesperrt)
+            .let { mod -> if (isEditMode && !isOnCourt && canSubstitute) mod.clickable(onClick = onSubstitutionClick) else mod }
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -115,7 +101,14 @@ internal fun FieldPlayerStatTrackerCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .clickable(onClick = onOpenProfile)
+                        // Kopfzeile antippen: im Bearbeitungsmodus Wechsel, sonst Profil
+                        .let { mod ->
+                            when {
+                                !isEditMode -> mod.clickable(onClick = onOpenProfile)
+                                canSubstitute -> mod.clickable(onClick = onSubstitutionClick)
+                                else -> mod
+                            }
+                        }
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -189,56 +182,6 @@ internal fun FieldPlayerStatTrackerCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (isOnCourt) {
-                            if (pendingSubInPlayer != null) {
-                                if (canSwapWithPending) {
-                                    val subBtnText = if (pendingSubInPlayer.role == PlayerRole.GOALKEEPER) {
-                                        "Auswechseln → 6+1 (TW #${pendingSubInPlayer.jerseyNumberHomeKit ?: "-"})"
-                                    } else {
-                                        "Auswechseln für #${pendingSubInPlayer.jerseyNumberHomeKit ?: "-"}"
-                                    }
-                                    Button(
-                                        onClick = onSubstitutionClick,
-                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                                    ) {
-                                        Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(subBtnText)
-                                    }
-                                } else {
-                                    OutlinedButton(onClick = {}, enabled = false) {
-                                        Text("Gesperrt (Max. 1 TW)")
-                                    }
-                                }
-                            } else {
-                                OutlinedButton(onClick = onSubstitutionClick) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Auf Bank")
-                                }
-                            }
-                        } else if (!isBlockedFromSubIn) {
-                            if (isSelectedForSubIn) {
-                                Button(
-                                    onClick = onSubstitutionClick,
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                                ) {
-                                    Text("Links Spieler wählen...")
-                                }
-                            } else {
-                                FilledTonalButton(onClick = onSubstitutionClick) {
-                                    Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Einwechseln")
-                                }
-                            }
-                            if (canEnterDirectly) {
-                                OutlinedButton(onClick = onEnterCourtDirectly) {
-                                    Text("Direkt aufs Feld")
-                                }
-                            }
-                        }
-
                         FilterChip(
                             selected = playerGame.twoMinuteSuspensions > 0,
                             onClick = {
@@ -592,13 +535,9 @@ internal fun GoalKeeperStatTrackerCard(
     gameElapsedSeconds: Int,
     isWideScreen: Boolean = true,
     isEditMode: Boolean,
-    pendingSubInPlayer: Player?,
-    canSwapWithPending: Boolean,
-    isSelectedForSubIn: Boolean,
-    canEnterDirectly: Boolean,
+    canSubstitute: Boolean,
     onOpenProfile: () -> Unit,
     onSubstitutionClick: () -> Unit,
-    onEnterCourtDirectly: () -> Unit,
     onAdjustPlusMinus: (Int) -> Unit,
     onUpdateStats: ((GoalKeeperGameStats) -> GoalKeeperGameStats) -> Unit,
     onUpdateDisciplinary: (Int, Boolean, Boolean, Boolean) -> Unit
@@ -606,12 +545,9 @@ internal fun GoalKeeperStatTrackerCard(
     val isOnCourt = playerGame.isOnCourt
     val canEditStats = isEditMode && isOnCourt
     val remainingSusp = playerGame.remainingSuspensionSeconds(gameElapsedSeconds)
-    val isBlockedFromSubIn = playerGame.isDisqualified || remainingSusp > 0
     var showMore by remember { mutableStateOf(false) }
 
     val borderStroke = when {
-        isSelectedForSubIn -> BorderStroke(2.5.dp, MaterialTheme.colorScheme.tertiary)
-        isEditMode && isOnCourt && pendingSubInPlayer != null && canSwapWithPending -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         isOnCourt -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f))
         else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     }
@@ -621,21 +557,15 @@ internal fun GoalKeeperStatTrackerCard(
         border = borderStroke,
         colors = CardDefaults.cardColors(
             containerColor = when {
-                isSelectedForSubIn -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
                 isOnCourt -> MaterialTheme.colorScheme.surface
                 else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
             }
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (isOnCourt || isSelectedForSubIn) 1f else 0.76f)
-            .let { mod ->
-                if (isEditMode && !isOnCourt && !isBlockedFromSubIn) {
-                    mod.clickable { onSubstitutionClick() }
-                } else if (isEditMode && isOnCourt && pendingSubInPlayer != null && canSwapWithPending) {
-                    mod.clickable { onSubstitutionClick() }
-                } else mod
-            }
+            .alpha(if (isOnCourt) 1f else 0.76f)
+            // Bank-Spieler: ganze Karte antippen = Wechsel (ihre Werte sind ohnehin gesperrt)
+            .let { mod -> if (isEditMode && !isOnCourt && canSubstitute) mod.clickable(onClick = onSubstitutionClick) else mod }
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -651,7 +581,14 @@ internal fun GoalKeeperStatTrackerCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .clickable(onClick = onOpenProfile)
+                        // Kopfzeile antippen: im Bearbeitungsmodus Wechsel, sonst Profil
+                        .let { mod ->
+                            when {
+                                !isEditMode -> mod.clickable(onClick = onOpenProfile)
+                                canSubstitute -> mod.clickable(onClick = onSubstitutionClick)
+                                else -> mod
+                            }
+                        }
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -722,56 +659,6 @@ internal fun GoalKeeperStatTrackerCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (isOnCourt) {
-                            if (pendingSubInPlayer != null) {
-                                if (canSwapWithPending) {
-                                    val subBtnText = if (pendingSubInPlayer.role == PlayerRole.FIELD_PLAYER) {
-                                        "TW raus → 7. Feldspieler (#${pendingSubInPlayer.jerseyNumberHomeKit ?: "-"})"
-                                    } else {
-                                        "Torwart-Wechsel für #${pendingSubInPlayer.jerseyNumberHomeKit ?: "-"}"
-                                    }
-                                    Button(
-                                        onClick = onSubstitutionClick,
-                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                                    ) {
-                                        Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(subBtnText)
-                                    }
-                                } else {
-                                    OutlinedButton(onClick = {}, enabled = false) {
-                                        Text("Gesperrt")
-                                    }
-                                }
-                            } else {
-                                OutlinedButton(onClick = onSubstitutionClick) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Auf Bank")
-                                }
-                            }
-                        } else if (!isBlockedFromSubIn) {
-                            if (isSelectedForSubIn) {
-                                Button(
-                                    onClick = onSubstitutionClick,
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                                ) {
-                                    Text("Links Spieler wählen...")
-                                }
-                            } else {
-                                FilledTonalButton(onClick = onSubstitutionClick) {
-                                    Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Einwechseln")
-                                }
-                            }
-                            if (canEnterDirectly) {
-                                OutlinedButton(onClick = onEnterCourtDirectly) {
-                                    Text("Direkt aufs Feld")
-                                }
-                            }
-                        }
-
                         FilterChip(
                             selected = playerGame.twoMinuteSuspensions > 0,
                             onClick = {

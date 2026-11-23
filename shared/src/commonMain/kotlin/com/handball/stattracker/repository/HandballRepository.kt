@@ -539,6 +539,50 @@ class HandballRepository(
     }
 
     /**
+     * Wechsel-Auswahl für einen angetippten Spieler ([playerId]) im Spiel [gameId]:
+     * - Spieler auf dem Feld: [SubstitutionOptions.partnerIds] = Bank-Spieler, die für ihn kommen dürfen;
+     *   [SubstitutionOptions.canActAlone] = er darf ohne Ersatz auf die Bank.
+     * - Spieler auf der Bank: [SubstitutionOptions.partnerIds] = Feld-Spieler, die er ersetzen darf;
+     *   [SubstitutionOptions.canActAlone] = er darf ohne Tausch aufs Feld (weniger als 7 aktiv).
+     * Partner sind sortiert: gleiche Rolle, dann gleiche Position, dann Trikotnummer.
+     * Gibt null zurück, wenn der Spieler nicht im Spiel ist oder Staff ist.
+     */
+    fun substitutionOptions(
+        gameId: Int,
+        playerId: Int,
+        state: DatabaseSnapshot = _snapshot.value
+    ): SubstitutionOptions? {
+        val pg = state.playerGames.find { it.gameId == gameId && it.playerId == playerId } ?: return null
+        val player = state.players.find { it.playerId == playerId } ?: return null
+        if (player.role == PlayerRole.COACH) return null
+
+        val candidates = state.playerGames
+            .filter { it.gameId == gameId && it.playerId != playerId && it.isOnCourt != pg.isOnCourt }
+            .mapNotNull { other -> state.players.find { it.playerId == other.playerId && it.role != PlayerRole.COACH } }
+        val partners = candidates
+            .filter { other ->
+                if (pg.isOnCourt) {
+                    canSubstituteOrEnterCourt(gameId, playerInId = other.playerId, playerOutId = playerId, state = state)
+                } else {
+                    canSubstituteOrEnterCourt(gameId, playerInId = playerId, playerOutId = other.playerId, state = state)
+                }
+            }
+            .sortedWith(
+                compareBy<Player> { it.role != player.role }
+                    .thenBy { player.positionId == null || it.positionId != player.positionId }
+                    .thenBy { it.jerseyNumberHomeKit ?: 99 }
+            )
+            .map { it.playerId }
+
+        val canActAlone = if (pg.isOnCourt) {
+            true
+        } else {
+            canSubstituteOrEnterCourt(gameId, playerInId = playerId, playerOutId = null, state = state)
+        }
+        return SubstitutionOptions(playerId = playerId, isOnCourt = pg.isOnCourt, partnerIds = partners, canActAlone = canActAlone)
+    }
+
+    /**
      * Führt einen Spielerwechsel durch:
      * - Wenn [playerOutId] angegeben ist: 1-zu-1 Wechsel ([playerInId] kommt von der Bank aufs Feld, [playerOutId] geht auf die Bank).
      * - Wenn [playerOutId] null ist: [playerInId] wird direkt von der Bank aufs Feld gestellt (sofern < 7 Feld-/Torwart-Spieler aktiv sind und max. 1 TW).

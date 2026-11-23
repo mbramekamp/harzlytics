@@ -68,8 +68,8 @@ internal fun GameInteractiveDashboard(
     // null = geschlossen, false = 6+1, true = 7+0
     var startingSevenDialogVariant by remember(game.gameId) { mutableStateOf<Boolean?>(null) }
 
-    // Für den 2-Klick-Wechsel-Workflow: ID des ausgewählten Bank-Spielers (rechts), der gegen einen Feld-Spieler (links) eingewechselt werden soll
-    var pendingSubInPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
+    // Angetippter Spieler, für den die Wechsel-Auswahl offen ist
+    var substitutionPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
 
     // Live-Spieluhr-Ticker (läuft im Sekundentakt, solange aktiv und < 60:00)
     LaunchedEffect(isClockRunning, game.gameId) {
@@ -87,7 +87,7 @@ internal fun GameInteractiveDashboard(
     LaunchedEffect(isEditMode) {
         if (!isEditMode) {
             isClockRunning = false
-            pendingSubInPlayerId = null
+            substitutionPlayerId = null
             if (activeTab == 3) activeTab = 0
         }
     }
@@ -130,14 +130,6 @@ internal fun GameInteractiveDashboard(
         allPlayerParticipants.filter { (pg, _) -> pg.hasActiveSuspension(game.elapsedSeconds) }
     }
 
-    // Bereinige pendingSubInPlayerId, falls der Spieler inzwischen auf dem Feld oder gesperrt ist
-    val pendingSubInPair = benchParticipants.find { it.second.playerId == pendingSubInPlayerId }
-    LaunchedEffect(pendingSubInPair) {
-        if (pendingSubInPlayerId != null && pendingSubInPair == null) {
-            pendingSubInPlayerId = null
-        }
-    }
-
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isSideBySideColumns = maxWidth >= 780.dp
 
@@ -167,7 +159,7 @@ internal fun GameInteractiveDashboard(
                 onToggleAutoSync = { autoSyncScore = it },
                 onOpenDirectScoreDialog = { showDirectScoreDialog = true },
                 onApplyStartingSeven = {
-                    pendingSubInPlayerId = null
+                    substitutionPlayerId = null
                     startingSevenDialogVariant = false
                 }
             )
@@ -250,24 +242,9 @@ internal fun GameInteractiveDashboard(
                             autoSyncScore = autoSyncScore,
                             onCourtParticipants = onCourtParticipants,
                             benchParticipants = benchParticipants,
-                            pendingSubInPair = pendingSubInPair,
-                            onSelectBenchForSub = { playerId ->
-                                pendingSubInPlayerId = if (pendingSubInPlayerId == playerId) null else playerId
-                            },
-                            onCompleteSubWithCourtPlayer = { outPlayerId ->
-                                val inId = pendingSubInPlayerId ?: return@SideBySideLineupAndBenchSection
-                                repository.substitutePlayer(game.gameId, playerInId = inId, playerOutId = outPlayerId)
-                                pendingSubInPlayerId = null
-                            },
-                            onPutBenchPlayerDirectlyOnCourt = { inPlayerId ->
-                                repository.substitutePlayer(game.gameId, playerInId = inPlayerId, playerOutId = null)
-                                pendingSubInPlayerId = null
-                            },
-                            onMoveCourtPlayerToBench = { outPlayerId ->
-                                repository.movePlayerToBench(game.gameId, outPlayerId)
-                            },
+                            onTapPlayerForSubstitution = { playerId -> substitutionPlayerId = playerId },
                             onApplyStartingSeven = { useSeventh ->
-                                pendingSubInPlayerId = null
+                                substitutionPlayerId = null
                                 startingSevenDialogVariant = useSeventh
                             },
                             onNavigateToPlayer = onNavigateToPlayer,
@@ -333,6 +310,39 @@ internal fun GameInteractiveDashboard(
 
                 Spacer(Modifier.height(24.dp))
             }
+        }
+    }
+
+    substitutionPlayerId?.let { playerId ->
+        val options = repository.substitutionOptions(game.gameId, playerId, snapshot)
+        val tapped = snapshot.players.find { it.playerId == playerId }
+        if (options == null || tapped == null || !options.hasAnyOption) {
+            LaunchedEffect(playerId) { substitutionPlayerId = null }
+        } else {
+            SubstitutionPickerDialog(
+                tappedPlayer = tapped,
+                options = options,
+                snapshot = snapshot,
+                gameId = game.gameId,
+                onCourtCount = onCourtParticipants.size,
+                onPickPartner = { partnerId ->
+                    if (options.isOnCourt) {
+                        repository.substitutePlayer(game.gameId, playerInId = partnerId, playerOutId = playerId)
+                    } else {
+                        repository.substitutePlayer(game.gameId, playerInId = playerId, playerOutId = partnerId)
+                    }
+                    substitutionPlayerId = null
+                },
+                onActAlone = {
+                    if (options.isOnCourt) {
+                        repository.movePlayerToBench(game.gameId, playerId)
+                    } else {
+                        repository.substitutePlayer(game.gameId, playerInId = playerId, playerOutId = null)
+                    }
+                    substitutionPlayerId = null
+                },
+                onDismiss = { substitutionPlayerId = null }
+            )
         }
     }
 

@@ -52,11 +52,7 @@ internal fun SideBySideLineupAndBenchSection(
     autoSyncScore: Boolean,
     onCourtParticipants: List<Pair<PlayerGame, Player>>,
     benchParticipants: List<Pair<PlayerGame, Player>>,
-    pendingSubInPair: Pair<PlayerGame, Player>?,
-    onSelectBenchForSub: (Int) -> Unit,
-    onCompleteSubWithCourtPlayer: (Int) -> Unit,
-    onPutBenchPlayerDirectlyOnCourt: (Int) -> Unit,
-    onMoveCourtPlayerToBench: (Int) -> Unit,
+    onTapPlayerForSubstitution: (Int) -> Unit,
     onApplyStartingSeven: (useSeventhFieldPlayer: Boolean) -> Unit,
     onNavigateToPlayer: (Int) -> Unit,
     onEnterEditAndManageSquad: () -> Unit
@@ -71,81 +67,6 @@ internal fun SideBySideLineupAndBenchSection(
     }
     val activeKeeperCount = remember(onCourtParticipants) {
         onCourtParticipants.count { it.second.role == PlayerRole.GOALKEEPER }
-    }
-
-    // Aktives Wechsel-Banner über beiden Spalten, wenn rechts ein Bank-Spieler angeklickt wurde
-    if (isEditMode && pendingSubInPair != null) {
-        val (_, benchPlayer) = pendingSubInPair
-        val benchPosName = snapshot.positions.find { it.positionId == benchPlayer.positionId }?.positionName
-            ?: benchPlayer.role.label
-        val canDirectEnter = repository.canSubstituteOrEnterCourt(
-            gameId = game.gameId,
-            playerInId = benchPlayer.playerId,
-            playerOutId = null,
-            state = snapshot
-        )
-        val ruleHintText = when {
-            benchPlayer.role == PlayerRole.GOALKEEPER && activeKeeperCount >= 1 ->
-                "Nur gegen den aktiven Torwart wechselbar (max. 1 TW)"
-            benchPlayer.role == PlayerRole.GOALKEEPER && activeKeeperCount == 0 ->
-                "Feldspieler links auswählen (Wechsel auf 6+1)"
-            else ->
-                "Spieler links zum Tauschen auswählen"
-        }
-
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.tertiaryContainer,
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SwapHoriz,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                    Column {
-                        Text(
-                            text = "Einwechslung: #${benchPlayer.jerseyNumberHomeKit ?: "-"} ${benchPlayer.fullName} ($benchPosName)",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        Text(
-                            text = ruleHintText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                    }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (canDirectEnter) {
-                        Button(
-                            onClick = { onPutBenchPlayerDirectlyOnCourt(benchPlayer.playerId) },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                        ) {
-                            Icon(Icons.Default.PersonAddAlt1, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Aufs Feld (${onCourtParticipants.size + 1}/7)")
-                        }
-                    }
-                    OutlinedButton(onClick = { onSelectBenchForSub(benchPlayer.playerId) }) {
-                        Text("Abbrechen")
-                    }
-                }
-            }
-        }
     }
 
     @Composable
@@ -307,12 +228,7 @@ internal fun SideBySideLineupAndBenchSection(
                 onCourtParticipants.forEach { (pg, person) ->
                     val posName = snapshot.positions.find { it.positionId == person.positionId }?.positionName
                         ?: person.role.label
-                    val canSwapWithPending = pendingSubInPair != null && repository.canSubstituteOrEnterCourt(
-                        gameId = game.gameId,
-                        playerInId = pendingSubInPair.second.playerId,
-                        playerOutId = person.playerId,
-                        state = snapshot
-                    )
+                    val canSubstitute = repository.substitutionOptions(game.gameId, person.playerId, snapshot)?.hasAnyOption == true
                     if (person.role == PlayerRole.GOALKEEPER) {
                         val stats = snapshot.goalKeeperStats.find { it.playerGameId == pg.playerGameId }
                             ?: GoalKeeperGameStats(0, pg.playerGameId)
@@ -324,19 +240,9 @@ internal fun SideBySideLineupAndBenchSection(
                             gameElapsedSeconds = game.elapsedSeconds,
                             isWideScreen = isSideBySide,
                             isEditMode = isEditMode,
-                            pendingSubInPlayer = pendingSubInPair?.second,
-                            canSwapWithPending = canSwapWithPending,
-                            isSelectedForSubIn = false,
-                            canEnterDirectly = false,
+                            canSubstitute = canSubstitute,
                             onOpenProfile = { onNavigateToPlayer(person.playerId) },
-                            onSubstitutionClick = {
-                                if (pendingSubInPair != null) {
-                                    if (canSwapWithPending) onCompleteSubWithCourtPlayer(person.playerId)
-                                } else {
-                                    onMoveCourtPlayerToBench(person.playerId)
-                                }
-                            },
-                            onEnterCourtDirectly = {},
+                            onSubstitutionClick = { onTapPlayerForSubstitution(person.playerId) },
                             onAdjustPlusMinus = { delta -> repository.adjustPlayerPlusMinus(pg.playerGameId, delta) },
                             onUpdateStats = { transform ->
                                 repository.updateGoalKeeperStats(
@@ -360,19 +266,9 @@ internal fun SideBySideLineupAndBenchSection(
                             gameElapsedSeconds = game.elapsedSeconds,
                             isWideScreen = isSideBySide,
                             isEditMode = isEditMode,
-                            pendingSubInPlayer = pendingSubInPair?.second,
-                            canSwapWithPending = canSwapWithPending,
-                            isSelectedForSubIn = false,
-                            canEnterDirectly = false,
+                            canSubstitute = canSubstitute,
                             onOpenProfile = { onNavigateToPlayer(person.playerId) },
-                            onSubstitutionClick = {
-                                if (pendingSubInPair != null) {
-                                    if (canSwapWithPending) onCompleteSubWithCourtPlayer(person.playerId)
-                                } else {
-                                    onMoveCourtPlayerToBench(person.playerId)
-                                }
-                            },
-                            onEnterCourtDirectly = {},
+                            onSubstitutionClick = { onTapPlayerForSubstitution(person.playerId) },
                             onAdjustPlusMinus = { delta -> repository.adjustPlayerPlusMinus(pg.playerGameId, delta) },
                             onUpdateStats = { transform ->
                                 repository.updateFieldPlayerStats(
@@ -442,13 +338,7 @@ internal fun SideBySideLineupAndBenchSection(
                 benchParticipants.forEach { (pg, person) ->
                     val posName = snapshot.positions.find { it.positionId == person.positionId }?.positionName
                         ?: person.role.label
-                    val isSelectedSubIn = pendingSubInPair?.second?.playerId == person.playerId
-                    val canEnterDirectly = repository.canSubstituteOrEnterCourt(
-                        gameId = game.gameId,
-                        playerInId = person.playerId,
-                        playerOutId = null,
-                        state = snapshot
-                    )
+                    val canSubstitute = repository.substitutionOptions(game.gameId, person.playerId, snapshot)?.hasAnyOption == true
 
                     if (person.role == PlayerRole.GOALKEEPER) {
                         val stats = snapshot.goalKeeperStats.find { it.playerGameId == pg.playerGameId }
@@ -461,13 +351,9 @@ internal fun SideBySideLineupAndBenchSection(
                             gameElapsedSeconds = game.elapsedSeconds,
                             isWideScreen = isSideBySide,
                             isEditMode = isEditMode,
-                            pendingSubInPlayer = null,
-                            canSwapWithPending = false,
-                            isSelectedForSubIn = isSelectedSubIn,
-                            canEnterDirectly = canEnterDirectly,
+                            canSubstitute = canSubstitute,
                             onOpenProfile = { onNavigateToPlayer(person.playerId) },
-                            onSubstitutionClick = { onSelectBenchForSub(person.playerId) },
-                            onEnterCourtDirectly = { onPutBenchPlayerDirectlyOnCourt(person.playerId) },
+                            onSubstitutionClick = { onTapPlayerForSubstitution(person.playerId) },
                             onAdjustPlusMinus = { delta -> repository.adjustPlayerPlusMinus(pg.playerGameId, delta) },
                             onUpdateStats = {},
                             onUpdateDisciplinary = { twoMin, yellow, red, blue ->
@@ -485,13 +371,9 @@ internal fun SideBySideLineupAndBenchSection(
                             gameElapsedSeconds = game.elapsedSeconds,
                             isWideScreen = isSideBySide,
                             isEditMode = isEditMode,
-                            pendingSubInPlayer = null,
-                            canSwapWithPending = false,
-                            isSelectedForSubIn = isSelectedSubIn,
-                            canEnterDirectly = canEnterDirectly,
+                            canSubstitute = canSubstitute,
                             onOpenProfile = { onNavigateToPlayer(person.playerId) },
-                            onSubstitutionClick = { onSelectBenchForSub(person.playerId) },
-                            onEnterCourtDirectly = { onPutBenchPlayerDirectlyOnCourt(person.playerId) },
+                            onSubstitutionClick = { onTapPlayerForSubstitution(person.playerId) },
                             onAdjustPlusMinus = { delta -> repository.adjustPlayerPlusMinus(pg.playerGameId, delta) },
                             onUpdateStats = {},
                             onUpdateDisciplinary = { twoMin, yellow, red, blue ->

@@ -556,3 +556,17 @@ data class RadarMetricAxis(
     val playerFormatted: String,
     val avgFormatted: String
 )
+
+/**
+ * Wechsel-Möglichkeiten für einen angetippten Spieler (siehe `HandballRepository.substitutionOptions`).
+ * [partnerIds]: Bank-Spieler, die für ihn kommen dürfen (er steht auf dem Feld) bzw. Feld-Spieler, die er ersetzen darf.
+ * [canActAlone]: allein auf die Bank (vom Feld) bzw. allein aufs Feld (von der Bank).
+ */
+data class SubstitutionOptions(
+    val playerId: Int,
+    val isOnCourt: Boolean,
+    val partnerIds: List<Int>,
+    val canActAlone: Boolean
+) {
+    val hasAnyOption: Boolean get() = partnerIds.isNotEmpty() || canActAlone
+}
