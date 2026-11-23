@@ -173,11 +173,11 @@ private fun PerformanceSummaryHeroCard(
     isWideScreen: Boolean = true
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         if (isWideScreen) {
@@ -420,7 +420,7 @@ private fun MiniKpiPill(label: String, value: String) {
                 text = value,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -461,8 +461,8 @@ private fun GameProgressionChartCard(
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -731,7 +731,7 @@ private fun GameProgressionChartCard(
                                     text = valText,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -781,8 +781,8 @@ private fun PositionRadarChartCard(
     val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
 
     Card(
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -945,8 +945,8 @@ private fun PositionMetricsComparisonSection(
     isWideScreen: Boolean = true
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -988,7 +988,7 @@ private fun PositionMetricComparisonBarRow(
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1166,11 +1166,11 @@ fun CoachPlayerRankingDashboard(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Card(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -1210,7 +1210,7 @@ fun CoachPlayerRankingDashboard(
                                 modifier = Modifier
                                     .width(185.dp)
                                     .clickable { onSelectPlayer(topForPos.player.playerId) },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 color = MaterialTheme.colorScheme.surface,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
                             ) {
@@ -1280,8 +1280,8 @@ fun TrainerPlayerRankingSection(
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -1344,13 +1344,13 @@ fun TrainerPlayerRankingSection(
             rankings.forEach { entry ->
                 val isHighlighted = entry.player.playerId == highlightedPlayerId
                 val containerColor = when {
-                    isHighlighted -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+                    isHighlighted -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
                     entry.rank == 1 -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
                     else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = containerColor,
                     border = if (isHighlighted) {
                         BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)

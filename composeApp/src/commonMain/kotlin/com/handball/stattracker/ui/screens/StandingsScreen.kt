@@ -44,8 +44,8 @@ fun StandingsScreen(
     ) {
         // Ligatabelle: Auf Smartphone horizontal scrollbar für saubere, ungeschnittene Spalten
         Card(
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth()
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -79,7 +79,7 @@ fun StandingsScreen(
 
                     standings.forEach { row ->
                         val rowBg = if (row.isOwnTeam) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
                         } else {
                             MaterialTheme.colorScheme.surface
                         }
@@ -100,7 +100,7 @@ fun StandingsScreen(
                                 Text(
                                     text = row.teamName,
                                     fontWeight = if (row.isOwnTeam) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                    color = if (row.isOwnTeam) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 // Für den eigenen Verein steht dort sonst nur "Heimverein"
                                 if (!row.isOwnTeam && row.location.isNotBlank()) {
@@ -123,10 +123,10 @@ fun StandingsScreen(
                                 modifier = Modifier.width(70.dp),
                                 textAlign = TextAlign.End,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
               }

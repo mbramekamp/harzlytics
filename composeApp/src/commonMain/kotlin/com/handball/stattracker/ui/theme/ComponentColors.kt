@@ -5,21 +5,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.runtime.Composable
 
-/** Untere Navigation: gewählter Eintrag in Lila statt Materials Standard (Bernstein/`secondary`). */
+/** Untere Navigation: gewähltes Symbol in Harz-Rot auf zartem Rot, Beschriftung in Textfarbe. */
 @Composable
 fun navigationItemColors() = NavigationBarItemDefaults.colors(
-    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-    selectedTextColor = MaterialTheme.colorScheme.primary,
+    selectedIconColor = MaterialTheme.colorScheme.primary,
+    selectedTextColor = MaterialTheme.colorScheme.onSurface,
     indicatorColor = MaterialTheme.colorScheme.primaryContainer,
     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 )
 
-/** Gewählte Saison-Chips: kräftig in Lila, auch auf lila Flächen gut erkennbar. */
+/** Gewählte Saison-Chips: dunkle Graphit-Pille (hell) bzw. helle Pille (dunkel); Rot bleibt Aktionen vorbehalten. */
 @Composable
 fun seasonChipColors() = FilterChipDefaults.filterChipColors(
-    selectedContainerColor = MaterialTheme.colorScheme.primary,
-    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+    selectedContainerColor = MaterialTheme.colorScheme.inverseSurface,
+    selectedLabelColor = MaterialTheme.colorScheme.inverseOnSurface,
+    selectedLeadingIconColor = MaterialTheme.colorScheme.inverseOnSurface
 )
 
 /** Bernstein-Fläche für Hinweise mit fester Bedeutung (Gelbe Karte, 2-Minuten-Strafe, Unentschieden, Auszeit). */

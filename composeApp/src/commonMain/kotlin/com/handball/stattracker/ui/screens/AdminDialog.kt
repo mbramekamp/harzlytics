@@ -57,7 +57,7 @@ fun AdminDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(14.dp),
             tonalElevation = 6.dp,
             modifier = Modifier.fillMaxWidth(0.94f).widthIn(max = 720.dp).fillMaxHeight(0.9f)
         ) {

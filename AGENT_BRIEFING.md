@@ -97,6 +97,7 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 - [x] **UI-Bereinigung & Professionalisierung**: Entfernung redundanter Labels, erklärender Hilfstexte und technischer Datenbank-Begriffe in der gesamten App.
 - [x] **Mobile-Ergonomie (Android) & Supabase Cloud-Sync** (Snapshot-Sync via `SupabaseSyncService.kt`, Konfiguration über `.env` / `SupabaseConfig.kt`).
 
+- [x] **UI-Welle 3 "Profi-Look & Logo"** (Details in §6.0): Theme Harz-Rot/Graphit statt Lila, Schrift Barlow, flache Hülle ohne verschachtelte Rahmen, Übersicht als Anzeigetafel, deutsche Datumsangaben, Logo-Zeichen und -Wortmarke in App, Fenster- und Android-Symbol.
 - [x] **UI-Überarbeitung Welle 1 & 2** (Details in §6): Lila/Weiß-Theme mit Dunkelmodus, Inhalts-Audit (ein Element = ein Zweck), Saison-Menü in der Kopfzeile, Sync-Symbol, Begriffe Kader/Staff/Aufgebot, Spieler-Profil-Tab mobil, Vereinsverwaltung (`ClubDialog`), Headless-Screenshot-Test.
 
 ### Nächste geplante Features (Priorität)
@@ -128,9 +129,18 @@ läuft. Nachdem das Statistik-, Aufstellungs- und Analyse-Kernsystem zunächst o
 
 ---
 
-## 6. Übergabe: Stand nach UI-Welle 2
+## 6. Übergabe: Stand nach UI-Welle 3 (Profi-Look & Logo)
 
 *Diesen Abschnitt zuerst lesen, wenn eine neue Session hier weiterarbeitet.*
+
+### 6.0 Welle 3: Profi-Look & Logo (Branch `design/professional-ui-logo`)
+- **Entscheidungen des Nutzers:** Markenfarbe = vertieftes Logo-Rot (`#C8102E`) statt Lila; Schrift Barlow (OFL) wird mitgeliefert.
+- **Gefundene Schwachstellen und Lösung:** Rahmen in Rahmen (Seitenleiste, Kopfzeile, Inhalt je umrandet; Karten in Karten) → bündige Seitenleiste mit Haarlinie, Kopfzeile ohne Box, weiße Flächen auf grauem Grund, Listen mit Trennlinien statt Kärtchen. Lila Schleier auf allen Flächen → neutrale Flächen. Zahlen in Markenfarbe → Textfarbe (Farbe nur mit Bedeutung). ISO-Daten → `DisplayFormat.date` ("18.10.2026"). Sieben Eckradien → drei. Zentrierter Titel in leerer Leiste → links. Großbuchstaben-Labels ("AUF DEM FELD", "TORHÜTER", "HEIM") → Satzschreibung. "1. Platz" unter "Tabellenplatz" → "1.". Neues Spiel hatte fest "2026-10-24" und "Löwen-Arena" als Vorgabe → heute bzw. Halle des letzten Heimspiels.
+- **Logo:** `ui/brand/HarzLogo.kt`: geneigter roter Block mit freigestelltem "H" (Neigung aus dem kursiven Original-Schriftzug) + Wortmarke HARZLYTICS in Barlow Semi Condensed Bold Italic. Eingesetzt in Desktop-Seitenleiste (Klick = Übersicht), mobiler Kopfzeile, Anmeldung, Fenster-Symbol (`Main.kt`), Android-Launcher (`androidMain/res`, adaptiv + Vektor für Android 7) und `docs/brand/harzlytics-mark.svg`. App-Name überall "Harzlytics".
+- **Desktop-Seitenleiste** hat jetzt einen eigenen Eintrag "Übersicht" (vorher nur das "H").
+- **Tests:** 69 Logik-Tests + 17 Screenshot-Tests (neu: `anmeldung-hell`/`anmeldung-dunkel`).
+- **Auf dem Gerät prüfen:** Android-Symbol und Schrift auf dem Handy (hier kein Android-SDK); Dialog-Screenshots wirken headless grau, weil der Scrim mitgezeichnet wird.
+- **Offen/Ideen:** Spielerkarten im Spiel (6.2 Punkt 2) sind weiterhin zahlenlastig; Diagrammfarben im Leistungs-Tab nutzen `primary` (Heim = Rot, Gast = Bernstein) und wurden nicht einzeln geprüft.
 
 ### 6.1 Stand
 - **Alles implementiert und per Desktop-Tests/-Screenshots geprüft:** Login mit Rollen (Spieler read-only, Trainer/Admin bearbeiten), Admin-Benutzerverwaltung, verschlüsselte Token-Speicherung, Android-Datenordner `filesDir` mit Umzug, Sync-Fixes (keine verlorenen Eingaben), Lila/Weiß-Theme, Inhalts-Audit Welle 1 und 2.

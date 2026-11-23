@@ -22,11 +22,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun RoleBadge(role: UserRole, offline: Boolean = false, modifier: Modifier = Modifier) {
     val container = when (role) {
-        UserRole.ADMIN -> MaterialTheme.colorScheme.primary
-        UserRole.TRAINER -> MaterialTheme.colorScheme.primaryContainer
-        UserRole.SPIELER -> MaterialTheme.colorScheme.surfaceContainerHighest
+        UserRole.ADMIN -> MaterialTheme.colorScheme.inverseSurface
+        UserRole.TRAINER -> MaterialTheme.colorScheme.secondaryContainer
+        UserRole.SPIELER -> MaterialTheme.colorScheme.surfaceVariant
     }
-    Surface(shape = RoundedCornerShape(50), color = container, modifier = modifier) {
+    Surface(shape = MaterialTheme.shapes.small, color = container, contentColor = contentColorFor(container), modifier = modifier) {
         Text(
             text = if (offline) "${role.label} · offline" else role.label,
             style = MaterialTheme.typography.labelMedium,

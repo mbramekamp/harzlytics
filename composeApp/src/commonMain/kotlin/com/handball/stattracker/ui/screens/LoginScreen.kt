@@ -25,6 +25,7 @@ import com.handball.stattracker.model.AuthActionResult
 import com.handball.stattracker.model.AuthState
 import com.handball.stattracker.repository.AuthRepository
 import kotlinx.coroutines.launch
+import com.handball.stattracker.ui.brand.HarzLockup
 
 private enum class AuthMode { LOGIN, REGISTER, RESET }
 
@@ -41,10 +42,9 @@ private fun AuthScaffold(content: @Composable ColumnScope.() -> Unit) {
         ) {
             Surface(
                 modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                tonalElevation = 2.dp
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp),
@@ -61,21 +61,7 @@ private fun AuthScaffold(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun BrandHeader() {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.size(56.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                "H",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
-        }
-    }
-    Text("Harzlytics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    HarzLockup(markHeight = 34.dp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
 }
 
 @Composable
@@ -89,7 +75,7 @@ private fun AuthMessage(result: AuthActionResult?) {
         )
         is AuthActionResult.Info -> Text(
             result.message,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center
         )

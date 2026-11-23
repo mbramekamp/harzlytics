@@ -1,6 +1,6 @@
 package com.handball.stattracker.ui
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 import com.handball.stattracker.model.DatabaseSnapshot
 import com.handball.stattracker.repository.HandballRepository
 import com.handball.stattracker.ui.screens.*
+import com.handball.stattracker.ui.brand.HarzMark
 import com.handball.stattracker.ui.theme.HandballTheme
 import com.handball.stattracker.ui.theme.navigationItemColors
 
@@ -164,11 +166,8 @@ internal fun MainAppContent(
                 }
 
                 if (isWideScreen) {
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        VerticalRoundedNavbar(
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        SideNavigationRail(
                             currentScreen = currentScreen,
                             onSelectScreen = { screen ->
                                 currentScreen = screen
@@ -178,12 +177,10 @@ internal fun MainAppContent(
                             },
                             onOpenPlusMenu = { openModal(CreationModalType.CHOOSER) }
                         )
+                        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-                        Column(
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            StaticTopHeaderBox(
+                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            DesktopHeader(
                                 title = staticHeaderTitle,
                                 seasonPicker = if (showSeasonPicker) {
                                     { SeasonPicker(snapshot.seasons, selectedSeasonId, { chosenSeasonId = it }) }
@@ -196,13 +193,7 @@ internal fun MainAppContent(
                                 onOpenAccount = { showAccount = true }
                             )
 
-                            Surface(
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
-                                shape = RoundedCornerShape(22.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                                tonalElevation = 1.dp
-                            ) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)) {
                                 MainContentRouter(
                                     currentScreen = currentScreen,
                                     repository = repository,
@@ -380,19 +371,15 @@ private fun MobileTopHeaderBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 4.dp)
-            ) {
+            HarzMark(height = 22.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -411,8 +398,9 @@ private fun MobileTopHeaderBar(
     }
 }
 
+/** Kopfzeile Desktop: liegt ohne Rahmen auf dem Hintergrund, Titel links, Werkzeuge rechts. */
 @Composable
-private fun StaticTopHeaderBox(
+private fun DesktopHeader(
     title: String,
     seasonPicker: (@Composable () -> Unit)?,
     syncState: SyncState,
@@ -422,138 +410,87 @@ private fun StaticTopHeaderBox(
     offline: Boolean,
     onOpenAccount: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().height(74.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-        tonalElevation = 2.dp
+    Row(
+        modifier = Modifier.fillMaxWidth().height(72.dp).padding(start = 28.dp, end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // Titel nimmt den Platz links vom Konto ein und überlappt es nie
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        seasonPicker?.invoke()
+        Spacer(Modifier.width(8.dp))
+        SyncIndicator(syncState, onSync)
+        Spacer(Modifier.width(4.dp))
+        TextButton(
+            onClick = onOpenAccount,
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
-            // Titel nimmt den Platz links vom Konto ein und überlappt es nie
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            seasonPicker?.invoke()
-            SyncIndicator(syncState, onSync)
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onOpenAccount) {
-                    Text(
-                        text = profile.fullName.ifBlank { email },
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 200.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    RoleBadge(profile.role, offline)
-                }
-            }
+            Text(
+                text = profile.fullName.ifBlank { email },
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 200.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            RoleBadge(profile.role, offline)
         }
     }
 }
 
+/** Seitenleiste Desktop: bündig am Rand, Logo oben, Anlegen-Knopf als Hauptaktion, dann die Bereiche. */
 @Composable
-private fun VerticalRoundedNavbar(
+private fun SideNavigationRail(
     currentScreen: MainNavScreen,
     onSelectScreen: (MainNavScreen) -> Unit,
     onOpenPlusMenu: () -> Unit
 ) {
     Surface(
         modifier = Modifier.width(88.dp).fillMaxHeight(),
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-        tonalElevation = 2.dp
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(vertical = 14.dp, horizontal = 10.dp),
+            modifier = Modifier.fillMaxSize().padding(vertical = 20.dp, horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                val isHomeSelected = currentScreen == MainNavScreen.HOME_DASHBOARD
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (isHomeSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.primaryContainer
-                    },
-                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clickable { onSelectScreen(MainNavScreen.HOME_DASHBOARD) }
+            HarzMark(
+                height = 30.dp,
+                modifier = Modifier.clickable { onSelectScreen(MainNavScreen.HOME_DASHBOARD) }
+            )
+            Spacer(Modifier.height(16.dp))
+
+            EditorOnly {
+                FilledIconButton(
+                    onClick = onOpenPlusMenu,
+                    modifier = Modifier.size(48.dp),
+                    shape = MaterialTheme.shapes.large,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "H",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (isHomeSelected) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            }
-                        )
-                    }
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Neu anlegen")
                 }
+            }
+            Spacer(Modifier.height(12.dp))
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 6.dp))
-
-                NavbarIconItem(
-                    label = "Kader",
-                    icon = Icons.Default.Groups,
-                    selected = currentScreen == MainNavScreen.ROSTER,
-                    onClick = { onSelectScreen(MainNavScreen.ROSTER) }
-                )
-
-                NavbarIconItem(
-                    label = "Saison",
-                    icon = Icons.Default.SportsHandball,
-                    selected = currentScreen == MainNavScreen.SEASON,
-                    onClick = { onSelectScreen(MainNavScreen.SEASON) }
-                )
-
-                NavbarIconItem(
-                    label = "Tabelle",
-                    icon = Icons.Default.FormatListNumbered,
-                    selected = currentScreen == MainNavScreen.STANDINGS,
-                    onClick = { onSelectScreen(MainNavScreen.STANDINGS) }
-                )
-
-                Spacer(Modifier.height(4.dp))
-
-                EditorOnly {
-                    FilledIconButton(
-                        onClick = onOpenPlusMenu,
-                        modifier = Modifier.size(52.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Neu anlegen (+)",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                }
+            NavbarIconItem("Übersicht", Icons.Default.Home, currentScreen == MainNavScreen.HOME_DASHBOARD) {
+                onSelectScreen(MainNavScreen.HOME_DASHBOARD)
+            }
+            NavbarIconItem("Kader", Icons.Default.Groups, currentScreen == MainNavScreen.ROSTER) {
+                onSelectScreen(MainNavScreen.ROSTER)
+            }
+            NavbarIconItem("Saison", Icons.Default.SportsHandball, currentScreen == MainNavScreen.SEASON) {
+                onSelectScreen(MainNavScreen.SEASON)
+            }
+            NavbarIconItem("Tabelle", Icons.Default.FormatListNumbered, currentScreen == MainNavScreen.STANDINGS) {
+                onSelectScreen(MainNavScreen.STANDINGS)
             }
         }
     }
@@ -566,42 +503,37 @@ private fun NavbarIconItem(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surface
-        },
+    Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Box(
+            modifier = Modifier
+                .size(width = 52.dp, height = 30.dp)
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = label,
-                tint = if (selected) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp)
             )
         }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -616,7 +548,7 @@ private fun BottomMobileNavbar(
     NavigationBar(
         modifier = Modifier.fillMaxWidth(),
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp
+        tonalElevation = 0.dp
     ) {
         NavigationBarItem(
             selected = currentScreen == MainNavScreen.HOME_DASHBOARD,
@@ -648,11 +580,11 @@ private fun BottomMobileNavbar(
             ) {
                 FloatingActionButton(
                     onClick = onOpenPlusMenu,
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.large,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    elevation = FloatingActionButtonDefaults.elevation(2.dp),
-                    modifier = Modifier.size(46.dp)
+                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,

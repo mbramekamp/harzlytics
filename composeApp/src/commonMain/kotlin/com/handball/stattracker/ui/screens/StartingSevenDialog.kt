@@ -139,7 +139,7 @@ private fun StartingSevenSlotCard(
 ) {
     val chosen = slot.chosen
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
         modifier = Modifier.fillMaxWidth()
     ) {

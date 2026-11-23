@@ -1,3 +1,5 @@
+<img src="docs/brand/harzlytics-mark.svg" alt="" width="56">
+
 # Harzlytics – Handball Stat Tracker
 
 Statistik-App für Handball-Mannschaften, gebaut mit **Kotlin Multiplatform** und **Compose Multiplatform**. Sie läuft auf **Android** und **Desktop (JVM)** (iOS ist vorbereitet, aber noch nicht gebaut). Die Daten liegen zuerst lokal (**Offline-First**) und werden über **Supabase** synchronisiert, damit mehrere Geräte denselben Stand haben. Gedacht für den Einsatz am Spielfeldrand: Spiel mitzählen, Aufstellung wechseln, danach auswerten.
@@ -9,7 +11,7 @@ Statistik-App für Handball-Mannschaften, gebaut mit **Kotlin Multiplatform** un
 - **Start-7-Empfehlung** aus Saisonleistung und aktueller Form, mit Begründung und Tausch gegen den Zweitplatzierten.
 - **Liga:** Saisons, Gegner, Ligatabelle (2-Punkte-Regel) auch für Spiele zweier Gegner.
 - **Konten und Rollen:** Anmeldung über Supabase. *Spieler* lesen nur, *Trainer* und *Admins* bearbeiten, Admins verwalten außerdem Benutzer.
-- **Aussehen:** Lila/Weiß-Theme mit Dunkelmodus, ein Saison-Menü in der Kopfzeile (beim Start die aktuelle Saison), Wolken-Symbol für den Sync-Zustand.
+- **Aussehen:** Harz-Rot auf Graphit/Weiß mit Dunkelmodus, Schrift Barlow, Logo in Seitenleiste, Kopfzeile, Anmeldung und App-Symbol, ein Saison-Menü in der Kopfzeile (beim Start die aktuelle Saison), Wolken-Symbol für den Sync-Zustand.
 
 ## Screenshots
 

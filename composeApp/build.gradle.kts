@@ -116,7 +116,7 @@ tasks.withType<Test>().configureEach {
 val docScreenshots = listOf(
     "desktop-hell-home", "desktop-dunkel-home", "desktop-hell-spiel", "desktop-hell-kader",
     "desktop-hell-tabelle", "mobil-hell-home", "mobil-dunkel-home", "mobil-hell-spieler-profil",
-    "dialog-admin-konto", "dialog-admin-verein", "dialog-admin-benutzer"
+    "dialog-admin-konto", "dialog-admin-verein", "dialog-admin-benutzer", "anmeldung-hell"
 )
 tasks.register<Copy>("updateDocScreenshots") {
     group = "documentation"
@@ -124,4 +124,9 @@ tasks.register<Copy>("updateDocScreenshots") {
     dependsOn("desktopTest")
     from(layout.buildDirectory.dir("screenshots")) { include(docScreenshots.map { "$it.png" }) }
     into(rootProject.layout.projectDirectory.dir("docs/screenshots"))
+}
+
+compose.resources {
+    packageOfResClass = "com.handball.stattracker.resources"
+    publicResClass = false
 }

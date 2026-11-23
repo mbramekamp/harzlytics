@@ -131,6 +131,23 @@ class ScreenshotTest {
         }
     }
 
+    /** Anmeldung mit Logo (ohne Supabase: die Maske selbst braucht keine Verbindung). */
+    @Test
+    fun loginLight() = renderDialog("anmeldung-hell", 900, 720) {
+        com.handball.stattracker.ui.screens.LoginScreen(
+            auth = com.handball.stattracker.repository.AuthRepository(api = null),
+            initialMessage = null
+        )
+    }
+
+    @Test
+    fun loginDark() = renderDialog("anmeldung-dunkel", 900, 720, dark = true) {
+        com.handball.stattracker.ui.screens.LoginScreen(
+            auth = com.handball.stattracker.repository.AuthRepository(api = null),
+            initialMessage = null
+        )
+    }
+
     /** Zeichnet einen Dialog (so, wie ihn der Nutzer sieht) auf neutralem Hintergrund. */
     private fun renderDialog(name: String, width: Int, height: Int, dark: Boolean = false, dialog: @androidx.compose.runtime.Composable () -> Unit) {
         val scene = ImageComposeScene(width, height, Density(1f)) {

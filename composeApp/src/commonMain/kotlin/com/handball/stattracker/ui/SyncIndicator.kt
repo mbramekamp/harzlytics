@@ -22,7 +22,7 @@ fun SyncIndicator(state: SyncState, onSync: () -> Unit, modifier: Modifier = Mod
         when (state) {
             SyncState.SYNCING -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             SyncState.SYNCED -> Icon(Icons.Default.CloudDone, "Synchronisiert", tint = MaterialTheme.colorScheme.tertiary)
-            SyncState.SYNCED_PENDING -> Icon(Icons.Default.CloudSync, "Änderungen werden gesendet", tint = MaterialTheme.colorScheme.primary)
+            SyncState.SYNCED_PENDING -> Icon(Icons.Default.CloudSync, "Änderungen werden gesendet", tint = MaterialTheme.colorScheme.onSurface)
             SyncState.OFFLINE -> Icon(Icons.Default.CloudOff, "Offline", tint = MaterialTheme.colorScheme.secondary)
             SyncState.UNAVAILABLE -> Icon(Icons.Default.CloudOff, "Sync nicht möglich", tint = MaterialTheme.colorScheme.error)
             SyncState.IDLE -> Icon(Icons.Default.Cloud, "Noch nicht synchronisiert", tint = MaterialTheme.colorScheme.onSurfaceVariant)

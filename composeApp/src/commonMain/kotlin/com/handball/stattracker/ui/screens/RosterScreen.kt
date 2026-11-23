@@ -62,8 +62,8 @@ fun RosterScreen(
             // Linke Spalte: Gruppierte Kaderliste
             Card(
                 modifier = Modifier.width(340.dp).fillMaxHeight(),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 RosterListPanel(
                     snapshot = snapshot,
@@ -77,8 +77,8 @@ fun RosterScreen(
             // Rechte Spalte: Spieler-/Trainerprofil mit Reitern (Übersicht & Spiele | Performance & Ranking)
             Card(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 if (selectedPlayer != null) {
                     PlayerProfileDetailPanel(
@@ -214,7 +214,7 @@ private fun RosterListPanel(
         ) {
             if (goalkeepers.isNotEmpty()) {
                 item {
-                    SectionHeaderBadge("TORHÜTER (${goalkeepers.size})")
+                    SectionHeaderBadge("Torhüter (${goalkeepers.size})")
                 }
                 items(goalkeepers, key = { it.playerId }) { player ->
                     RosterPersonRow(
@@ -229,7 +229,7 @@ private fun RosterListPanel(
             if (fieldPlayers.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(6.dp))
-                    SectionHeaderBadge("FELDSPIELER (${fieldPlayers.size})")
+                    SectionHeaderBadge("Feldspieler (${fieldPlayers.size})")
                 }
                 items(fieldPlayers, key = { it.playerId }) { player ->
                     RosterPersonRow(
@@ -244,7 +244,7 @@ private fun RosterListPanel(
             if (coaches.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(6.dp))
-                    SectionHeaderBadge("STAFF (${coaches.size})")
+                    SectionHeaderBadge("Staff (${coaches.size})")
                 }
                 items(coaches, key = { it.playerId }) { coach ->
                     RosterPersonRow(
@@ -265,10 +265,9 @@ private fun RosterListPanel(
 private fun SectionHeaderBadge(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp, start = 4.dp, end = 4.dp)
     )
 }
 
@@ -280,13 +279,13 @@ private fun RosterPersonRow(
     onClick: () -> Unit
 ) {
     val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
+        MaterialTheme.colorScheme.secondaryContainer
     } else {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         color = containerColor,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
@@ -297,7 +296,7 @@ private fun RosterPersonRow(
         ) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.inverseSurface
             ) {
                 val badgeText = if (player.role == PlayerRole.COACH) {
                     "TR"
@@ -309,7 +308,7 @@ private fun RosterPersonRow(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = MaterialTheme.colorScheme.inverseOnSurface
                 )
             }
 
@@ -365,11 +364,11 @@ private fun PlayerProfileDetailPanel(
     ) {
         // Profil-Kopfbereich
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.primaryContainer
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surface
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(18.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = if (isWideScreen) 0.dp else 16.dp, vertical = if (isWideScreen) 4.dp else 14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
@@ -389,14 +388,14 @@ private fun PlayerProfileDetailPanel(
                         }
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.inverseSurface
                         ) {
                             Text(
                                 text = if (player.role == PlayerRole.COACH) "TR" else "#${player.jerseyNumberHomeKit ?: "-"}",
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color = MaterialTheme.colorScheme.inverseOnSurface
                             )
                         }
                         Column(modifier = Modifier.weight(1f)) {
@@ -404,14 +403,14 @@ private fun PlayerProfileDetailPanel(
                                 text = player.fullName,
                                 style = if (isWideScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = if (player.role == PlayerRole.COACH) player.role.label else positionName,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -475,7 +474,7 @@ private fun PlayerProfileDetailPanel(
         // Reiter (Tabs) im Spielerprofil: "Übersicht & Spiele" vs. "Performance & Ranking"
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -496,7 +495,7 @@ private fun PlayerProfileDetailPanel(
                             .weight(1f)
                             .clickable { onSelectTab(tab) },
                         shape = RoundedCornerShape(10.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0f)
+                        color = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0f)
                     ) {
                         Row(
                             modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
@@ -507,14 +506,14 @@ private fun PlayerProfileDetailPanel(
                                 imageVector = if (tab == PlayerProfileTab.OVERVIEW) Icons.Default.History else Icons.Default.QueryStats,
                                 contentDescription = tabLabel,
                                 modifier = Modifier.size(18.dp),
-                                tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = tabLabel,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -777,7 +776,7 @@ private fun PlayerProfileDetailPanel(
 
             if (gameHistory.isEmpty()) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -812,7 +811,7 @@ private fun ProfileStatBox(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
     ) {
         Column(
@@ -826,9 +825,8 @@ private fun ProfileStatBox(
             )
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = sub,
@@ -848,7 +846,7 @@ private fun PlayerGameHistoryCard(
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         Column(
@@ -868,7 +866,7 @@ private fun PlayerGameHistoryCard(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "${entry.game.gameDate} • ${entry.seasonName} • ${entry.game.location}",
+                            text = "${com.handball.stattracker.repository.DisplayFormat.date(entry.game.gameDate)} • ${entry.seasonName} • ${entry.game.location}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -888,7 +886,7 @@ private fun PlayerGameHistoryCard(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -962,7 +960,7 @@ private fun PlayerGameHistoryCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${entry.game.gameDate} • ${entry.game.location}",
+                            text = "${com.handball.stattracker.repository.DisplayFormat.date(entry.game.gameDate)} • ${entry.game.location}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -976,7 +974,7 @@ private fun PlayerGameHistoryCard(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -1001,7 +999,7 @@ private fun PlayerGameHistoryCard(
                             if (fs.technicalMistakes > 0) add("Techn. Fehler" to "${fs.technicalMistakes}")
                             if (entry.playerGame.twoMinuteSuspensions > 0) add("2 Min" to "${entry.playerGame.twoMinuteSuspensions}")
                         }
-                        GameValueRow(values, MaterialTheme.colorScheme.primary)
+                        GameValueRow(values, MaterialTheme.colorScheme.onSurface)
                     }
                 }
                 PlayerRole.GOALKEEPER -> {

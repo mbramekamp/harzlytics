@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.handball.stattracker.model.*
 import com.handball.stattracker.repository.HandballRepository
 import kotlinx.coroutines.delay
@@ -122,7 +123,7 @@ fun SeasonScreen(
         // Spiele-Liste
         if (gamesInSeason.isEmpty()) {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -140,7 +141,7 @@ fun SeasonScreen(
             gamesInSeason.forEach { game ->
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onSelectGame(game.gameId) }
@@ -162,10 +163,10 @@ fun SeasonScreen(
                                 if (game.isOwnTeamGame) {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer
+                                        color = MaterialTheme.colorScheme.secondaryContainer
                                     ) {
                                         Text(
-                                            text = if (game.isHomeGame) "HEIM" else "AUSWÄRTS",
+                                            text = if (game.isHomeGame) "Heim" else "Auswärts",
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold
@@ -173,7 +174,7 @@ fun SeasonScreen(
                                     }
                                 }
                                 Text(
-                                    text = "${game.gameDate} • ${game.location}",
+                                    text = "${com.handball.stattracker.repository.DisplayFormat.date(game.gameDate)} • ${game.location}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -188,14 +189,13 @@ fun SeasonScreen(
                         Column(horizontalAlignment = Alignment.End) {
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
+                                color = MaterialTheme.colorScheme.secondaryContainer
                             ) {
                                 Text(
-                                    text = "${game.homeTeamScore} : ${game.awayTeamScore}",
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    text = "${game.homeTeamScore}:${game.awayTeamScore}",
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                    style = com.handball.stattracker.ui.theme.scoreStyle(24.sp),
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
                             Text(
@@ -556,8 +556,9 @@ private fun ScoreboardAndMatchClockCard(
     onApplyStartingSeven: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(18.dp),
@@ -577,7 +578,7 @@ private fun ScoreboardAndMatchClockCard(
                     }
 
                     Text(
-                        text = "${game.gameDate} • ${game.location} • ${game.gameType}",
+                        text = "${com.handball.stattracker.repository.DisplayFormat.date(game.gameDate)} • ${game.location} • ${game.gameType}",
                         style = MaterialTheme.typography.labelLarge
                     )
 
@@ -665,9 +666,9 @@ private fun ScoreboardAndMatchClockCard(
                     }
 
                     Text(
-                        text = "${game.gameDate} • ${game.location} • ${game.gameType}",
+                        text = "${com.handball.stattracker.repository.DisplayFormat.date(game.gameDate)} • ${game.location} • ${game.gameType}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                     )
 
                     if (isEditMode) {
@@ -723,7 +724,7 @@ private fun ScoreboardAndMatchClockCard(
                 ) {
                     // Heim-Team
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                        Text("HEIM", style = MaterialTheme.typography.labelSmall)
+                        Text("Heim", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(homeName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -747,8 +748,7 @@ private fun ScoreboardAndMatchClockCard(
                             }
                             Text(
                                 text = "${game.homeTeamScore}",
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.ExtraBold
+                                style = com.handball.stattracker.ui.theme.scoreStyle(56.sp)
                             )
                             if (isEditMode) {
                                 FilledIconButton(
@@ -774,9 +774,9 @@ private fun ScoreboardAndMatchClockCard(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -792,8 +792,7 @@ private fun ScoreboardAndMatchClockCard(
                                     Text(
                                         text = game.elapsedFormatted,
                                         style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = "${game.currentMinute}. Min",
@@ -827,7 +826,7 @@ private fun ScoreboardAndMatchClockCard(
 
                     // Gast-Team
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                        Text("GAST", style = MaterialTheme.typography.labelSmall)
+                        Text("Gast", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(awayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -851,8 +850,7 @@ private fun ScoreboardAndMatchClockCard(
                             }
                             Text(
                                 text = "${game.awayTeamScore}",
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.ExtraBold
+                                style = com.handball.stattracker.ui.theme.scoreStyle(56.sp)
                             )
                             if (isEditMode) {
                                 FilledIconButton(
@@ -879,7 +877,7 @@ private fun ScoreboardAndMatchClockCard(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surface,
                         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth()
@@ -942,7 +940,7 @@ private fun ScoreboardAndMatchClockCard(
                         // Heim-Team Panel
                         Surface(
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                         ) {
                             Column(
@@ -950,7 +948,7 @@ private fun ScoreboardAndMatchClockCard(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text("HEIM", style = MaterialTheme.typography.labelSmall)
+                                Text("Heim", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
                                     text = homeName,
                                     style = MaterialTheme.typography.titleSmall,
@@ -980,8 +978,7 @@ private fun ScoreboardAndMatchClockCard(
                                     }
                                     Text(
                                         text = "${game.homeTeamScore}",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.ExtraBold
+                                        style = com.handball.stattracker.ui.theme.scoreStyle(40.sp)
                                     )
                                     if (isEditMode) {
                                         FilledIconButton(
@@ -1006,7 +1003,7 @@ private fun ScoreboardAndMatchClockCard(
                         // Gast-Team Panel
                         Surface(
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                         ) {
                             Column(
@@ -1014,7 +1011,7 @@ private fun ScoreboardAndMatchClockCard(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text("GAST", style = MaterialTheme.typography.labelSmall)
+                                Text("Gast", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
                                     text = awayName,
                                     style = MaterialTheme.typography.titleSmall,
@@ -1044,8 +1041,7 @@ private fun ScoreboardAndMatchClockCard(
                                     }
                                     Text(
                                         text = "${game.awayTeamScore}",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.ExtraBold
+                                        style = com.handball.stattracker.ui.theme.scoreStyle(40.sp)
                                     )
                                     if (isEditMode) {
                                         FilledIconButton(
@@ -1278,8 +1274,8 @@ private fun SideBySideLineupAndBenchSection(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (isSideBySide) {
@@ -1299,10 +1295,9 @@ private fun SideBySideLineupAndBenchSection(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "AUF DEM FELD (${onCourtParticipants.size}/7)",
+                                text = "Auf dem Feld (${onCourtParticipants.size}/7)",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             // Nur der Sonderfall ohne Torwart ist eine Information; 6+1 ist der Normalfall
                             if (activeFieldCount == 7 && activeKeeperCount == 0) {
@@ -1360,7 +1355,7 @@ private fun SideBySideLineupAndBenchSection(
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "AUF DEM FELD (${onCourtParticipants.size}/7)",
+                                    text = "Auf dem Feld (${onCourtParticipants.size}/7)",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.primary
@@ -1413,7 +1408,7 @@ private fun SideBySideLineupAndBenchSection(
             }
 
             if (onCourtParticipants.isEmpty()) {
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Card(shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1522,7 +1517,7 @@ private fun SideBySideLineupAndBenchSection(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1541,7 +1536,7 @@ private fun SideBySideLineupAndBenchSection(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "BANK (${benchParticipants.size})",
+                            text = "Bank (${benchParticipants.size})",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -1551,7 +1546,7 @@ private fun SideBySideLineupAndBenchSection(
 
             if (benchParticipants.isEmpty()) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1762,7 +1757,7 @@ private fun GameLogAndProgressionTabSection(
 
         // 2. Spielprotokoll-Liste (Game Log)
         Card(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -1916,8 +1911,8 @@ private fun ScoreProgressionMiniChartCard(
     val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
 
     Card(
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -2127,7 +2122,7 @@ private fun GameLogEventRow(
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -2153,14 +2148,14 @@ private fun GameLogEventRow(
 
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = MaterialTheme.colorScheme.secondaryContainer
             ) {
                 Text(
                     text = entry.scoreFormatted,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
 
@@ -2236,8 +2231,8 @@ private fun FieldPlayerStatTrackerCard(
     val borderStroke = when {
         isSelectedForSubIn -> BorderStroke(2.5.dp, MaterialTheme.colorScheme.tertiary)
         isEditMode && isOnCourt && pendingSubInPlayer != null && canSwapWithPending -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
-        isOnCourt -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
-        else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
+        isOnCourt -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+        else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     }
 
     Card(
@@ -2279,12 +2274,12 @@ private fun FieldPlayerStatTrackerCard(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isOnCourt) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        color = if (isOnCourt) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.outline
                     ) {
                         Text(
                             text = "#${player.jerseyNumberHomeKit ?: "-"}",
                             modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                            color = Color.White,
+                            color = if (isOnCourt) MaterialTheme.colorScheme.inverseOnSurface else Color.White,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -2796,7 +2791,7 @@ private fun GoalKeeperStatTrackerCard(
         isSelectedForSubIn -> BorderStroke(2.5.dp, MaterialTheme.colorScheme.tertiary)
         isEditMode && isOnCourt && pendingSubInPlayer != null && canSwapWithPending -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         isOnCourt -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f))
-        else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
+        else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     }
 
     Card(
@@ -3177,7 +3172,7 @@ private fun LineupStatusAndPlusMinusPills(
     val pmColor = when {
         playerGame.plusMinus > 0 -> MaterialTheme.colorScheme.tertiary
         playerGame.plusMinus < 0 -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
         shape = RoundedCornerShape(6.dp),
@@ -3231,7 +3226,7 @@ private fun CoachTimeoutTrackerCard(
 
     Card(
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -3394,14 +3389,14 @@ private fun ReadOnlyDisciplinaryRow(playerGame: PlayerGame) {
         if (playerGame.blueCard) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = MaterialTheme.colorScheme.secondaryContainer
             ) {
                 Text(
                     text = "Blau",
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
         }

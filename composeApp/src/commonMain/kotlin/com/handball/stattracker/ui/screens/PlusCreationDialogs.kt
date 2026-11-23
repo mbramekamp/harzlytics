@@ -163,7 +163,7 @@ private fun PlusOptionCard(
     onClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
@@ -174,13 +174,13 @@ private fun PlusOptionCard(
         ) {
             Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = MaterialTheme.colorScheme.secondaryContainer
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     modifier = Modifier.padding(10.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -602,9 +602,12 @@ private fun NewGameModal(
     var secondOpponentId by remember {
         mutableStateOf(snapshot.opponentTeams.drop(1).firstOrNull()?.opponentTeamId ?: opponentId)
     }
-    var location by remember { mutableStateOf("Löwen-Arena") }
+    // Vorschlag: Halle des letzten eigenen Heimspiels
+    var location by remember {
+        mutableStateOf(snapshot.games.lastOrNull { it.isOwnTeamGame && it.isHomeGame }?.location ?: "")
+    }
     var gameType by remember { mutableStateOf("Ligaspiel") }
-    var gameDate by remember { mutableStateOf("2026-10-24") }
+    var gameDate by remember { mutableStateOf(com.handball.stattracker.repository.SeasonSelection.today()) }
     var homeScore by remember { mutableStateOf("0") }
     var awayScore by remember { mutableStateOf("0") }
     var homeHalf by remember { mutableStateOf("0") }

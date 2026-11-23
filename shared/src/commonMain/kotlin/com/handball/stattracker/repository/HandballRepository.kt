@@ -2150,18 +2150,20 @@ class HandballRepository(
         return sorted.mapIndexed { idx, entry -> entry.copy(rank = idx + 1) }
     }
 
-    fun formatGameMatchup(game: Game, state: DatabaseSnapshot = _snapshot.value): String {
+    /** Heim- und Gastname eines Spiels (eigenes Spiel oder Ligaspiel zweier Gegner). */
+    fun gameTeamNames(game: Game, state: DatabaseSnapshot = _snapshot.value): Pair<String, String> {
         val opp1 = state.opponentTeams.find { it.opponentTeamId == game.opponentId }?.opponentName ?: "Gegner"
         return if (game.secondOpponentId == null) {
-            if (game.isHomeGame) {
-                "${state.ownClubName} vs. $opp1"
-            } else {
-                "$opp1 vs. ${state.ownClubName}"
-            }
+            if (game.isHomeGame) state.ownClubName to opp1 else opp1 to state.ownClubName
         } else {
             val opp2 = state.opponentTeams.find { it.opponentTeamId == game.secondOpponentId }?.opponentName ?: "Gegner 2"
-            "$opp1 vs. $opp2"
+            opp1 to opp2
         }
+    }
+
+    fun formatGameMatchup(game: Game, state: DatabaseSnapshot = _snapshot.value): String {
+        val (home, away) = gameTeamNames(game, state)
+        return "$home vs. $away"
     }
 
     // --- OFFLINE-FIRST CLOUD SYNC (Supabase) ---

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Harzlytics-Zeichen (siehe ui/brand/HarzLogo.kt), zentriert in der sicheren Zone des adaptiven Symbols -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#C8102E" android:pathData="M36.5,29.0 L81.5,29.0 L71.5,79.0 L26.5,79.0Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M46.3,40.0 L53.8,40.0 L48.2,68.0 L40.7,68.0Z M59.8,40.0 L67.3,40.0 L61.7,68.0 L54.2,68.0Z M51.1,51.0 L58.1,51.0 L56.9,57.0 L49.9,57.0Z" />
+</vector>
