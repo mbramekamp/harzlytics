@@ -70,6 +70,8 @@ internal fun GameInteractiveDashboard(
 
     // Angetippter Spieler, für den die Wechsel-Auswahl offen ist
     var substitutionPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
+    // Auswahl für einen freien Platz auf dem Feld (Handy, weniger als 7 aktiv)
+    var showFreeSlotPicker by remember(game.gameId) { mutableStateOf(false) }
 
     // Live-Spieluhr-Ticker (läuft im Sekundentakt, solange aktiv und < 60:00)
     LaunchedEffect(isClockRunning, game.gameId) {
@@ -88,6 +90,7 @@ internal fun GameInteractiveDashboard(
         if (!isEditMode) {
             isClockRunning = false
             substitutionPlayerId = null
+            showFreeSlotPicker = false
             if (activeTab == 3) activeTab = 0
         }
     }
@@ -124,6 +127,10 @@ internal fun GameInteractiveDashboard(
             val p = snapshot.players.find { it.playerId == pg.playerId && it.role == PlayerRole.COACH }
             if (p != null) pg to p else null
         }
+    }
+
+    val courtEntryCandidates = remember(snapshot, game.gameId) {
+        repository.courtEntryCandidates(game.gameId, snapshot)
     }
 
     val activeSuspensions = remember(allPlayerParticipants, game.elapsedSeconds) {
@@ -243,6 +250,9 @@ internal fun GameInteractiveDashboard(
                             onCourtParticipants = onCourtParticipants,
                             benchParticipants = benchParticipants,
                             onTapPlayerForSubstitution = { playerId -> substitutionPlayerId = playerId },
+                            showBench = isWideScreen,
+                            canFillFreeSlot = courtEntryCandidates.isNotEmpty(),
+                            onOpenFreeSlot = { showFreeSlotPicker = true },
                             onApplyStartingSeven = { useSeventh ->
                                 substitutionPlayerId = null
                                 startingSevenDialogVariant = useSeventh
@@ -343,6 +353,28 @@ internal fun GameInteractiveDashboard(
                     substitutionPlayerId = null
                 },
                 onDismiss = { substitutionPlayerId = null }
+            )
+        }
+    }
+
+    if (showFreeSlotPicker) {
+        if (courtEntryCandidates.isEmpty() || onCourtParticipants.size >= 7) {
+            LaunchedEffect(Unit) { showFreeSlotPicker = false }
+        } else {
+            SubstitutionPicker(
+                asBottomSheet = !isWideScreen,
+                title = "Freier Platz (${onCourtParticipants.size}/7)",
+                partnerIds = courtEntryCandidates,
+                emptyText = "Niemand auf der Bank kann kommen.",
+                actAloneLabel = null,
+                snapshot = snapshot,
+                gameId = game.gameId,
+                onPickPartner = { playerId ->
+                    repository.substitutePlayer(game.gameId, playerInId = playerId, playerOutId = null)
+                    showFreeSlotPicker = false
+                },
+                onActAlone = {},
+                onDismiss = { showFreeSlotPicker = false }
             )
         }
     }

@@ -583,6 +583,18 @@ class HandballRepository(
     }
 
     /**
+     * Bank-Spieler, die ohne Tausch aufs Feld dürfen ("Freier Platz", weniger als 7 aktiv):
+     * keine Gesperrten, nie ein zweiter TW. Feldspieler zuerst, dann nach Trikotnummer.
+     */
+    fun courtEntryCandidates(gameId: Int, state: DatabaseSnapshot = _snapshot.value): List<Int> =
+        state.playerGames
+            .filter { it.gameId == gameId && !it.isOnCourt }
+            .mapNotNull { pg -> state.players.find { it.playerId == pg.playerId && it.role != PlayerRole.COACH } }
+            .filter { canSubstituteOrEnterCourt(gameId, playerInId = it.playerId, playerOutId = null, state = state) }
+            .sortedWith(compareBy<Player> { it.role != PlayerRole.FIELD_PLAYER }.thenBy { it.jerseyNumberHomeKit ?: 99 })
+            .map { it.playerId }
+
+    /**
      * Führt einen Spielerwechsel durch:
      * - Wenn [playerOutId] angegeben ist: 1-zu-1 Wechsel ([playerInId] kommt von der Bank aufs Feld, [playerOutId] geht auf die Bank).
      * - Wenn [playerOutId] null ist: [playerInId] wird direkt von der Bank aufs Feld gestellt (sofern < 7 Feld-/Torwart-Spieler aktiv sind und max. 1 TW).

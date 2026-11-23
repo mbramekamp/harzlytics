@@ -53,6 +53,9 @@ internal fun SideBySideLineupAndBenchSection(
     onCourtParticipants: List<Pair<PlayerGame, Player>>,
     benchParticipants: List<Pair<PlayerGame, Player>>,
     onTapPlayerForSubstitution: (Int) -> Unit,
+    showBench: Boolean,
+    canFillFreeSlot: Boolean,
+    onOpenFreeSlot: () -> Unit,
     onApplyStartingSeven: (useSeventhFieldPlayer: Boolean) -> Unit,
     onNavigateToPlayer: (Int) -> Unit,
     onEnterEditAndManageSquad: () -> Unit
@@ -283,6 +286,11 @@ internal fun SideBySideLineupAndBenchSection(
                         )
                     }
                 }
+
+                // Handy ohne Bank-Liste: freien Platz hier besetzen
+                if (isEditMode && !showBench && canFillFreeSlot && onCourtParticipants.size < 7) {
+                    FreeCourtSlotRow(onCourtCount = onCourtParticipants.size, onClick = onOpenFreeSlot)
+                }
             }
         }
     }
@@ -402,7 +410,8 @@ internal fun SideBySideLineupAndBenchSection(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             renderActiveOnCourtColumn(modifier = Modifier.fillMaxWidth())
-            renderBenchColumn(modifier = Modifier.fillMaxWidth())
+            // Auf dem Handy nur die Spieler auf dem Feld; die Bank erscheint in der Wechsel-Auswahl
+            if (showBench) renderBenchColumn(modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -490,6 +499,30 @@ internal fun EmptySquadHint(
                     Text("Aufgebot auswählen")
                 }
             }
+        }
+    }
+}
+
+/** Platzhalter für einen unbesetzten Platz auf dem Feld (weniger als 7 aktiv); öffnet die Auswahl der Bank. */
+@Composable
+private fun FreeCourtSlotRow(onCourtCount: Int, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.PersonAddAlt1, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = "Freier Platz ($onCourtCount/7)",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

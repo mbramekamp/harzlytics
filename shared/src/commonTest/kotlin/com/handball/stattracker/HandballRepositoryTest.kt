@@ -114,6 +114,30 @@ class HandballRepositoryTest {
     }
 
     @Test
+    fun testCourtEntryCandidatesForFreeSlot() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        // Spiel 1: 7 aktiv → kein freier Platz
+        assertTrue(repo.courtEntryCandidates(gameId = 1).isEmpty())
+
+        // Feldspieler 3 geht allein raus → 5 Feld + 1 TW: Feldspieler der Bank dürfen rein, der zweite TW nicht
+        repo.movePlayerToBench(gameId = 1, playerOutId = 3)
+        val candidates = repo.courtEntryCandidates(gameId = 1)
+        assertTrue(candidates.containsAll(listOf(3, 9, 13)))
+        assertFalse(2 in candidates, "Nie zwei Torhüter gleichzeitig")
+
+        // Wer gesperrt ist, kommt nicht in die Auswahl
+        repo.setGameClockSeconds(gameId = 1, targetSeconds = 1200)
+        val pg5 = repo.snapshot.value.playerGames.first { it.gameId == 1 && it.playerId == 5 }
+        repo.updatePlayerDisciplinary(pg5.playerGameId, pg5.twoMinuteSuspensions + 1, pg5.yellowCard, pg5.redCard, pg5.blueCard)
+        assertFalse(5 in repo.courtEntryCandidates(gameId = 1))
+
+        // Freien Platz besetzen
+        assertTrue(repo.substitutePlayer(gameId = 1, playerInId = 13, playerOutId = null))
+        assertFalse(13 in repo.courtEntryCandidates(gameId = 1))
+    }
+
+    @Test
     fun testSubstitutionOptionsForTappedPlayer() {
         val repo = HandballRepository(persistLocally = false)
         repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())

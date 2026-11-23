@@ -32,12 +32,47 @@ import com.handball.stattracker.model.Player
 import com.handball.stattracker.model.SubstitutionOptions
 
 /**
- * Wechsel-Auswahl nach Tipp auf eine Spielerkarte:
- * Feldspieler angetippt → Bank-Spieler zur Wahl (oder allein auf die Bank),
- * Bank-Spieler angetippt → Feld-Spieler zur Wahl (oder allein aufs Feld, wenn weniger als 7 spielen).
- * Handy ([asBottomSheet]): Bottom Sheet auf Inhaltshöhe (Liste scrollt, Einzelaktion bleibt unten), schließt per Wischen oder Tipp daneben.
- * Tablet/Desktop: Pop-up.
+ * Wechsel-Auswahl: eine Liste von Spielern, ein Tipp wählt aus; optional eine Einzelaktion
+ * ("Nur auf die Bank" / "Aufs Feld"). Genutzt nach Tipp auf eine Spielerkarte und für "Freier Platz".
+ * Handy ([asBottomSheet]): Bottom Sheet auf Inhaltshöhe (Liste scrollt, Einzelaktion bleibt unten),
+ * schließt per Wischen oder Tipp daneben. Tablet/Desktop: Pop-up.
  */
+@Composable
+internal fun SubstitutionPicker(
+    asBottomSheet: Boolean,
+    title: String,
+    partnerIds: List<Int>,
+    emptyText: String,
+    actAloneLabel: String?,
+    snapshot: DatabaseSnapshot,
+    gameId: Int,
+    onPickPartner: (Int) -> Unit,
+    onActAlone: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val list: @Composable () -> Unit = { SubstitutionPartnerList(partnerIds, emptyText, snapshot, gameId, onPickPartner) }
+    if (asBottomSheet) {
+        SubstitutionBottomSheet(title, actAloneLabel, onActAlone, onDismiss, list)
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { SubstitutionTitle(title) },
+            text = {
+                Column(modifier = Modifier.widthIn(max = 420.dp).verticalScroll(rememberScrollState())) { list() }
+            },
+            confirmButton = {
+                if (actAloneLabel != null) {
+                    FilledTonalButton(onClick = onActAlone) { Text(actAloneLabel) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text("Abbrechen") }
+            }
+        )
+    }
+}
+
+/** Wechsel-Auswahl für einen angetippten Spieler (Feld → Bank-Partner, Bank → Feld-Partner). */
 @Composable
 internal fun SubstitutionPicker(
     asBottomSheet: Boolean,
@@ -51,40 +86,29 @@ internal fun SubstitutionPicker(
     onDismiss: () -> Unit
 ) {
     val number = tappedPlayer.jerseyNumberHomeKit?.let { "#$it " } ?: ""
-    val title = if (options.isOnCourt) "Wechsel für $number${tappedPlayer.fullName}" else "$number${tappedPlayer.fullName} einwechseln für"
-    val actAloneLabel = if (options.isOnCourt) "Nur auf die Bank" else "Aufs Feld (${onCourtCount + 1}/7)"
-
-    if (asBottomSheet) {
-        SubstitutionBottomSheet(title, actAloneLabel, options, onActAlone, onDismiss) {
-            SubstitutionPartnerList(options, snapshot, gameId, onPickPartner)
-        }
-    } else {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { SubstitutionTitle(title) },
-            text = {
-                Column(modifier = Modifier.widthIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                    SubstitutionPartnerList(options, snapshot, gameId, onPickPartner)
-                }
-            },
-            confirmButton = {
-                if (options.canActAlone) {
-                    FilledTonalButton(onClick = onActAlone) { Text(actAloneLabel) }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) { Text("Abbrechen") }
-            }
-        )
-    }
+    SubstitutionPicker(
+        asBottomSheet = asBottomSheet,
+        title = if (options.isOnCourt) "Wechsel für $number${tappedPlayer.fullName}" else "$number${tappedPlayer.fullName} einwechseln für",
+        partnerIds = options.partnerIds,
+        emptyText = if (options.isOnCourt) "Niemand auf der Bank kann kommen." else "Kein Tausch möglich.",
+        actAloneLabel = when {
+            !options.canActAlone -> null
+            options.isOnCourt -> "Nur auf die Bank"
+            else -> "Aufs Feld (${onCourtCount + 1}/7)"
+        },
+        snapshot = snapshot,
+        gameId = gameId,
+        onPickPartner = onPickPartner,
+        onActAlone = onActAlone,
+        onDismiss = onDismiss
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SubstitutionBottomSheet(
     title: String,
-    actAloneLabel: String,
-    options: SubstitutionOptions,
+    actAloneLabel: String?,
     onActAlone: () -> Unit,
     onDismiss: () -> Unit,
     list: @Composable () -> Unit
@@ -103,7 +127,7 @@ private fun SubstitutionBottomSheet(
                 list()
             }
             // Einzelaktion ganz unten: liegt in der Daumenzone
-            if (options.canActAlone) {
+            if (actAloneLabel != null) {
                 FilledTonalButton(onClick = onActAlone, modifier = Modifier.fillMaxWidth()) {
                     Text(actAloneLabel)
                 }
@@ -125,15 +149,16 @@ private fun SubstitutionTitle(text: String) {
 
 @Composable
 private fun SubstitutionPartnerList(
-    options: SubstitutionOptions,
+    partnerIds: List<Int>,
+    emptyText: String,
     snapshot: DatabaseSnapshot,
     gameId: Int,
     onPickPartner: (Int) -> Unit
 ) {
-    val partners = options.partnerIds.mapNotNull { id -> snapshot.players.find { it.playerId == id } }
+    val partners = partnerIds.mapNotNull { id -> snapshot.players.find { it.playerId == id } }
     if (partners.isEmpty()) {
         Text(
-            text = if (options.isOnCourt) "Niemand auf der Bank kann kommen." else "Kein Tausch möglich.",
+            text = emptyText,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

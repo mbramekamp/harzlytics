@@ -21,6 +21,9 @@ import com.handball.stattracker.model.PlayerRole
 import com.handball.stattracker.ui.screens.FieldPlayerStatTrackerCard
 import com.handball.stattracker.ui.screens.GoalKeeperStatTrackerCard
 import com.handball.stattracker.ui.screens.SubstitutionPicker
+import com.handball.stattracker.ui.screens.SideBySideLineupAndBenchSection
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.handball.stattracker.repository.DemoDataSeed
 import com.handball.stattracker.repository.HandballRepository
 import com.handball.stattracker.ui.theme.HandballTheme
@@ -139,6 +142,52 @@ class GameCardScreenshotTest {
             } finally {
                 scene.close()
             }
+        }
+    }
+
+    /** Handy im Bearbeitungsmodus: nur die Spieler auf dem Feld, ein Platz frei (Demo-Spiel 1, #15 auf der Bank). */
+    @Test
+    fun mobileLineupWithFreeSlot() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        repo.movePlayerToBench(gameId = 1, playerOutId = 3)
+        val snapshot = repo.snapshot.value
+        val game = snapshot.games.first { it.gameId == 1 }
+        val participants = snapshot.playerGames.filter { it.gameId == 1 }.mapNotNull { pg ->
+            snapshot.players.find { it.playerId == pg.playerId && it.role != PlayerRole.COACH }?.let { pg to it }
+        }.sortedWith(compareBy({ it.second.role != PlayerRole.GOALKEEPER }, { it.second.jerseyNumberHomeKit ?: 99 }))
+        val scene = ImageComposeScene((width * density).toInt(), (3800 * density).toInt(), Density(density)) {
+            HandballTheme(darkTheme = false) {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(10.dp)) {
+                    androidx.compose.foundation.layout.Column {
+                        SideBySideLineupAndBenchSection(
+                            repository = repo,
+                            snapshot = snapshot,
+                            game = game,
+                            isSideBySide = false,
+                            isEditMode = true,
+                            autoSyncScore = true,
+                            onCourtParticipants = participants.filter { it.first.isOnCourt },
+                            benchParticipants = participants.filter { !it.first.isOnCourt },
+                            onTapPlayerForSubstitution = {},
+                            showBench = false,
+                            canFillFreeSlot = repo.courtEntryCandidates(1).isNotEmpty(),
+                            onOpenFreeSlot = {},
+                            onApplyStartingSeven = {},
+                            onNavigateToPlayer = {},
+                            onEnterEditAndManageSquad = {}
+                        )
+                    }
+                }
+            }
+        }
+        try {
+            var image = scene.render(0)
+            for (i in 1..4) image = scene.render(i * 100_000_000L)
+            val f = File(outDir, "mobil-feld-freier-platz.png").also { it.writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes) }
+            assertTrue(f.length() > 5_000)
+        } finally {
+            scene.close()
         }
     }
 }
