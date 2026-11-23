@@ -22,6 +22,7 @@ import com.handball.stattracker.ui.screens.FieldPlayerStatTrackerCard
 import com.handball.stattracker.ui.screens.GoalKeeperStatTrackerCard
 import com.handball.stattracker.ui.screens.SubstitutionPicker
 import com.handball.stattracker.ui.screens.MobileCourtList
+import com.handball.stattracker.ui.screens.CompactScoreboard
 import com.handball.stattracker.ui.screens.MobileActionBar
 import com.handball.stattracker.ui.screens.shortLabel
 import com.handball.stattracker.model.FieldAction
@@ -214,6 +215,14 @@ class GameCardScreenshotTest {
                         androidx.compose.foundation.layout.Column(
                             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(10.dp)
                         ) {
+                            CompactScoreboard(
+                                repository = repo, snapshot = snapshot, game = snapshot.games.first { it.gameId == 1 },
+                                isEditMode = true, isClockRunning = true, autoSyncScore = true,
+                                activeSuspensions = emptyList(),
+                                onBack = {}, onToggleEditMode = {}, onToggleClockRunning = {}, onAdjustClock = {},
+                                onSetClock = {}, onToggleAutoSync = {}, onOpenDirectScoreDialog = {}
+                            )
+                            androidx.compose.foundation.layout.Spacer(Modifier.padding(5.dp))
                             MobileCourtList(
                                 onCourt = onCourt,
                                 positionName = { p -> snapshot.positions.find { it.positionId == p.positionId }?.positionName?.substringBefore(" ") ?: p.role.label },

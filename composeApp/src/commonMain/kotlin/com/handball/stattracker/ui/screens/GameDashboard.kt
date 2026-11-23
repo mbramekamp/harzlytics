@@ -181,8 +181,23 @@ internal fun GameInteractiveDashboard(
                 .padding(if (isWideScreen) 18.dp else 10.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. Scoreboard + Match Clock Card
-            ScoreboardAndMatchClockCard(
+            // 1. Anzeigetafel: Handy kompakt, Tablet/Desktop groß
+            if (!isWideScreen) CompactScoreboard(
+                repository = repository,
+                snapshot = snapshot,
+                game = game,
+                isEditMode = isEditMode,
+                isClockRunning = isClockRunning,
+                autoSyncScore = autoSyncScore,
+                activeSuspensions = activeSuspensions,
+                onBack = onBack,
+                onToggleEditMode = { if (canEdit) isEditMode = !isEditMode },
+                onToggleClockRunning = { isClockRunning = !isClockRunning },
+                onAdjustClock = { deltaSec -> repository.advanceGameClock(game.gameId, deltaSec) },
+                onSetClock = { targetSec -> repository.setGameClockSeconds(game.gameId, targetSec) },
+                onToggleAutoSync = { autoSyncScore = it },
+                onOpenDirectScoreDialog = { showDirectScoreDialog = true }
+            ) else ScoreboardAndMatchClockCard(
                 repository = repository,
                 snapshot = snapshot,
                 game = game,
