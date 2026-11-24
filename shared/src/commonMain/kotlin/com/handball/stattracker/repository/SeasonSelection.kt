@@ -1,6 +1,10 @@
 package com.handball.stattracker.repository
 
+import com.handball.stattracker.model.Competition
+import com.handball.stattracker.model.Game
 import com.handball.stattracker.model.Season
+import com.handball.stattracker.model.SeasonPhase
+import com.handball.stattracker.model.SeasonScope
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -22,6 +26,28 @@ object SeasonSelection {
         seasons.filter { it.startOfSeason.isNotBlank() && it.startOfSeason > today }
             .minByOrNull { it.startOfSeason }?.let { return it.seasonId }
         return seasons.first().seasonId
+    }
+
+    /**
+     * Startauswahl im Saison-Menü: Läuft keine Saison, die nächste aber schon mit einem Testspiel
+     * (Datum ≤ [today]) vorbereitet wird, deren Vorbereitung; sonst die Saison aus [currentSeasonId].
+     */
+    fun currentScope(seasons: List<Season>, games: List<Game>, today: String): SeasonScope? {
+        val running = seasons.any { it.startOfSeason.isNotBlank() && it.startOfSeason <= today && today <= it.endOfSeason }
+        if (!running) {
+            val upcoming = seasons.filter { it.startOfSeason > today }.minByOrNull { it.startOfSeason }
+            if (upcoming != null && games.any {
+                    it.seasonId == upcoming.seasonId && it.competition == Competition.FRIENDLY && it.gameDate <= today
+                }
+            ) return SeasonScope(upcoming.seasonId, SeasonPhase.PRESEASON)
+        }
+        return currentSeasonId(seasons, today)?.let { SeasonScope(it) }
+    }
+
+    /** Einträge des Saison-Menüs: jede Saison, darunter ihre Vorbereitung, sobald es dort Testspiele gibt. */
+    fun menuScopes(seasons: List<Season>, games: List<Game>): List<SeasonScope> = seasons.flatMap { season ->
+        val hasPreseason = games.any { it.seasonId == season.seasonId && it.competition == Competition.FRIENDLY }
+        listOfNotNull(SeasonScope(season.seasonId), SeasonScope(season.seasonId, SeasonPhase.PRESEASON).takeIf { hasPreseason })
     }
 
     fun today(): String =

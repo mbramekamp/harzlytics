@@ -1,5 +1,8 @@
 package com.handball.stattracker.ui
 
+import com.handball.stattracker.model.Competition
+import com.handball.stattracker.model.SeasonPhase
+import com.handball.stattracker.model.SeasonScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -115,12 +118,17 @@ internal fun MainAppContent(
 
     var currentScreen by remember { mutableStateOf(initialScreen) }
     // Beim Start die aktuelle Saison; eine gewählte bleibt, solange es sie gibt
-    var chosenSeasonId by remember { mutableStateOf<Int?>(null) }
-    val currentSeasonId = remember(snapshot.seasons) {
-        SeasonSelection.currentSeasonId(snapshot.seasons, SeasonSelection.today())
+    // Auswahl = Saison oder deren Vorbereitung (SeasonScope)
+    var chosenScope by remember { mutableStateOf<SeasonScope?>(null) }
+    val currentScope = remember(snapshot.seasons, snapshot.games) {
+        SeasonSelection.currentScope(snapshot.seasons, snapshot.games, SeasonSelection.today())
     }
-    val selectedSeasonId = chosenSeasonId?.takeIf { id -> snapshot.seasons.any { it.seasonId == id } }
-        ?: currentSeasonId ?: 1
+    val menuScopes = remember(snapshot.seasons, snapshot.games) {
+        SeasonSelection.menuScopes(snapshot.seasons, snapshot.games)
+    }
+    val selectedScope = chosenScope?.takeIf { scope -> snapshot.seasons.any { it.seasonId == scope.seasonId } }
+        ?: currentScope ?: SeasonScope(1)
+    val selectedSeasonId = selectedScope.seasonId
     val syncState by repository.syncState.collectAsState()
     val syncScope = rememberCoroutineScope()
     // Wolken-Symbol = alles aktualisieren: Daten und Konto
@@ -203,7 +211,7 @@ internal fun MainAppContent(
                             DesktopHeader(
                                 title = staticHeaderTitle,
                                 seasonPicker = if (showSeasonPicker) {
-                                    { SeasonPicker(snapshot.seasons, selectedSeasonId, { chosenSeasonId = it }) }
+                                    { SeasonPicker(snapshot.seasons, menuScopes, selectedScope, { chosenScope = it }) }
                                 } else null,
                                 syncState = syncState,
                                 onSync = onSync,
@@ -219,7 +227,7 @@ internal fun MainAppContent(
                                     repository = repository,
                                     snapshot = snapshot,
                                     isWideScreen = true,
-                                    selectedSeasonId = selectedSeasonId,
+                                    selectedScope = selectedScope,
                                     selectedPlayerId = selectedPlayerId,
                                     selectedGameId = selectedGameId,
                                     ownPlayerId = ownPlayerId,
@@ -247,7 +255,7 @@ internal fun MainAppContent(
                         MobileTopHeaderBar(
                             title = staticHeaderTitle,
                             seasonPicker = if (showSeasonPicker) {
-                                { SeasonPicker(snapshot.seasons, selectedSeasonId, { chosenSeasonId = it }, compact = true) }
+                                { SeasonPicker(snapshot.seasons, menuScopes, selectedScope, { chosenScope = it }, compact = true) }
                             } else null,
                             syncState = syncState,
                             onSync = onSync,
@@ -264,7 +272,7 @@ internal fun MainAppContent(
                                 repository = repository,
                                 snapshot = snapshot,
                                 isWideScreen = false,
-                                selectedSeasonId = selectedSeasonId,
+                                selectedScope = selectedScope,
                                 selectedPlayerId = selectedPlayerId,
                                 selectedGameId = selectedGameId,
                                 ownPlayerId = ownPlayerId,
@@ -346,11 +354,14 @@ internal fun MainAppContent(
                 modalType = creationModal,
                 repository = repository,
                 snapshot = snapshot,
-                defaultSeasonId = selectedSeasonId,
+                defaultScope = selectedScope,
                 onSelectModal = { creationModal = it },
                 onDismiss = { creationModal = CreationModalType.NONE },
                 onGameCreated = { newGame ->
-                    chosenSeasonId = newGame.seasonId
+                    chosenScope = SeasonScope(
+                        newGame.seasonId,
+                        if (newGame.competition == Competition.FRIENDLY) SeasonPhase.PRESEASON else SeasonPhase.SEASON
+                    )
                     selectedGameId = newGame.gameId
                     currentScreen = MainNavScreen.SEASON
                 },
@@ -359,7 +370,7 @@ internal fun MainAppContent(
                     currentScreen = MainNavScreen.ROSTER
                 },
                 onSeasonCreated = { newSeason ->
-                    chosenSeasonId = newSeason.seasonId
+                    chosenScope = SeasonScope(newSeason.seasonId)
                     selectedGameId = null
                     currentScreen = MainNavScreen.SEASON
                 }
@@ -670,7 +681,7 @@ private fun MainContentRouter(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
     isWideScreen: Boolean,
-    selectedSeasonId: Int,
+    selectedScope: SeasonScope,
     selectedPlayerId: Int?,
     selectedGameId: Int?,
     ownPlayerId: Int?,
@@ -685,7 +696,7 @@ private fun MainContentRouter(
                 repository = repository,
                 snapshot = snapshot,
                 isWideScreen = isWideScreen,
-                selectedSeasonId = selectedSeasonId,
+                selectedScope = selectedScope,
                 onNavigateToPlayer = { onSelectPlayer(it) },
                 onNavigateToGame = { onSelectGame(it) },
                 onNavigateToStandings = onNavigateToStandings
@@ -709,7 +720,7 @@ private fun MainContentRouter(
             SeasonScreen(
                 repository = repository,
                 snapshot = snapshot,
-                selectedSeasonId = selectedSeasonId,
+                selectedScope = selectedScope,
                 selectedGameId = selectedGameId,
                 isWideScreen = isWideScreen,
                 onSelectGame = onSelectGame,
@@ -722,7 +733,7 @@ private fun MainContentRouter(
                 repository = repository,
                 snapshot = snapshot,
                 isWideScreen = isWideScreen,
-                selectedSeasonId = selectedSeasonId
+                selectedSeasonId = selectedScope.seasonId
             )
         }
 

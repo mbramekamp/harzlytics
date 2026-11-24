@@ -76,6 +76,9 @@ data class Game(
 ) {
     val isOwnTeamGame: Boolean get() = secondOpponentId == null
 
+    /** Wettbewerb aus dem gespeicherten Text (`game_type`); unbekannte Werte gelten als Ligaspiel. */
+    val competition: Competition get() = Competition.fromStorage(gameType)
+
     val elapsedFormatted: String
         get() = formatGameClockSeconds(elapsedSeconds)
 
@@ -569,4 +572,32 @@ data class SubstitutionOptions(
     val canActAlone: Boolean
 ) {
     val hasAnyOption: Boolean get() = partnerIds.isNotEmpty() || canActAlone
+}
+
+/** Wettbewerb eines Spiels. Gespeichert wird [storageValue] (Spalte `game_type`), damit Supabase unverändert bleibt. */
+enum class Competition(val storageValue: String) {
+    LEAGUE("Ligaspiel"),
+    FRIENDLY("Testspiel");
+
+    companion object {
+        fun fromStorage(value: String): Competition =
+            entries.firstOrNull { it.storageValue.equals(value.trim(), ignoreCase = true) } ?: LEAGUE
+    }
+}
+
+/** Teil einer Saison: die Saison selbst (Ligaspiele) oder die Vorbereitung davor (Testspiele). */
+enum class SeasonPhase { SEASON, PRESEASON }
+
+/**
+ * Auswahl im Saison-Menü und Filter für Statistiken: Saison [seasonId], eingeschränkt auf [phase]
+ * (`null` = beide Teile, z. B. für die Startsieben-Empfehlung).
+ */
+data class SeasonScope(val seasonId: Int, val phase: SeasonPhase? = SeasonPhase.SEASON) {
+    fun includes(game: Game): Boolean = game.seasonId == seasonId && when (phase) {
+        null -> true
+        SeasonPhase.SEASON -> game.competition == Competition.LEAGUE
+        SeasonPhase.PRESEASON -> game.competition == Competition.FRIENDLY
+    }
+
+    val isPreseason: Boolean get() = phase == SeasonPhase.PRESEASON
 }

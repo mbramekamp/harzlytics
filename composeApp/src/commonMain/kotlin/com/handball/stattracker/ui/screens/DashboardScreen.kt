@@ -1,5 +1,6 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.model.SeasonScope
 import com.handball.stattracker.ui.EditorOnly
 import com.handball.stattracker.ui.theme.seasonChipColors
 import com.handball.stattracker.ui.rememberCanEdit
@@ -32,40 +33,40 @@ fun DashboardScreen(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
     isWideScreen: Boolean = true,
-    selectedSeasonId: Int,
+    selectedScope: SeasonScope,
     onNavigateToPlayer: (Int) -> Unit,
     onNavigateToGame: (Int) -> Unit,
     onNavigateToStandings: () -> Unit
 ) {
 
-    val activeSeason = snapshot.seasons.find { it.seasonId == selectedSeasonId } ?: snapshot.seasons.firstOrNull()
-    val standings = remember(snapshot, activeSeason) {
+    val activeSeason = snapshot.seasons.find { it.seasonId == selectedScope.seasonId } ?: snapshot.seasons.firstOrNull()
+    val standings = remember(snapshot, activeSeason, selectedScope) {
         activeSeason?.let { repository.computeStandings(it.seasonId, snapshot) } ?: emptyList()
     }
     val ownStanding = standings.find { it.isOwnTeam }
 
-    val topScorers = remember(snapshot, activeSeason) {
+    val topScorers = remember(snapshot, activeSeason, selectedScope) {
         snapshot.players
             .filter { it.role == PlayerRole.FIELD_PLAYER }
             .map { player ->
-                player to repository.computePlayerAggregatedStats(player.playerId, activeSeason?.seasonId, snapshot)
+                player to repository.computePlayerAggregatedStats(player.playerId, selectedScope, snapshot)
             }
             .sortedByDescending { it.second.totalGoals }
             .take(5)
     }
 
-    val topKeepers = remember(snapshot, activeSeason) {
+    val topKeepers = remember(snapshot, activeSeason, selectedScope) {
         snapshot.players
             .filter { it.role == PlayerRole.GOALKEEPER }
             .map { player ->
-                player to repository.computePlayerAggregatedStats(player.playerId, activeSeason?.seasonId, snapshot)
+                player to repository.computePlayerAggregatedStats(player.playerId, selectedScope, snapshot)
             }
             .sortedByDescending { it.second.savePercentage }
     }
 
-    val recentGames = remember(snapshot, activeSeason) {
+    val recentGames = remember(snapshot, activeSeason, selectedScope) {
         snapshot.games
-            .filter { activeSeason == null || it.seasonId == activeSeason.seasonId }
+            .filter { selectedScope.includes(it) }
             .sortedByDescending { it.gameDate }
             .take(4)
     }

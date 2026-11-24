@@ -1,5 +1,7 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.repository.SeasonSelection
+import com.handball.stattracker.model.SeasonScope
 import com.handball.stattracker.model.UserRole
 import com.handball.stattracker.ui.EditorOnly
 import com.handball.stattracker.ui.LocalUserRole
@@ -383,7 +385,7 @@ private fun PlayerProfileDetailPanel(
     onNavigateToGame: (Int) -> Unit,
     onDeleted: () -> Unit
 ) {
-    var seasonFilterId by remember { mutableStateOf<Int?>(null) }
+    var seasonFilterId by remember { mutableStateOf<SeasonScope?>(null) }
 
     val stats = remember(snapshot, player.playerId, seasonFilterId) {
         repository.computePlayerAggregatedStats(player.playerId, seasonFilterId, snapshot)
@@ -574,11 +576,11 @@ private fun PlayerProfileDetailPanel(
                 onClick = { seasonFilterId = null },
                 label = { Text("Gesamt") }
             )
-            snapshot.seasons.forEach { season ->
+            SeasonSelection.menuScopes(snapshot.seasons, snapshot.games).forEach { scope ->
                 FilterChip(
-                    selected = seasonFilterId == season.seasonId,
-                    onClick = { seasonFilterId = season.seasonId },
-                    label = { Text(season.division) }
+                    selected = seasonFilterId == scope,
+                    onClick = { seasonFilterId = scope },
+                    label = { Text(com.handball.stattracker.ui.scopeLabel(snapshot.seasons, scope)) }
                 )
             }
         }

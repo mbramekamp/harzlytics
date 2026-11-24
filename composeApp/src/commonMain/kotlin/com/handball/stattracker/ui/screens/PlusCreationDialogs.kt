@@ -1,5 +1,6 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.model.SeasonScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -32,7 +33,7 @@ fun PlusCreationModalHost(
     modalType: CreationModalType,
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
-    defaultSeasonId: Int,
+    defaultScope: SeasonScope,
     onSelectModal: (CreationModalType) -> Unit,
     onDismiss: () -> Unit,
     onGameCreated: (Game) -> Unit,
@@ -124,7 +125,7 @@ fun PlusCreationModalHost(
             NewOpponentModal(
                 repository = repository,
                 snapshot = snapshot,
-                defaultSeasonId = defaultSeasonId,
+                defaultSeasonId = defaultScope.seasonId,
                 onDismiss = onDismiss
             )
         }
@@ -141,10 +142,10 @@ fun PlusCreationModalHost(
         }
 
         CreationModalType.NEW_GAME -> {
-            NewGameModal(
+            NewGameForm(
                 repository = repository,
                 snapshot = snapshot,
-                defaultSeasonId = defaultSeasonId,
+                defaultScope = defaultScope,
                 onDismiss = onDismiss,
                 onCreated = {
                     onGameCreated(it)
@@ -218,154 +219,74 @@ private fun NewPlayerModal(
     var customPositionName by remember { mutableStateOf("") }
     var showAddPosition by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Neuer Spieler", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = role == PlayerRole.FIELD_PLAYER,
-                        onClick = { role = PlayerRole.FIELD_PLAYER },
-                        label = { Text("Feldspieler") }
+    CreationFormFrame(
+        title = "Neuer Spieler",
+        actionLabel = "Anlegen",
+        actionEnabled = firstName.isNotBlank() && lastName.isNotBlank(),
+        onAction = {
+            val created = repository.addPlayer(
+                firstName = firstName,
+                lastName = lastName,
+                email = email,
+                role = role,
+                positionId = selectedPositionId,
+                jerseyHome = jerseyHome.toIntOrNull(),
+                jerseyAway = jerseyAway.toIntOrNull() ?: jerseyHome.toIntOrNull()
+            )
+            onCreated(created)
+        },
+        onClose = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()).then(FormContentPadding),
+            verticalArrangement = FormFieldSpacing
+        ) {
+            SegmentedChoice(listOf(PlayerRole.FIELD_PLAYER to "Feldspieler", PlayerRole.GOALKEEPER to "Torwart"), role) { newRole ->
+                role = newRole
+                if (newRole == PlayerRole.GOALKEEPER) {
+                    selectedPositionId = snapshot.positions.firstOrNull { it.positionName.startsWith("TW") }?.positionId ?: selectedPositionId
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(firstName, { firstName = it }, label = { Text("Vorname") }, singleLine = true, modifier = Modifier.weight(1f))
+                OutlinedTextField(lastName, { lastName = it }, label = { Text("Nachname") }, singleLine = true, modifier = Modifier.weight(1f))
+            }
+            OutlinedTextField(email, { email = it }, label = { Text("E-Mail") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            // Kurze, gleich lange Beschriftungen: beide Felder bleiben einzeilig und gleich hoch
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NumberField("Nr. Heim", jerseyHome, { jerseyHome = it }, Modifier.weight(1f))
+                NumberField("Nr. Auswärts", jerseyAway, { jerseyAway = it }, Modifier.weight(1f))
+            }
+            DropdownField(
+                label = "Position",
+                options = snapshot.positions.map { it.positionId to it.positionName },
+                selected = selectedPositionId,
+                onSelect = { selectedPositionId = it }
+            )
+            if (showAddPosition) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        customPositionName,
+                        { customPositionName = it },
+                        label = { Text("Neue Position") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
                     )
-                    FilterChip(
-                        selected = role == PlayerRole.GOALKEEPER,
+                    FilledTonalButton(
+                        enabled = customPositionName.isNotBlank(),
                         onClick = {
-                            role = PlayerRole.GOALKEEPER
-                            selectedPositionId = snapshot.positions.firstOrNull { it.positionName.startsWith("TW") }?.positionId
-                                ?: selectedPositionId
-                        },
-                        label = { Text("Torwart") }
-                    )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = firstName,
-                        onValueChange = { firstName = it },
-                        label = { Text("Vorname *") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = lastName,
-                        onValueChange = { lastName = it },
-                        label = { Text("Nachname *") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("E-Mail") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = jerseyHome,
-                        onValueChange = { jerseyHome = it },
-                        label = { Text("Trikot Heim") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = jerseyAway,
-                        onValueChange = { jerseyAway = it },
-                        label = { Text("Trikot Auswärts") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Position", fontWeight = FontWeight.SemiBold)
-                    TextButton(onClick = { showAddPosition = !showAddPosition }) {
-                        Text("+ Eigene Position")
-                    }
-                }
-
-                if (showAddPosition) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = customPositionName,
-                            onValueChange = { customPositionName = it },
-                            label = { Text("Positionsbezeichnung") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Button(
-                            onClick = {
-                                if (customPositionName.isNotBlank()) {
-                                    val created = repository.addPosition(customPositionName)
-                                    selectedPositionId = created.positionId
-                                    customPositionName = ""
-                                    showAddPosition = false
-                                }
-                            }
-                        ) {
-                            Text("Hinzufügen")
+                            val created = repository.addPosition(customPositionName)
+                            selectedPositionId = created.positionId
+                            customPositionName = ""
+                            showAddPosition = false
                         }
-                    }
+                    ) { Text("Hinzufügen") }
                 }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    snapshot.positions.forEach { pos ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedPositionId = pos.positionId }
-                        ) {
-                            RadioButton(
-                                selected = selectedPositionId == pos.positionId,
-                                onClick = { selectedPositionId = pos.positionId }
-                            )
-                            Text(pos.positionName)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = firstName.isNotBlank() && lastName.isNotBlank(),
-                onClick = {
-                    val created = repository.addPlayer(
-                        firstName = firstName,
-                        lastName = lastName,
-                        email = email,
-                        role = role,
-                        positionId = selectedPositionId,
-                        jerseyHome = jerseyHome.toIntOrNull(),
-                        jerseyAway = jerseyAway.toIntOrNull() ?: jerseyHome.toIntOrNull()
-                    )
-                    onCreated(created)
-                }
-            ) {
-                Text("Speichern")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
+            } else {
+                TextButton(onClick = { showAddPosition = true }) { Text("Eigene Position") }
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -378,62 +299,36 @@ private fun NewTrainerModal(
     var lastName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Neuer Trainer", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = firstName,
-                    onValueChange = { firstName = it },
-                    label = { Text("Vorname *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+    CreationFormFrame(
+        title = "Neuer Trainer",
+        actionLabel = "Anlegen",
+        actionEnabled = firstName.isNotBlank() && lastName.isNotBlank(),
+        onAction = {
+            onCreated(
+                repository.addPlayer(
+                    firstName = firstName,
+                    lastName = lastName,
+                    email = email,
+                    role = PlayerRole.COACH,
+                    positionId = null,
+                    jerseyHome = null,
+                    jerseyAway = null
                 )
-                OutlinedTextField(
-                    value = lastName,
-                    onValueChange = { lastName = it },
-                    label = { Text("Nachname *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("E-Mail") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            )
         },
-        confirmButton = {
-            Button(
-                enabled = firstName.isNotBlank() && lastName.isNotBlank(),
-                onClick = {
-                    val coach = repository.addPlayer(
-                        firstName = firstName,
-                        lastName = lastName,
-                        email = email,
-                        role = PlayerRole.COACH,
-                        positionId = null,
-                        jerseyHome = null,
-                        jerseyAway = null
-                    )
-                    onCreated(coach)
-                }
-            ) {
-                Text("Speichern")
+        onClose = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()).then(FormContentPadding),
+            verticalArrangement = FormFieldSpacing
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(firstName, { firstName = it }, label = { Text("Vorname") }, singleLine = true, modifier = Modifier.weight(1f))
+                OutlinedTextField(lastName, { lastName = it }, label = { Text("Nachname") }, singleLine = true, modifier = Modifier.weight(1f))
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
+            OutlinedTextField(email, { email = it }, label = { Text("E-Mail") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         }
-    )
+    }
 }
 
 @Composable
@@ -447,80 +342,48 @@ private fun NewOpponentModal(
     var opponentLocation by remember { mutableStateOf("") }
     var selectedSeasonIds by remember { mutableStateOf(setOf(defaultSeasonId)) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Neuer Gegner", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = opponentName,
-                    onValueChange = { opponentName = it },
-                    label = { Text("Vereinsname *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = opponentLocation,
-                    onValueChange = { opponentLocation = it },
-                    label = { Text("Ort *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Text("Staffel-Zuweisung", fontWeight = FontWeight.SemiBold)
+    CreationFormFrame(
+        title = "Neuer Gegner",
+        actionLabel = "Anlegen",
+        actionEnabled = opponentName.isNotBlank() && opponentLocation.isNotBlank(),
+        onAction = {
+            repository.addOpponentWithSeasons(
+                opponentName = opponentName,
+                opponentLocation = opponentLocation,
+                assignedSeasonIds = selectedSeasonIds
+            )
+            onDismiss()
+        },
+        onClose = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()).then(FormContentPadding),
+            verticalArrangement = FormFieldSpacing
+        ) {
+            OutlinedTextField(opponentName, { opponentName = it }, label = { Text("Verein") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(opponentLocation, { opponentLocation = it }, label = { Text("Ort") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            FormSectionLabel("Spielt in")
+            Column {
                 snapshot.seasons.forEach { season ->
                     val checked = season.seasonId in selectedSeasonIds
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                selectedSeasonIds = if (checked) {
-                                    selectedSeasonIds - season.seasonId
-                                } else {
-                                    selectedSeasonIds + season.seasonId
-                                }
-                            }
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            selectedSeasonIds = if (checked) selectedSeasonIds - season.seasonId else selectedSeasonIds + season.seasonId
+                        }
                     ) {
                         Checkbox(
                             checked = checked,
                             onCheckedChange = { isChecked ->
-                                selectedSeasonIds = if (isChecked) {
-                                    selectedSeasonIds + season.seasonId
-                                } else {
-                                    selectedSeasonIds - season.seasonId
-                                }
+                                selectedSeasonIds = if (isChecked) selectedSeasonIds + season.seasonId else selectedSeasonIds - season.seasonId
                             }
                         )
                         Text(season.division)
                     }
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                enabled = opponentName.isNotBlank() && opponentLocation.isNotBlank(),
-                onClick = {
-                    repository.addOpponentWithSeasons(
-                        opponentName = opponentName,
-                        opponentLocation = opponentLocation,
-                        assignedSeasonIds = selectedSeasonIds
-                    )
-                    onDismiss()
-                }
-            ) {
-                Text("Speichern")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
         }
-    )
+    }
 }
 
 @Composable
@@ -529,318 +392,28 @@ private fun NewSeasonModal(
     onDismiss: () -> Unit,
     onCreated: (Season) -> Unit
 ) {
+    // Vorschlag: nächste Saison ab 1. September bis 31. Mai
+    val year = com.handball.stattracker.repository.SeasonSelection.today().take(4).toIntOrNull() ?: 2026
     var division by remember { mutableStateOf("") }
-    var startOfSeason by remember { mutableStateOf("2026-09-01") }
-    var endOfSeason by remember { mutableStateOf("2027-05-31") }
+    var startOfSeason by remember { mutableStateOf("$year-09-01") }
+    var endOfSeason by remember { mutableStateOf("${year + 1}-05-31") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Neue Saison", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = division,
-                    onValueChange = { division = it },
-                    label = { Text("Staffel / Liga *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = startOfSeason,
-                    onValueChange = { startOfSeason = it },
-                    label = { Text("Beginn (YYYY-MM-DD)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = endOfSeason,
-                    onValueChange = { endOfSeason = it },
-                    label = { Text("Ende (YYYY-MM-DD)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = division.isNotBlank(),
-                onClick = {
-                    val created = repository.addSeason(division, startOfSeason, endOfSeason)
-                    onCreated(created)
-                }
-            ) {
-                Text("Anlegen")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
+    CreationFormFrame(
+        title = "Neue Saison",
+        actionLabel = "Anlegen",
+        actionEnabled = division.isNotBlank() && startOfSeason <= endOfSeason,
+        onAction = { onCreated(repository.addSeason(division, startOfSeason, endOfSeason)) },
+        onClose = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()).then(FormContentPadding),
+            verticalArrangement = FormFieldSpacing
+        ) {
+            OutlinedTextField(division, { division = it }, label = { Text("Staffel / Liga") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DateField("Beginn", startOfSeason, { startOfSeason = it }, Modifier.weight(1f))
+                DateField("Ende", endOfSeason, { endOfSeason = it }, Modifier.weight(1f))
             }
         }
-    )
-}
-
-@Composable
-private fun NewGameModal(
-    repository: HandballRepository,
-    snapshot: DatabaseSnapshot,
-    defaultSeasonId: Int,
-    onDismiss: () -> Unit,
-    onCreated: (Game) -> Unit
-) {
-    var seasonId by remember {
-        mutableStateOf(snapshot.seasons.find { it.seasonId == defaultSeasonId }?.seasonId ?: snapshot.seasons.firstOrNull()?.seasonId ?: 1)
     }
-    var isOwnTeamMatch by remember { mutableStateOf(true) }
-    var isHomeGame by remember { mutableStateOf(true) }
-    var opponentId by remember {
-        mutableStateOf(snapshot.opponentTeams.firstOrNull()?.opponentTeamId ?: 1)
-    }
-    var secondOpponentId by remember {
-        mutableStateOf(snapshot.opponentTeams.drop(1).firstOrNull()?.opponentTeamId ?: opponentId)
-    }
-    // Vorschlag: Halle des letzten eigenen Heimspiels
-    var location by remember {
-        mutableStateOf(snapshot.games.lastOrNull { it.isOwnTeamGame && it.isHomeGame }?.location ?: "")
-    }
-    var gameType by remember { mutableStateOf("Ligaspiel") }
-    var gameDate by remember { mutableStateOf(com.handball.stattracker.repository.SeasonSelection.today()) }
-    var homeScore by remember { mutableStateOf("0") }
-    var awayScore by remember { mutableStateOf("0") }
-    var homeHalf by remember { mutableStateOf("0") }
-    var awayHalf by remember { mutableStateOf("0") }
-
-    var nominatedIds by remember {
-        mutableStateOf(snapshot.players.map { it.playerId }.toSet())
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Neues Spiel", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = isOwnTeamMatch,
-                        onClick = { isOwnTeamMatch = true },
-                        label = { Text("Eigenes Spiel") }
-                    )
-                    FilterChip(
-                        selected = !isOwnTeamMatch,
-                        onClick = { isOwnTeamMatch = false },
-                        label = { Text("Fremdpaarung") }
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    snapshot.seasons.forEach { s ->
-                        FilterChip(
-                            selected = seasonId == s.seasonId,
-                            onClick = { seasonId = s.seasonId },
-                            label = { Text(s.division) }
-                        )
-                    }
-                }
-
-                if (isOwnTeamMatch) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = isHomeGame,
-                            onClick = {
-                                isHomeGame = true
-                                location = "Löwen-Arena"
-                            },
-                            label = { Text("Heimspiel") }
-                        )
-                        FilterChip(
-                            selected = !isHomeGame,
-                            onClick = {
-                                isHomeGame = false
-                                val oppLoc = snapshot.opponentTeams.find { it.opponentTeamId == opponentId }?.opponentLocation
-                                if (!oppLoc.isNullOrBlank()) location = "Sporthalle $oppLoc"
-                            },
-                            label = { Text("Auswärtsspiel") }
-                        )
-                    }
-                }
-
-                Text(
-                    text = if (isOwnTeamMatch) "Gegner" else "Heim",
-                    fontWeight = FontWeight.SemiBold
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    snapshot.opponentTeams.forEach { opp ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { opponentId = opp.opponentTeamId }
-                        ) {
-                            RadioButton(
-                                selected = opponentId == opp.opponentTeamId,
-                                onClick = { opponentId = opp.opponentTeamId }
-                            )
-                            Text("${opp.opponentName} (${opp.opponentLocation})")
-                        }
-                    }
-                }
-
-                if (!isOwnTeamMatch) {
-                    Text("Gast", fontWeight = FontWeight.SemiBold)
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        snapshot.opponentTeams.forEach { opp ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { secondOpponentId = opp.opponentTeamId }
-                            ) {
-                                RadioButton(
-                                    selected = secondOpponentId == opp.opponentTeamId,
-                                    onClick = { secondOpponentId = opp.opponentTeamId }
-                                )
-                                Text("${opp.opponentName} (${opp.opponentLocation})")
-                            }
-                        }
-                    }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = gameDate,
-                        onValueChange = { gameDate = it },
-                        label = { Text("Datum") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = location,
-                        onValueChange = { location = it },
-                        label = { Text("Spielort") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = gameType,
-                    onValueChange = { gameType = it },
-                    label = { Text("Wettbewerb") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = homeScore,
-                        onValueChange = { homeScore = it },
-                        label = { Text("Tore Heim") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = awayScore,
-                        onValueChange = { awayScore = it },
-                        label = { Text("Tore Gast") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = homeHalf,
-                        onValueChange = { homeHalf = it },
-                        label = { Text("HZ Heim") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = awayHalf,
-                        onValueChange = { awayHalf = it },
-                        label = { Text("HZ Gast") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                if (isOwnTeamMatch) {
-                    HorizontalDivider()
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Aufgebot (${nominatedIds.size}/${snapshot.players.size})",
-                            fontWeight = FontWeight.Bold
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            TextButton(onClick = { nominatedIds = snapshot.players.map { it.playerId }.toSet() }) {
-                                Text("Alle")
-                            }
-                            TextButton(onClick = { nominatedIds = emptySet() }) {
-                                Text("Keine")
-                            }
-                        }
-                    }
-
-                    snapshot.players.forEach { p ->
-                        val checked = p.playerId in nominatedIds
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    nominatedIds = if (checked) nominatedIds - p.playerId else nominatedIds + p.playerId
-                                }
-                        ) {
-                            Checkbox(
-                                checked = checked,
-                                onCheckedChange = { isChecked ->
-                                    nominatedIds = if (isChecked) nominatedIds + p.playerId else nominatedIds - p.playerId
-                                }
-                            )
-                            Text("${p.fullName} (${p.role.label})")
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = snapshot.opponentTeams.isNotEmpty() && (isOwnTeamMatch || opponentId != secondOpponentId),
-                onClick = {
-                    val created = repository.addGame(
-                        seasonId = seasonId,
-                        opponentId = opponentId,
-                        secondOpponentId = if (isOwnTeamMatch) null else secondOpponentId,
-                        isHomeGame = isHomeGame,
-                        location = location,
-                        gameType = gameType,
-                        gameDate = gameDate,
-                        homeHalftime = homeHalf.toIntOrNull() ?: 0,
-                        awayHalftime = awayHalf.toIntOrNull() ?: 0,
-                        homeScore = homeScore.toIntOrNull() ?: 0,
-                        awayScore = awayScore.toIntOrNull() ?: 0,
-                        nominatedPlayerIds = if (isOwnTeamMatch) nominatedIds else emptySet()
-                    )
-                    onCreated(created)
-                }
-            ) {
-                Text("Anlegen")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
 }

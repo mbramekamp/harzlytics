@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.handball.stattracker.model.Season
+import com.handball.stattracker.model.SeasonScope
+import androidx.compose.foundation.layout.padding
 
 /**
  * Die eine Saison-Auswahl der App (Kopfzeile). Alle Screens zeigen die hier gewählte Saison;
@@ -31,14 +33,14 @@ import com.handball.stattracker.model.Season
 @Composable
 fun SeasonPicker(
     seasons: List<Season>,
-    selectedSeasonId: Int,
-    onSelect: (Int) -> Unit,
+    scopes: List<SeasonScope>,
+    selected: SeasonScope,
+    onSelect: (SeasonScope) -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false
 ) {
     if (seasons.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
-    val label = seasons.find { it.seasonId == selectedSeasonId }?.division ?: seasons.first().division
 
     Box(modifier) {
         TextButton(
@@ -48,7 +50,7 @@ fun SeasonPicker(
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
         ) {
             Text(
-                label,
+                scopeLabel(seasons, selected),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -58,18 +60,31 @@ fun SeasonPicker(
             Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Saison wählen")
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            seasons.forEach { season ->
+            scopes.forEach { scope ->
+                val season = seasons.find { it.seasonId == scope.seasonId } ?: return@forEach
                 DropdownMenuItem(
-                    text = { Text(season.division) },
+                    // Vorbereitung eingerückt unter ihrer Saison
+                    text = {
+                        Text(
+                            if (scope.isPreseason) "Vorbereitung" else season.division,
+                            modifier = if (scope.isPreseason) Modifier.padding(start = 16.dp) else Modifier
+                        )
+                    },
                     trailingIcon = {
-                        if (season.seasonId == selectedSeasonId) Icon(Icons.Default.Check, contentDescription = null)
+                        if (scope == selected) Icon(Icons.Default.Check, contentDescription = null)
                     },
                     onClick = {
                         expanded = false
-                        onSelect(season.seasonId)
+                        onSelect(scope)
                     }
                 )
             }
         }
     }
+}
+
+/** Anzeigename eines Saison-Bereichs, z. B. "Oberliga Nord 2026/27" oder "Vorbereitung – Oberliga Nord 2026/27". */
+fun scopeLabel(seasons: List<Season>, scope: SeasonScope): String {
+    val division = seasons.find { it.seasonId == scope.seasonId }?.division ?: seasons.firstOrNull()?.division.orEmpty()
+    return if (scope.isPreseason) "Vorbereitung – $division" else division
 }

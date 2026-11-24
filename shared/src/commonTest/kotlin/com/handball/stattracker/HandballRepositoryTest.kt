@@ -150,6 +150,51 @@ class HandballRepositoryTest {
     }
 
     @Test
+    fun testSuggestedSquadReusesTheLastOwnGame() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        val state = repo.snapshot.value
+        val lastOwn = state.games.filter { it.isOwnTeamGame }.maxBy { it.gameDate }
+        val expected = state.playerGames.filter { it.gameId == lastOwn.gameId }.map { it.playerId }.toSet()
+        assertEquals(expected, repo.suggestedSquad())
+
+        // Ohne Spiele: ganzer Kader samt Staff
+        repo.replaceSnapshot(state.copy(games = emptyList(), playerGames = emptyList()))
+        assertEquals(state.players.map { it.playerId }.toSet(), repo.suggestedSquad())
+    }
+
+    @Test
+    fun testDateConversionForTheCalendar() {
+        val millis = com.handball.stattracker.repository.DisplayFormat.isoToEpochMillisUtc("2026-11-24")!!
+        assertEquals("2026-11-24", com.handball.stattracker.repository.DisplayFormat.epochMillisUtcToIso(millis))
+        assertEquals(null, com.handball.stattracker.repository.DisplayFormat.isoToEpochMillisUtc("24.11.2026"))
+    }
+
+    @Test
+    fun testFriendlyGamesStayOutOfStandingsAndSeasonStats() {
+        val repo = HandballRepository(persistLocally = false)
+        repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())
+        val before = repo.computeStandings(seasonId = 1)
+        val ownBefore = before.first { it.isOwnTeam }
+        val opponentId = repo.snapshot.value.opponentTeams.first().opponentTeamId
+
+        val friendly = repo.addGame(
+            seasonId = 1, opponentId = opponentId, secondOpponentId = null, isHomeGame = true,
+            location = "Halle", gameType = com.handball.stattracker.model.Competition.FRIENDLY.storageValue,
+            gameDate = "2026-08-01", homeHalftime = 0, awayHalftime = 0, homeScore = 30, awayScore = 20,
+            nominatedPlayerIds = setOf(3)
+        )
+        assertEquals(com.handball.stattracker.model.Competition.FRIENDLY, friendly.competition)
+        assertEquals(ownBefore.gamesPlayed, repo.computeStandings(seasonId = 1).first { it.isOwnTeam }.gamesPlayed, "Testspiel zählt nicht in der Tabelle")
+
+        // Spiel-Historie: Saison ohne, Vorbereitung nur mit dem Testspiel
+        val seasonHistory = repo.getPlayerGameHistory(3, com.handball.stattracker.model.SeasonScope(1))
+        val preseasonHistory = repo.getPlayerGameHistory(3, com.handball.stattracker.model.SeasonScope(1, com.handball.stattracker.model.SeasonPhase.PRESEASON))
+        assertFalse(seasonHistory.any { it.game.gameId == friendly.gameId })
+        assertEquals(listOf(friendly.gameId), preseasonHistory.map { it.game.gameId })
+    }
+
+    @Test
     fun testGoalConcededWithoutKeeperOnlyWithSevenFieldPlayers() {
         val repo = HandballRepository(persistLocally = false)
         repo.replaceSnapshot(DemoDataSeed.createDemoSnapshot())

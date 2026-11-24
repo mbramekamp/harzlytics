@@ -1,5 +1,6 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.model.SeasonScope
 import com.handball.stattracker.ui.EditorOnly
 import com.handball.stattracker.ui.theme.amberContainer
 import com.handball.stattracker.ui.theme.seasonChipColors
@@ -53,7 +54,7 @@ import kotlinx.coroutines.delay
 fun SeasonScreen(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
-    selectedSeasonId: Int,
+    selectedScope: SeasonScope,
     selectedGameId: Int?,
     isWideScreen: Boolean = true,
     onSelectGame: (Int?) -> Unit,
@@ -72,12 +73,12 @@ fun SeasonScreen(
         return
     }
 
-    val activeSeason = snapshot.seasons.find { it.seasonId == selectedSeasonId } ?: snapshot.seasons.firstOrNull()
+    val activeSeason = snapshot.seasons.find { it.seasonId == selectedScope.seasonId } ?: snapshot.seasons.firstOrNull()
     var filterMode by remember { mutableStateOf(0) } // 0 = Alle, 1 = Eigene Spiele, 2 = Liga-Fremdspiele
 
-    val gamesInSeason = remember(snapshot.games, activeSeason, filterMode) {
+    val gamesInSeason = remember(snapshot.games, selectedScope, filterMode) {
         snapshot.games
-            .filter { activeSeason == null || it.seasonId == activeSeason.seasonId }
+            .filter { selectedScope.includes(it) }
             .filter {
                 when (filterMode) {
                     1 -> it.isOwnTeamGame

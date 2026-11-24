@@ -1,5 +1,6 @@
 package com.handball.stattracker.ui.screens
 
+import com.handball.stattracker.model.SeasonScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -51,7 +52,7 @@ fun PlayerPerformanceTabContent(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
     player: Player,
-    seasonFilterId: Int?,
+    seasonFilterId: SeasonScope?,
     isWideScreen: Boolean,
     onSelectPlayer: (Int) -> Unit,
     onNavigateToGame: (Int) -> Unit
@@ -84,7 +85,7 @@ fun PlayerPerformanceTabContent(
     val positionRankings = remember(snapshot, player.positionId, seasonFilterId) {
         repository.computePlayerRankings(
             positionIdFilter = player.positionId,
-            seasonIdFilter = seasonFilterId,
+            seasonScope = seasonFilterId,
             sortCriterion = RankingSortCriterion.PERFORMANCE_INDEX,
             state = snapshot
         )
@@ -1161,7 +1162,7 @@ private fun PositionMetricComparisonBarRow(
 fun CoachPlayerRankingDashboard(
     repository: HandballRepository,
     snapshot: DatabaseSnapshot,
-    seasonFilterId: Int?,
+    seasonFilterId: SeasonScope?,
     onSelectPlayer: (Int) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -1200,7 +1201,7 @@ fun CoachPlayerRankingDashboard(
                     snapshot.positions.forEach { pos ->
                         val topForPos = repository.computePlayerRankings(
                             positionIdFilter = pos.positionId,
-                            seasonIdFilter = seasonFilterId,
+                            seasonScope = seasonFilterId,
                             sortCriterion = RankingSortCriterion.PERFORMANCE_INDEX,
                             state = snapshot
                         ).firstOrNull()
@@ -1264,7 +1265,7 @@ fun TrainerPlayerRankingSection(
     snapshot: DatabaseSnapshot,
     highlightedPlayerId: Int?,
     initialPositionIdFilter: Int?,
-    seasonFilterId: Int?,
+    seasonFilterId: SeasonScope?,
     onSelectPlayer: (Int) -> Unit
 ) {
     var selectedPositionId by remember(initialPositionIdFilter) { mutableStateOf(initialPositionIdFilter) }
@@ -1273,7 +1274,7 @@ fun TrainerPlayerRankingSection(
     val rankings = remember(snapshot, selectedPositionId, seasonFilterId, sortCriterion) {
         repository.computePlayerRankings(
             positionIdFilter = selectedPositionId,
-            seasonIdFilter = seasonFilterId,
+            seasonScope = seasonFilterId,
             sortCriterion = sortCriterion,
             state = snapshot
         )

@@ -240,6 +240,17 @@ class HandballRepository(
     }
 
     // --- GAME & PLAYER_GAME ---
+    /**
+     * Vorschlag für das Aufgebot eines neuen eigenen Spiels: das Aufgebot des letzten eigenen Spiels (nach Datum),
+     * soweit die Personen noch existieren; ohne früheres Spiel der ganze Kader samt Staff.
+     */
+    fun suggestedSquad(state: DatabaseSnapshot = _snapshot.value): Set<Int> {
+        val existing = state.players.map { it.playerId }.toSet()
+        val lastGame = state.games.filter { it.isOwnTeamGame }.maxByOrNull { it.gameDate } ?: return existing
+        val last = state.playerGames.filter { it.gameId == lastGame.gameId }.map { it.playerId }.toSet() intersect existing
+        return last.ifEmpty { existing }
+    }
+
     fun addGame(
         seasonId: Int,
         opponentId: Int,
@@ -758,10 +769,10 @@ class HandballRepository(
             state.copy(playerGames = state.playerGames.filterNot { it.gameId == game.gameId })
         }
 
-        val seasonStats = computePlayerAggregatedStats(player.playerId, game.seasonId, statsState)
+        val seasonStats = computePlayerAggregatedStats(player.playerId, SeasonScope(game.seasonId, phase = null), statsState)
         val seasonScore = computePerformanceScore(player.role, seasonStats)
 
-        val recent = getPlayerPerformanceSeries(player.playerId, seasonIdFilter = null, state = statsState)
+        val recent = getPlayerPerformanceSeries(player.playerId, seasonScope = null, state = statsState)
             .filter { it.gameDate <= game.gameDate || it.gameId == game.gameId }
             .takeLast(StartingSevenWeights.RECENT_GAMES)
         val formScore = if (recent.isEmpty()) seasonScore else recent.map { it.performanceScore }.average()
@@ -1515,7 +1526,8 @@ class HandballRepository(
             .map { it.opponentTeamId }
             .toSet()
 
-        val seasonGames = state.games.filter { it.seasonId == seasonId }
+        // Tabelle: nur Ligaspiele, Testspiele der Vorbereitung zählen nicht
+        val seasonGames = state.games.filter { it.seasonId == seasonId && it.competition == Competition.LEAGUE }
         val gameOpponentIds = seasonGames.flatMap { listOfNotNull(it.opponentId, it.secondOpponentId) }.toSet()
         val allOpponentIdsInSeason = assignedOpponentIds + gameOpponentIds
 
@@ -1615,13 +1627,13 @@ class HandballRepository(
     // --- SPIELERPROFIL & SPIEL-HISTORIE ---
     fun getPlayerGameHistory(
         playerId: Int,
-        seasonIdFilter: Int? = null,
+        seasonScope: SeasonScope? = null,
         state: DatabaseSnapshot = _snapshot.value
     ): List<PlayerGameHistoryEntry> {
         val pGames = state.playerGames.filter { it.playerId == playerId }
         return pGames.mapNotNull { pg ->
             val game = state.games.find { it.gameId == pg.gameId } ?: return@mapNotNull null
-            if (seasonIdFilter != null && game.seasonId != seasonIdFilter) return@mapNotNull null
+            if (seasonScope != null && !seasonScope.includes(game)) return@mapNotNull null
 
             val season = state.seasons.find { it.seasonId == game.seasonId }
             val opponent = state.opponentTeams.find { it.opponentTeamId == game.opponentId }
@@ -1664,10 +1676,10 @@ class HandballRepository(
 
     fun computePlayerAggregatedStats(
         playerId: Int,
-        seasonIdFilter: Int? = null,
+        seasonScope: SeasonScope? = null,
         state: DatabaseSnapshot = _snapshot.value
     ): PlayerAggregatedStats {
-        val history = getPlayerGameHistory(playerId, seasonIdFilter, state)
+        val history = getPlayerGameHistory(playerId, seasonScope, state)
         if (history.isEmpty()) return PlayerAggregatedStats()
 
         var twoMin = 0
@@ -1858,11 +1870,11 @@ class HandballRepository(
      */
     fun getPlayerPerformanceSeries(
         playerId: Int,
-        seasonIdFilter: Int? = null,
+        seasonScope: SeasonScope? = null,
         state: DatabaseSnapshot = _snapshot.value
     ): List<PlayerGamePerformancePoint> {
         val player = state.players.find { it.playerId == playerId } ?: return emptyList()
-        val chronological = getPlayerGameHistory(playerId, seasonIdFilter, state)
+        val chronological = getPlayerGameHistory(playerId, seasonScope, state)
             .sortedWith(compareBy<PlayerGameHistoryEntry> { it.game.gameDate }.thenBy { it.game.gameId })
 
         return chronological.mapIndexed { idx, entry ->
@@ -1920,7 +1932,7 @@ class HandballRepository(
      */
     fun computePositionMetricComparisons(
         playerId: Int,
-        seasonIdFilter: Int? = null,
+        seasonScope: SeasonScope? = null,
         state: DatabaseSnapshot = _snapshot.value
     ): List<PositionMetricComparison> {
         val player = state.players.find { it.playerId == playerId } ?: return emptyList()
@@ -1931,7 +1943,7 @@ class HandballRepository(
         }.ifEmpty { listOf(player) }
 
         val peerStats = peers.associateWith { p ->
-            computePlayerAggregatedStats(p.playerId, seasonIdFilter, state)
+            computePlayerAggregatedStats(p.playerId, seasonScope, state)
         }
 
         data class MetricSpec(
@@ -2046,10 +2058,10 @@ class HandballRepository(
      */
     fun computeRadarAxesForPlayer(
         playerId: Int,
-        seasonIdFilter: Int? = null,
+        seasonScope: SeasonScope? = null,
         state: DatabaseSnapshot = _snapshot.value
     ): List<RadarMetricAxis> {
-        val comparisons = computePositionMetricComparisons(playerId, seasonIdFilter, state)
+        val comparisons = computePositionMetricComparisons(playerId, seasonScope, state)
         if (comparisons.isEmpty()) return emptyList()
         val byKey = comparisons.associateBy { it.metricKey }
         val player = state.players.find { it.playerId == playerId } ?: return emptyList()
@@ -2186,7 +2198,7 @@ class HandballRepository(
     fun computePlayerRankings(
         positionIdFilter: Int? = null,
         roleFilter: PlayerRole? = null,
-        seasonIdFilter: Int? = null,
+        seasonScope: SeasonScope? = null,
         sortCriterion: RankingSortCriterion = RankingSortCriterion.PERFORMANCE_INDEX,
         state: DatabaseSnapshot = _snapshot.value
     ): List<PlayerRankingEntry> {
@@ -2197,7 +2209,7 @@ class HandballRepository(
         }
 
         val rawEntries = candidates.map { player ->
-            val stats = computePlayerAggregatedStats(player.playerId, seasonIdFilter, state)
+            val stats = computePlayerAggregatedStats(player.playerId, seasonScope, state)
             val perfScore = computePerformanceScore(player.role, stats)
             val posName = state.positions.find { it.positionId == player.positionId }?.positionName ?: player.role.label
             PlayerRankingEntry(
