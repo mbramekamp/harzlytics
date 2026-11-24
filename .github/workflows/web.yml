@@ -1,8 +1,9 @@
 # Baut die Web-Version (PWA) und veröffentlicht sie auf GitHub Pages.
 # Einmalig im Repository einrichten:
 #   1. Settings → Pages → Source: "GitHub Actions"
-#   2. Settings → Secrets and variables → Actions: SUPABASE_URL und SUPABASE_PUBLIC_KEY
-#      (der öffentliche Schlüssel, niemals ein sb_secret_-Schlüssel)
+#   2. Settings → Secrets and variables → Actions: SUPABASE_URL und SUPABASE_PUBLIC_KEY, als Variables
+#      oder Secrets (beides geht; die Werte sind ohnehin in der fertigen Web-App sichtbar).
+#      Nur den öffentlichen Schlüssel verwenden, niemals einen sb_secret_-Schlüssel.
 name: Web-Version
 
 on:
@@ -37,8 +38,8 @@ jobs:
 
       - name: Web-Version bauen
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_PUBLIC_KEY: ${{ secrets.SUPABASE_PUBLIC_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          SUPABASE_PUBLIC_KEY: ${{ secrets.SUPABASE_PUBLIC_KEY || vars.SUPABASE_PUBLIC_KEY }}
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLIC_KEY" ]; then
             echo "::warning::SUPABASE_URL oder SUPABASE_PUBLIC_KEY fehlt: die Web-Version zeigt dann 'App nicht eingerichtet'."

@@ -85,7 +85,7 @@ Unter Windows `.\gradlew.bat` statt `./gradlew`. Die APK installierst du mit `ad
 ```
 Die Web-Version wird bei jedem Push auf `main` automatisch gebaut und auf **GitHub Pages** veröffentlicht ([`.github/workflows/web.yml`](.github/workflows/web.yml)). Einmalig einrichten:
 1. Repository → *Settings → Pages → Source*: **GitHub Actions**.
-2. *Settings → Secrets and variables → Actions*: `SUPABASE_URL` und `SUPABASE_PUBLIC_KEY` als Secrets anlegen (öffentlicher Schlüssel).
+2. *Settings → Secrets and variables → Actions*: `SUPABASE_URL` und `SUPABASE_PUBLIC_KEY` als Variables oder Secrets anlegen (öffentlicher Schlüssel).
 3. In Supabase unter *Authentication → URL Configuration* die Seitenadresse als *Site URL* eintragen, damit Links aus Bestätigungs-Mails dort landen.
 
 Auf dem Handy die Seite öffnen und *Zum Startbildschirm hinzufügen* wählen (Android: Chrome-Menü, iPhone: Safari → Teilen). Die App startet dann im Vollbild und auch ohne Netz. Sie braucht einen aktuellen Browser (Chrome ab ca. 119, Safari ab iOS 18.2), weil sie Kotlin/Wasm nutzt. Die Daten liegen im Browser-Speicher und werden wie in der App mit Supabase abgeglichen.
