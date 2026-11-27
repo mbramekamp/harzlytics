@@ -94,17 +94,6 @@ internal fun GameInteractiveDashboard(
         lastActionText = confirmation
     }
 
-    // Wechselpaar Angriff/Abwehr mit einem Tipp tauschen; der Eingewechselte ist gleich gewählt
-    fun swapPair(playerId: Int) {
-        val state = repository.snapshot.value
-        val pg = state.playerGames.find { it.gameId == game.gameId && it.playerId == playerId } ?: return
-        val partnerPg = state.playerGames.find { it.playerGameId == pg.swapPartnerPlayerGameId } ?: return
-        val incomingId = if (pg.isOnCourt) partnerPg.playerId else playerId
-        val label = state.players.find { it.playerId == incomingId }?.shortLabel() ?: ""
-        track("$label aufs Feld") { repository.swapWithPartner(game.gameId, playerId) }
-        selectedPlayerId = incomingId
-    }
-
     // Live-Spieluhr-Ticker (läuft im Sekundentakt, solange aktiv und < 60:00)
     LaunchedEffect(isClockRunning, game.gameId) {
         while (isClockRunning) {
@@ -318,7 +307,6 @@ internal fun GameInteractiveDashboard(
                         MobileCourtList(
                             onCourt = onCourtParticipants,
                             swapStandby = swapStandby,
-                            onSwapPair = ::swapPair,
                             positionName = { p ->
                                 snapshot.positions.find { it.positionId == p.positionId }?.positionName?.substringBefore(" ")
                                     ?: p.role.label
@@ -344,7 +332,6 @@ internal fun GameInteractiveDashboard(
                             onCourtParticipants = onCourtParticipants,
                             benchParticipants = benchParticipants,
                             swapStandby = swapStandby,
-                            onSwapPair = ::swapPair,
                             onTapPlayerForSubstitution = { playerId -> substitutionPlayerId = playerId },
                             showBench = isWideScreen,
                             canFillFreeSlot = courtEntryCandidates.isNotEmpty(),

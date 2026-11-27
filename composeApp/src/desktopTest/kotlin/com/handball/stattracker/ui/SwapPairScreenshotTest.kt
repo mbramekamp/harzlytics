@@ -108,7 +108,6 @@ class SwapPairScreenshotTest {
                         onCourtParticipants = all.filter { it.first.isOnCourt },
                         benchParticipants = all.filter { !it.first.isOnCourt && it.first.playerGameId !in standbyIds },
                         swapStandby = standby,
-                        onSwapPair = {},
                         onTapPlayerForSubstitution = {},
                         showBench = true,
                         canFillFreeSlot = false,

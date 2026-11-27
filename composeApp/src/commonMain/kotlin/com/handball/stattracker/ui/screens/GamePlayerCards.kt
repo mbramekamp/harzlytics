@@ -51,14 +51,13 @@ internal fun FieldPlayerStatTrackerCard(
     onAdjustPlusMinus: (Int) -> Unit,
     onUpdateStats: ((FieldPlayerGameStats) -> FieldPlayerGameStats) -> Unit,
     onUpdateDisciplinary: (Int, Boolean, Boolean, Boolean) -> Unit,
-    /** Wechselspieler (Angriff/Abwehr) eines Feldspielers: steht in der Feldansicht und darf Statistik bekommen. */
-    isSwapStandby: Boolean = false,
-    /** Gesetzt, wenn der Spieler in einem Wechselpaar ist: ein Tipp tauscht die beiden. */
-    onSwapPartner: (() -> Unit)? = null
+    /** Wechselspieler (Angriff/Abwehr) eines Feldspielers: voll aktiv wie ein Spieler auf dem Feld. */
+    isSwapStandby: Boolean = false
 ) {
-    val isOnCourt = playerGame.isOnCourt
+    // Darstellung und Eingabe wie auf dem Feld; der Wechselspieler zählt dazu
+    val isOnCourt = playerGame.isOnCourt || isSwapStandby
     // Statistik nur für Spieler auf dem Feld und für Wechselspieler eines Feldspielers
-    val canEditStats = isEditMode && (isOnCourt || isSwapStandby)
+    val canEditStats = isEditMode && isOnCourt
     var showDirectEdit by remember { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
 
@@ -89,10 +88,10 @@ internal fun FieldPlayerStatTrackerCard(
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (isOnCourt || isSwapStandby) 1f else 0.76f)
+            .alpha(if (isOnCourt) 1f else 0.76f)
             // Bank-Spieler: ganze Karte antippen = Wechsel (ihre Werte sind ohnehin gesperrt)
             .let { mod ->
-                if (isEditMode && !isOnCourt && !isSwapStandby && canSubstitute) mod.clickable(onClick = onSubstitutionClick) else mod
+                if (isEditMode && !isOnCourt && canSubstitute) mod.clickable(onClick = onSubstitutionClick) else mod
             }
     ) {
         Column(
@@ -153,9 +152,6 @@ internal fun FieldPlayerStatTrackerCard(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
-                            }
-                            if (onSwapPartner != null) {
-                                SwapPairChip(isStandby = isSwapStandby, enabled = isEditMode, onClick = onSwapPartner)
                             }
                         }
                         val shotPct = if (stats.goalesAttempted > 0) (stats.goalsScored * 100) / stats.goalesAttempted else 0
@@ -930,36 +926,3 @@ internal fun StatStepperBox(
     }
 }
 
-/**
- * Kennzeichen eines Wechselpaars (Angriff/Abwehr) an der Spielerkarte; im Bearbeitungsmodus tauscht ein Tipp die beiden.
- * Beim Wechselspieler steht "Wechsel", beim Partner auf dem Feld nur das Symbol.
- */
-@Composable
-internal fun SwapPairChip(isStandby: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = if (enabled) Modifier.clickable(onClick = onClick) else Modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Icon(
-                Icons.Default.SwapVert,
-                contentDescription = if (isStandby) null else "Mit Wechselspieler tauschen",
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            if (isStandby) {
-                Text(
-                    text = "Wechsel",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-        }
-    }
-}

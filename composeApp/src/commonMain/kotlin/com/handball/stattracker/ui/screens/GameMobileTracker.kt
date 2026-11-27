@@ -96,7 +96,6 @@ internal fun MobileCourtList(
     onCourt: List<Pair<PlayerGame, Player>>,
     /** Wechselspieler (Angriff/Abwehr) je Feldspieler: playerGameId des Feldspielers → Wechselspieler. */
     swapStandby: Map<Int, Pair<PlayerGame, Player>> = emptyMap(),
-    onSwapPair: (playerId: Int) -> Unit = {},
     positionName: (Player) -> String,
     fieldStats: (PlayerGame) -> FieldPlayerGameStats,
     keeperStats: (PlayerGame) -> GoalKeeperGameStats,
@@ -116,7 +115,7 @@ internal fun MobileCourtList(
             ) {
                 Text("Auf dem Feld", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(8.dp))
-                Text("${onCourt.size}/7", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${onCourt.size}/7" + if (swapStandby.isNotEmpty()) " + ${swapStandby.size}" else "", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.weight(1f))
                 if (isEditMode) {
                     TextButton(onClick = onOpenStartingSeven) { Text("Startsieben") }
@@ -135,9 +134,8 @@ internal fun MobileCourtList(
             val rows = onCourt.flatMap { entry ->
                 listOfNotNull(entry to false, swapStandby[entry.first.playerGameId]?.let { it to true })
             }
-            rows.forEach { (entry, isStandby) ->
+            rows.forEach { (entry, _) ->
                 val (pg, player) = entry
-                val isPaired = isStandby || swapStandby.containsKey(pg.playerGameId)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 val isKeeper = player.role == PlayerRole.GOALKEEPER
                 val stat = if (isKeeper) {
@@ -153,10 +151,7 @@ internal fun MobileCourtList(
                     positionName = positionName(player),
                     stat = stat,
                     selected = isEditMode && player.playerId == selectedPlayerId,
-                    onClick = { if (isEditMode) onSelect(player.playerId) else onOpenProfile(player.playerId) },
-                    isSwapStandby = isStandby,
-                    onSwapPartner = if (isPaired) ({ onSwapPair(player.playerId) }) else null,
-                    swapEnabled = isEditMode
+                    onClick = { if (isEditMode) onSelect(player.playerId) else onOpenProfile(player.playerId) }
                 )
             }
             if (showFreeSlot) {
@@ -181,10 +176,7 @@ private fun MobileCourtRow(
     positionName: String,
     stat: String,
     selected: Boolean,
-    onClick: () -> Unit,
-    isSwapStandby: Boolean = false,
-    onSwapPartner: (() -> Unit)? = null,
-    swapEnabled: Boolean = false
+    onClick: () -> Unit
 ) {
     val isKeeper = player.role == PlayerRole.GOALKEEPER
     val stripe = MaterialTheme.colorScheme.primary
@@ -218,7 +210,6 @@ private fun MobileCourtRow(
                 Text(player.fullName, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(positionName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (onSwapPartner != null) SwapPairChip(isStandby = isSwapStandby, enabled = swapEnabled, onClick = onSwapPartner)
                     if (playerGame.twoMinuteSuspensions > 0) {
                         PenaltyBadge("${playerGame.twoMinuteSuspensions}× 2 Min", amberContainer(), MaterialTheme.colorScheme.onSurface)
                     }

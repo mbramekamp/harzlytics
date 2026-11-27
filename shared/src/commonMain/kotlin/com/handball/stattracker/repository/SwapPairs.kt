@@ -6,8 +6,9 @@ import com.handball.stattracker.model.PlayerRole
 
 /*
  * Wechselpaar Angriff/Abwehr: zwei Feldspieler teilen sich einen Platz und wechseln ständig.
- * Der Partner auf der Bank steht in der Feldansicht mit drin ("8. Mann") und darf Statistik bekommen;
- * Spielzeit und Plus/Minus zählen weiter nur für den, der wirklich auf dem Feld steht.
+ * Der Partner (formal auf der Bank, damit die 7er-Regel gilt) ist voll aktiv ("8. Mann"):
+ * er steht in der Feldansicht, bekommt Statistik, Spielzeit und Plus/Minus wie ein Spieler auf dem Feld.
+ * Ein Tausch per Knopf entfällt bewusst (Entscheidung des Nutzers 2026-11-27).
  */
 
 /**
@@ -29,6 +30,13 @@ fun DatabaseSnapshot.isSwapStandby(pg: PlayerGame): Boolean =
 
 /** Statistik darf gebucht werden: auf dem Feld oder als Wechselspieler eines Feldspielers. */
 fun DatabaseSnapshot.canRecordStats(pg: PlayerGame): Boolean = pg.isOnCourt || isSwapStandby(pg)
+
+/**
+ * Zählt für Spielzeit und Plus/Minus als auf dem Feld: tatsächlich auf dem Feld oder
+ * Wechselspieler eines Feldspielers ohne laufende Zeitstrafe.
+ */
+fun DatabaseSnapshot.isActiveInGame(pg: PlayerGame, gameElapsedSeconds: Int): Boolean =
+    pg.isOnCourt || (isSwapStandby(pg) && !pg.hasActiveSuspension(gameElapsedSeconds))
 
 /** Wechselspieler je Feldspieler im Spiel [gameId]: playerGameId (Feld) → PlayerGame (Bank). */
 fun DatabaseSnapshot.swapStandbyByCourtPlayer(gameId: Int): Map<Int, PlayerGame> =

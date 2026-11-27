@@ -54,7 +54,6 @@ internal fun SideBySideLineupAndBenchSection(
     benchParticipants: List<Pair<PlayerGame, Player>>,
     /** Wechselspieler (Angriff/Abwehr) je Feldspieler: playerGameId des Feldspielers → Wechselspieler. */
     swapStandby: Map<Int, Pair<PlayerGame, Player>> = emptyMap(),
-    onSwapPair: (playerId: Int) -> Unit = {},
     onTapPlayerForSubstitution: (Int) -> Unit,
     showBench: Boolean,
     canFillFreeSlot: Boolean,
@@ -82,7 +81,6 @@ internal fun SideBySideLineupAndBenchSection(
         posName: String,
         canSubstitute: Boolean,
         isSwapStandby: Boolean,
-        onSwapPartner: (() -> Unit)?,
         onSubstitutionClick: () -> Unit
     ) {
         val stats = snapshot.fieldPlayerStats.find { it.playerGameId == pg.playerGameId }
@@ -109,8 +107,7 @@ internal fun SideBySideLineupAndBenchSection(
             onUpdateDisciplinary = { twoMin, yellow, red, blue ->
                 repository.updatePlayerDisciplinary(pg.playerGameId, twoMin, yellow, red, blue)
             },
-            isSwapStandby = isSwapStandby,
-            onSwapPartner = onSwapPartner
+            isSwapStandby = isSwapStandby
         )
     }
 
@@ -142,7 +139,7 @@ internal fun SideBySideLineupAndBenchSection(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Auf dem Feld (${onCourtParticipants.size}/7)",
+                                text = "Auf dem Feld (${onCourtParticipants.size}/7" + (if (swapStandby.isNotEmpty()) " + ${swapStandby.size}" else "") + ")",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -202,7 +199,7 @@ internal fun SideBySideLineupAndBenchSection(
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "Auf dem Feld (${onCourtParticipants.size}/7)",
+                                    text = "Auf dem Feld (${onCourtParticipants.size}/7" + (if (swapStandby.isNotEmpty()) " + ${swapStandby.size}" else "") + ")",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.primary
@@ -308,7 +305,6 @@ internal fun SideBySideLineupAndBenchSection(
                             posName = posName,
                             canSubstitute = canSubstitute,
                             isSwapStandby = false,
-                            onSwapPartner = if (standby != null) ({ onSwapPair(person.playerId) }) else null,
                             onSubstitutionClick = { onTapPlayerForSubstitution(person.playerId) }
                         )
                         // 8. Mann: Wechselspieler direkt unter seinem Partner, mit Statistik
@@ -321,7 +317,6 @@ internal fun SideBySideLineupAndBenchSection(
                                     ?: standbyPerson.role.label,
                                 canSubstitute = repository.substitutionOptions(game.gameId, standbyPerson.playerId, snapshot)?.hasAnyOption == true,
                                 isSwapStandby = true,
-                                onSwapPartner = { onSwapPair(standbyPerson.playerId) },
                                 onSubstitutionClick = { onTapPlayerForSubstitution(standbyPerson.playerId) }
                             )
                         }

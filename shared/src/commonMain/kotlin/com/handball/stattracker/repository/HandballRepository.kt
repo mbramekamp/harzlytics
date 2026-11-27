@@ -461,7 +461,7 @@ class HandballRepository(
             val updatedPlayerGames = state.playerGames.map { pg ->
                 if (pg.gameId == gameId) {
                     val role = state.players.find { it.playerId == pg.playerId }?.role
-                    val addedTime = if (pg.isOnCourt && role != PlayerRole.COACH && actualDelta > 0) actualDelta else 0
+                    val addedTime = if (state.isActiveInGame(pg, game.elapsedSeconds) && role != PlayerRole.COACH && actualDelta > 0) actualDelta else 0
                     val clearedSuspension = if (pg.activeSuspensionUntilSeconds != null && newElapsed >= pg.activeSuspensionUntilSeconds) {
                         null
                     } else {
@@ -797,19 +797,6 @@ class HandballRepository(
     }
 
     /**
-     * Tauscht ein Wechselpaar mit einem Tipp: der Partner auf dem Feld geht raus, der andere kommt.
-     * Läuft über [substitutePlayer] (Aufstellungsregel, Sperren, Spielprotokoll).
-     */
-    fun swapWithPartner(gameId: Int, playerId: Int): Boolean {
-        val state = _snapshot.value
-        val pg = state.playerGames.find { it.gameId == gameId && it.playerId == playerId } ?: return false
-        val partner = state.swapPartnerOf(pg) ?: return false
-        if (pg.isOnCourt == partner.isOnCourt) return false
-        val (inPg, outPg) = if (pg.isOnCourt) partner to pg else pg to partner
-        return substitutePlayer(gameId, playerInId = inPg.playerId, playerOutId = outPg.playerId)
-    }
-
-    /**
      * Kurzname einer Position für die Startsieben-Anzeige ("LA - Linksaußen" → "LA").
      */
     fun positionShortName(position: Position?): String {
@@ -1103,7 +1090,7 @@ class HandballRepository(
             val updatedPlayerGames = if (netOwnDelta != 0) {
                 state.playerGames.map { pg ->
                     val role = state.players.find { it.playerId == pg.playerId }?.role
-                    if (pg.gameId == gameId && pg.isOnCourt && role != PlayerRole.COACH) {
+                    if (pg.gameId == gameId && state.isActiveInGame(pg, oldGame.elapsedSeconds) && role != PlayerRole.COACH) {
                         pg.copy(plusMinus = pg.plusMinus + netOwnDelta)
                     } else pg
                 }
@@ -1335,7 +1322,7 @@ class HandballRepository(
             val updatedPlayerGames = if (goalDelta != 0 && game != null) {
                 state.playerGames.map { item ->
                     val role = state.players.find { it.playerId == item.playerId }?.role
-                    if (item.gameId == game.gameId && item.isOnCourt && role != PlayerRole.COACH) {
+                    if (item.gameId == game.gameId && state.isActiveInGame(item, game.elapsedSeconds) && role != PlayerRole.COACH) {
                         item.copy(plusMinus = item.plusMinus + goalDelta)
                     } else item
                 }
@@ -1446,7 +1433,7 @@ class HandballRepository(
             val updatedPlayerGames = if (concededDelta != 0 && game != null) {
                 state.playerGames.map { item ->
                     val role = state.players.find { it.playerId == item.playerId }?.role
-                    if (item.gameId == game.gameId && item.isOnCourt && role != PlayerRole.COACH) {
+                    if (item.gameId == game.gameId && state.isActiveInGame(item, game.elapsedSeconds) && role != PlayerRole.COACH) {
                         item.copy(plusMinus = item.plusMinus - concededDelta)
                     } else item
                 }
@@ -1515,7 +1502,9 @@ class HandballRepository(
             state.copy(
                 games = state.games.map { if (it.gameId == gameId) it.copy(homeTeamScore = home, awayTeamScore = away) else it },
                 playerGames = state.playerGames.map { pg ->
-                    if (pg.gameId == gameId && pg.isOnCourt && roles[pg.playerGameId] != PlayerRole.COACH) pg.copy(plusMinus = pg.plusMinus - 1) else pg
+                    if (pg.gameId == gameId && state.isActiveInGame(pg, game.elapsedSeconds) && state.players.find { it.playerId == pg.playerId }?.role != PlayerRole.COACH) {
+                        pg.copy(plusMinus = pg.plusMinus - 1)
+                    } else pg
                 },
                 gameLogs = state.gameLogs + GameLogEntry(
                     logId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1,

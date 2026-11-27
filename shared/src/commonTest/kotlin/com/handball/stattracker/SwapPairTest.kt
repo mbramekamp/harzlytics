@@ -1,6 +1,5 @@
 package com.handball.stattracker
 
-import com.handball.stattracker.model.GameLogEventType
 import com.handball.stattracker.model.PlayerRole
 import com.handball.stattracker.repository.DemoDataSeed
 import com.handball.stattracker.repository.HandballRepository
@@ -55,36 +54,47 @@ class SwapPairTest {
     }
 
     @Test
-    fun swapWithPartnerSubstitutesAndKeepsLineupValid() {
-        val repo = demoRepo()
-        repo.setGameClockSeconds(1, 600)
-        repo.setSwapPartner(1, 13, 3)
-        val logsBefore = repo.getGameLogs(1).size
-
-        assertTrue(repo.swapWithPartner(gameId = 1, playerId = 13))
-        assertTrue(repo.pg(13).isOnCourt)
-        assertFalse(repo.pg(3).isOnCourt)
-        assertEquals(7, repo.snapshot.value.playerGames.count { it.gameId == 1 && it.isOnCourt })
-        assertEquals(GameLogEventType.SUBSTITUTION, repo.snapshot.value.gameLogs.maxBy { it.logId }.eventType)
-        assertEquals(logsBefore + 1, repo.getGameLogs(1).size)
-
-        // Paar bleibt: jetzt ist 3 der Wechselspieler; Tausch zurück über beide Seiten möglich
-        assertTrue(repo.snapshot.value.isSwapStandby(repo.pg(3)))
-        assertTrue(repo.swapWithPartner(gameId = 1, playerId = 13))
-        assertTrue(repo.pg(3).isOnCourt)
-        assertFalse(repo.pg(13).isOnCourt)
-    }
-
-    @Test
-    fun playingTimeCountsOnlyForPlayerOnCourt() {
+    fun allEightAreActiveForTimeAndPlusMinus() {
         val repo = demoRepo()
         repo.setGameClockSeconds(1, 600)
         repo.setSwapPartner(1, 3, 13)
-        val standbyBefore = repo.pg(13).secondsPlayed
-        val courtBefore = repo.pg(3).secondsPlayed
+        val standbyBefore = repo.pg(13)
+        val courtBefore = repo.pg(3)
+        val benchKeeperBefore = repo.pg(2)
+
         repo.advanceGameClock(1, 60)
-        assertEquals(standbyBefore, repo.pg(13).secondsPlayed)
-        assertEquals(courtBefore + 60, repo.pg(3).secondsPlayed)
+        assertEquals(standbyBefore.secondsPlayed + 60, repo.pg(13).secondsPlayed, "Wechselspieler bekommt Spielzeit")
+        assertEquals(courtBefore.secondsPlayed + 60, repo.pg(3).secondsPlayed)
+        assertEquals(benchKeeperBefore.secondsPlayed, repo.pg(2).secondsPlayed, "Bank bleibt bei 0")
+
+        // Tor durch den Wechselspieler: alle 8 bekommen +1, die Bank nicht
+        repo.updateFieldPlayerStats(repo.pg(13).playerGameId, autoSyncTeamScore = true) {
+            it.copy(goalsScored = it.goalsScored + 1, goalesAttempted = it.goalesAttempted + 1)
+        }
+        assertEquals(standbyBefore.plusMinus + 1, repo.pg(13).plusMinus)
+        assertEquals(courtBefore.plusMinus + 1, repo.pg(3).plusMinus)
+        assertEquals(benchKeeperBefore.plusMinus, repo.pg(2).plusMinus)
+
+        // Gegentor beim TW: alle 8 bekommen −1
+        repo.updateGoalKeeperStats(repo.pg(1).playerGameId, autoSyncOpponentScore = true) {
+            it.copy(goalesConceded = it.goalesConceded + 1)
+        }
+        assertEquals(standbyBefore.plusMinus, repo.pg(13).plusMinus)
+
+        // Aufstellung bleibt formal bei 7 (Regel 6+1 / 7+0)
+        assertEquals(7, repo.snapshot.value.playerGames.count { it.gameId == 1 && it.isOnCourt })
+    }
+
+    @Test
+    fun suspendedStandbyGetsNoPlayingTime() {
+        val repo = demoRepo()
+        repo.setGameClockSeconds(1, 600)
+        repo.setSwapPartner(1, 3, 13)
+        val pg13 = repo.pg(13)
+        repo.updatePlayerDisciplinary(pg13.playerGameId, pg13.twoMinuteSuspensions + 1, pg13.yellowCard, pg13.redCard, pg13.blueCard)
+        val before = repo.pg(13).secondsPlayed
+        repo.advanceGameClock(1, 60)
+        assertEquals(before, repo.pg(13).secondsPlayed)
     }
 
     @Test
@@ -119,22 +129,10 @@ class SwapPairTest {
         val pg13 = repo.pg(13)
         repo.updatePlayerDisciplinary(pg13.playerGameId, pg13.twoMinuteSuspensions, pg13.yellowCard, redCard = true, blueCard = false)
         assertFalse(repo.snapshot.value.isSwapStandby(repo.pg(13)))
-        assertFalse(repo.swapWithPartner(1, 3))
     }
 
     @Test
-    fun swapIsBlockedWhileStandbyServesSuspension() {
-        val repo = demoRepo()
-        repo.setGameClockSeconds(1, 600)
-        repo.setSwapPartner(1, 3, 13)
-        val pg13 = repo.pg(13)
-        repo.updatePlayerDisciplinary(pg13.playerGameId, pg13.twoMinuteSuspensions + 1, pg13.yellowCard, pg13.redCard, pg13.blueCard)
-        assertFalse(repo.swapWithPartner(1, 13), "zeitbestraft: darf nicht aufs Feld")
-        assertTrue(repo.pg(3).isOnCourt)
-    }
-
-    @Test
-    fun readOnlyRoleCannotPairOrSwap() {
+    fun readOnlyRoleCannotPair() {
         val repo = demoRepo(canEdit = false)
         assertFalse(repo.setSwapPartner(1, 3, 13))
         assertNull(repo.pg(13).swapPartnerPlayerGameId)
