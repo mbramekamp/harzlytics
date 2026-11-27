@@ -52,6 +52,9 @@ internal fun SideBySideLineupAndBenchSection(
     autoSyncScore: Boolean,
     onCourtParticipants: List<Pair<PlayerGame, Player>>,
     benchParticipants: List<Pair<PlayerGame, Player>>,
+    /** Wechselspieler (Angriff/Abwehr) je Feldspieler: playerGameId des Feldspielers → Wechselspieler. */
+    swapStandby: Map<Int, Pair<PlayerGame, Player>> = emptyMap(),
+    onSwapPair: (playerId: Int) -> Unit = {},
     onTapPlayerForSubstitution: (Int) -> Unit,
     showBench: Boolean,
     canFillFreeSlot: Boolean,
@@ -70,6 +73,45 @@ internal fun SideBySideLineupAndBenchSection(
     }
     val activeKeeperCount = remember(onCourtParticipants) {
         onCourtParticipants.count { it.second.role == PlayerRole.GOALKEEPER }
+    }
+
+    @Composable
+    fun TrackedFieldPlayerCard(
+        pg: PlayerGame,
+        person: Player,
+        posName: String,
+        canSubstitute: Boolean,
+        isSwapStandby: Boolean,
+        onSwapPartner: (() -> Unit)?,
+        onSubstitutionClick: () -> Unit
+    ) {
+        val stats = snapshot.fieldPlayerStats.find { it.playerGameId == pg.playerGameId }
+            ?: FieldPlayerGameStats(0, pg.playerGameId)
+        FieldPlayerStatTrackerCard(
+            player = person,
+            positionName = posName,
+            playerGame = pg,
+            stats = stats,
+            gameElapsedSeconds = game.elapsedSeconds,
+            isWideScreen = isSideBySide,
+            isEditMode = isEditMode,
+            canSubstitute = canSubstitute,
+            onOpenProfile = { onNavigateToPlayer(person.playerId) },
+            onSubstitutionClick = onSubstitutionClick,
+            onAdjustPlusMinus = { delta -> repository.adjustPlayerPlusMinus(pg.playerGameId, delta) },
+            onUpdateStats = { transform ->
+                repository.updateFieldPlayerStats(
+                    playerGameId = pg.playerGameId,
+                    autoSyncTeamScore = autoSyncScore,
+                    transform = transform
+                )
+            },
+            onUpdateDisciplinary = { twoMin, yellow, red, blue ->
+                repository.updatePlayerDisciplinary(pg.playerGameId, twoMin, yellow, red, blue)
+            },
+            isSwapStandby = isSwapStandby,
+            onSwapPartner = onSwapPartner
+        )
     }
 
     @Composable
@@ -259,31 +301,30 @@ internal fun SideBySideLineupAndBenchSection(
                             }
                         )
                     } else {
-                        val stats = snapshot.fieldPlayerStats.find { it.playerGameId == pg.playerGameId }
-                            ?: FieldPlayerGameStats(0, pg.playerGameId)
-                        FieldPlayerStatTrackerCard(
-                            player = person,
-                            positionName = posName,
-                            playerGame = pg,
-                            stats = stats,
-                            gameElapsedSeconds = game.elapsedSeconds,
-                            isWideScreen = isSideBySide,
-                            isEditMode = isEditMode,
+                        val standby = swapStandby[pg.playerGameId]
+                        TrackedFieldPlayerCard(
+                            pg = pg,
+                            person = person,
+                            posName = posName,
                             canSubstitute = canSubstitute,
-                            onOpenProfile = { onNavigateToPlayer(person.playerId) },
-                            onSubstitutionClick = { onTapPlayerForSubstitution(person.playerId) },
-                            onAdjustPlusMinus = { delta -> repository.adjustPlayerPlusMinus(pg.playerGameId, delta) },
-                            onUpdateStats = { transform ->
-                                repository.updateFieldPlayerStats(
-                                    playerGameId = pg.playerGameId,
-                                    autoSyncTeamScore = autoSyncScore,
-                                    transform = transform
-                                )
-                            },
-                            onUpdateDisciplinary = { twoMin, yellow, red, blue ->
-                                repository.updatePlayerDisciplinary(pg.playerGameId, twoMin, yellow, red, blue)
-                            }
+                            isSwapStandby = false,
+                            onSwapPartner = if (standby != null) ({ onSwapPair(person.playerId) }) else null,
+                            onSubstitutionClick = { onTapPlayerForSubstitution(person.playerId) }
                         )
+                        // 8. Mann: Wechselspieler direkt unter seinem Partner, mit Statistik
+                        if (standby != null) {
+                            val (standbyPg, standbyPerson) = standby
+                            TrackedFieldPlayerCard(
+                                pg = standbyPg,
+                                person = standbyPerson,
+                                posName = snapshot.positions.find { it.positionId == standbyPerson.positionId }?.positionName
+                                    ?: standbyPerson.role.label,
+                                canSubstitute = repository.substitutionOptions(game.gameId, standbyPerson.playerId, snapshot)?.hasAnyOption == true,
+                                isSwapStandby = true,
+                                onSwapPartner = { onSwapPair(standbyPerson.playerId) },
+                                onSubstitutionClick = { onTapPlayerForSubstitution(standbyPerson.playerId) }
+                            )
+                        }
                     }
                 }
 

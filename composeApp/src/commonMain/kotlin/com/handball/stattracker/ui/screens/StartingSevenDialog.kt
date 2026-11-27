@@ -5,7 +5,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +20,7 @@ import com.handball.stattracker.model.StartingSevenCandidate
 import com.handball.stattracker.model.StartingSevenRecommendation
 import com.handball.stattracker.model.StartingSevenSlot
 import com.handball.stattracker.repository.HandballRepository
+import com.handball.stattracker.repository.currentSwapPair
 
 /**
  * Vorschau der performance-basierten Startsieben:
@@ -34,7 +37,14 @@ fun StartingSevenDialog(
 ) {
     var useSeventh by remember(gameId) { mutableStateOf(initialUseSeventhFieldPlayer) }
     var recommendation by remember(gameId, useSeventh) {
-        mutableStateOf(repository.recommendStartingSeven(gameId, useSeventh))
+        // Ein bestehendes Wechselpaar bleibt vorausgewählt, solange es zur Empfehlung passt
+        val rec = repository.recommendStartingSeven(gameId, useSeventh)
+        val existing = repository.snapshot.value.currentSwapPair(gameId)
+        mutableStateOf(
+            if (existing != null && existing.second in rec.chosenPlayerIds) {
+                rec.withSwapStandby(existing.first).withSwapPartner(existing.second)
+            } else rec
+        )
     }
 
     AlertDialog(
@@ -79,13 +89,20 @@ fun StartingSevenDialog(
                         onSwap = { recommendation = recommendation.swapWithRunnerUp(idx) }
                     )
                 }
+                if (recommendation.swapStandbyOptions.isNotEmpty() && recommendation.swapPartnerOptions.isNotEmpty()) {
+                    SwapStandbySlotCard(
+                        recommendation = recommendation,
+                        onStandbyChange = { recommendation = recommendation.withSwapStandby(it) },
+                        onPartnerChange = { recommendation = recommendation.withSwapPartner(it) }
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 enabled = recommendation.chosenPlayerIds.isNotEmpty(),
                 onClick = {
-                    if (repository.applyStartingSevenLineup(gameId, recommendation.chosenPlayerIds)) {
+                    if (repository.applyStartingSevenLineup(gameId, recommendation.chosenPlayerIds, recommendation.swapPair)) {
                         onApplied()
                     }
                 }
@@ -224,6 +241,107 @@ private fun StartingSevenSlotCard(
                         Icon(Icons.Default.SwapHoriz, contentDescription = "Tauschen", modifier = Modifier.size(18.dp))
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 8. Platz "Wechsel": ein Feldspieler, der sich mit einem Spieler der Startsieben abwechselt (Angriff/Abwehr).
+ * Startet auf der Bank, steht aber in der Feldansicht und bekommt Statistik.
+ */
+@Composable
+private fun SwapStandbySlotCard(
+    recommendation: StartingSevenRecommendation,
+    onStandbyChange: (Int?) -> Unit,
+    onPartnerChange: (Int) -> Unit
+) {
+    val standby = recommendation.swapStandbyOptions.find { it.player.playerId == recommendation.swapStandbyId }
+    val partner = recommendation.swapPartnerOptions.find { it.player.playerId == recommendation.swapPartnerId }
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SlotBadge("Wechsel")
+                CandidateDropdown(
+                    label = standby?.let { playerLabel(it) } ?: "—",
+                    options = listOf<StartingSevenCandidate?>(null) + recommendation.swapStandbyOptions,
+                    optionLabel = { it?.let(::playerLabel) ?: "Keiner" },
+                    onSelect = { onStandbyChange(it?.player?.playerId) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            if (standby != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SwapVert,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text("mit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    CandidateDropdown(
+                        label = partner?.let { playerLabel(it) } ?: "—",
+                        options = recommendation.swapPartnerOptions,
+                        optionLabel = ::playerLabel,
+                        onSelect = { onPartnerChange(it.player.playerId) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> CandidateDropdown(
+    label: String,
+    options: List<T>,
+    optionLabel: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        TextButton(
+            onClick = { expanded = true },
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = label,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(optionLabel(option)) },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    }
+                )
             }
         }
     }

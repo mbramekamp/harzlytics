@@ -105,7 +105,12 @@ data class PlayerGame(
     val isOnCourt: Boolean = false,
     val plusMinus: Int = 0,
     val secondsPlayed: Int = 0,
-    val activeSuspensionUntilSeconds: Int? = null
+    val activeSuspensionUntilSeconds: Int? = null,
+    /**
+     * Wechselpaar Angriff/Abwehr: [PlayerGame.playerGameId] des Partners (gegenseitig gesetzt).
+     * Der Partner auf der Bank erscheint in der Feldansicht und darf Statistik bekommen.
+     */
+    val swapPartnerPlayerGameId: Int? = null
 ) {
     val isDisqualified: Boolean
         get() = redCard || blueCard || twoMinuteSuspensions >= 3
@@ -518,7 +523,13 @@ data class StartingSevenSlot(
 data class StartingSevenRecommendation(
     val gameId: Int,
     val useSeventhFieldPlayer: Boolean,
-    val slots: List<StartingSevenSlot>
+    val slots: List<StartingSevenSlot>,
+    /** Alle spielberechtigten Feldspieler, nach Bewertung sortiert (Auswahl für den Wechsel-Platz). */
+    val fieldCandidates: List<StartingSevenCandidate> = emptyList(),
+    /** Optionaler 8. Spieler (Wechsel Angriff/Abwehr): startet auf der Bank. */
+    val swapStandbyId: Int? = null,
+    /** Feldspieler der Startsieben, mit dem sich [swapStandbyId] abwechselt. */
+    val swapPartnerId: Int? = null
 ) {
     val chosenPlayerIds: List<Int>
         get() = slots.mapNotNull { it.chosen?.player?.playerId }
@@ -541,12 +552,57 @@ data class StartingSevenRecommendation(
     /** Tauscht den gewählten Spieler eines Platzes mit dessen Zweitplatziertem. */
     fun swapWithRunnerUp(slotIndex: Int): StartingSevenRecommendation {
         if (!canSwapToRunnerUp(slotIndex)) return this
-        return copy(
-            slots = slots.mapIndexed { idx, slot ->
-                if (idx == slotIndex) slot.copy(chosen = slot.runnerUp, runnerUp = slot.chosen) else slot
+        val slot = slots[slotIndex]
+        val incomingId = slot.runnerUp?.player?.playerId
+        val outgoingId = slot.chosen?.player?.playerId
+        val swapped = copy(
+            slots = slots.mapIndexed { idx, s ->
+                if (idx == slotIndex) s.copy(chosen = s.runnerUp, runnerUp = s.chosen) else s
             }
         )
+        return when {
+            // Der Wechselspieler rückt in die Startsieben: kein Wechsel-Platz mehr
+            incomingId != null && incomingId == swapStandbyId -> swapped.copy(swapStandbyId = null, swapPartnerId = null)
+            // Der Partner verlässt die Startsieben: sein Nachfolger übernimmt das Paar (falls Feldspieler)
+            outgoingId != null && outgoingId == swapPartnerId ->
+                swapped.copy(swapPartnerId = slot.runnerUp?.takeIf { it.player.role == PlayerRole.FIELD_PLAYER }?.player?.playerId)
+            else -> swapped
+        }
     }
+
+    /** Feldspieler, die als Wechselspieler (8. Mann) in Frage kommen: nicht in der Startsieben. */
+    val swapStandbyOptions: List<StartingSevenCandidate>
+        get() = fieldCandidates.filter { it.player.playerId !in chosenPlayerIds }
+
+    /** Feldspieler der Startsieben, die Partner des Wechselspielers sein können. */
+    val swapPartnerOptions: List<StartingSevenCandidate>
+        get() = slots.mapNotNull { it.chosen }.filter { it.player.role == PlayerRole.FIELD_PLAYER }
+
+    /**
+     * Wählt den Wechselspieler; der Partner ist der Feldspieler der Startsieben auf derselben Position
+     * (sonst der bisherige Partner, sonst der erste Feldspieler). null entfernt den Wechsel-Platz.
+     */
+    fun withSwapStandby(playerId: Int?): StartingSevenRecommendation {
+        if (playerId == null) return copy(swapStandbyId = null, swapPartnerId = null)
+        val standby = swapStandbyOptions.find { it.player.playerId == playerId } ?: return this
+        val partners = swapPartnerOptions
+        val partner = partners.find { it.player.positionId != null && it.player.positionId == standby.player.positionId }
+            ?: partners.find { it.player.playerId == swapPartnerId }
+            ?: partners.firstOrNull()
+        return copy(swapStandbyId = playerId, swapPartnerId = partner?.player?.playerId)
+    }
+
+    fun withSwapPartner(playerId: Int): StartingSevenRecommendation =
+        if (swapStandbyId != null && swapPartnerOptions.any { it.player.playerId == playerId }) copy(swapPartnerId = playerId) else this
+
+    /** Gültiges Wechselpaar (Wechselspieler, Partner) oder null. */
+    val swapPair: Pair<Int, Int>?
+        get() {
+            val standby = swapStandbyId ?: return null
+            val partner = swapPartnerId ?: return null
+            if (standby in chosenPlayerIds || swapPartnerOptions.none { it.player.playerId == partner }) return null
+            return standby to partner
+        }
 }
 
 /**

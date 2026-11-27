@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.handball.stattracker.model.*
 import com.handball.stattracker.repository.HandballRepository
+import com.handball.stattracker.repository.swapStandbyByCourtPlayer
 import kotlinx.coroutines.delay
 
 /**
@@ -70,6 +71,7 @@ internal fun GameInteractiveDashboard(
 
     // Angetippter Spieler, für den die Wechsel-Auswahl offen ist
     var substitutionPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
+    var swapPairPickerPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
     // Auswahl für einen freien Platz auf dem Feld (Handy, weniger als 7 aktiv)
     var showFreeSlotPicker by remember(game.gameId) { mutableStateOf(false) }
 
@@ -90,6 +92,17 @@ internal fun GameInteractiveDashboard(
         if (undoStack.size > 30) undoStack.removeAt(0)
         change()
         lastActionText = confirmation
+    }
+
+    // Wechselpaar Angriff/Abwehr mit einem Tipp tauschen; der Eingewechselte ist gleich gewählt
+    fun swapPair(playerId: Int) {
+        val state = repository.snapshot.value
+        val pg = state.playerGames.find { it.gameId == game.gameId && it.playerId == playerId } ?: return
+        val partnerPg = state.playerGames.find { it.playerGameId == pg.swapPartnerPlayerGameId } ?: return
+        val incomingId = if (pg.isOnCourt) partnerPg.playerId else playerId
+        val label = state.players.find { it.playerId == incomingId }?.shortLabel() ?: ""
+        track("$label aufs Feld") { repository.swapWithPartner(game.gameId, playerId) }
+        selectedPlayerId = incomingId
     }
 
     // Live-Spieluhr-Ticker (läuft im Sekundentakt, solange aktiv und < 60:00)
@@ -138,8 +151,21 @@ internal fun GameInteractiveDashboard(
         allPlayerParticipants.filter { it.first.isOnCourt }
     }
 
-    val benchParticipants = remember(allPlayerParticipants) {
-        allPlayerParticipants.filter { !it.first.isOnCourt }
+    // Wechselspieler (Angriff/Abwehr): stehen unter ihrem Partner in der Feldansicht, nicht auf der Bank
+    val swapStandby = remember(snapshot, game.gameId) {
+        snapshot.swapStandbyByCourtPlayer(game.gameId).mapNotNull { (courtPgId, standbyPg) ->
+            allPlayerParticipants.find { it.first.playerGameId == standbyPg.playerGameId }?.let { courtPgId to it }
+        }.toMap()
+    }
+
+    val benchParticipants = remember(allPlayerParticipants, swapStandby) {
+        val standbyIds = swapStandby.values.map { it.first.playerGameId }.toSet()
+        allPlayerParticipants.filter { !it.first.isOnCourt && it.first.playerGameId !in standbyIds }
+    }
+
+    // Feldansicht in Anzeigereihenfolge: jeder Wechselspieler direkt nach seinem Partner
+    val trackedParticipants = remember(onCourtParticipants, swapStandby) {
+        onCourtParticipants.flatMap { entry -> listOfNotNull(entry, swapStandby[entry.first.playerGameId]) }
     }
 
     val coachParticipants = remember(gamePlayerGames, snapshot.players) {
@@ -159,7 +185,7 @@ internal fun GameInteractiveDashboard(
 
     // Handy: Zeilen + feste Aktionsleiste statt großer Karten
     val useMobileTracker = !isWideScreen && game.isOwnTeamGame
-    val selectedPair = onCourtParticipants.find { it.second.playerId == selectedPlayerId }
+    val selectedPair = trackedParticipants.find { it.second.playerId == selectedPlayerId }
         ?: onCourtParticipants.firstOrNull { it.second.role == PlayerRole.FIELD_PLAYER }
         ?: onCourtParticipants.firstOrNull()
     val selectedFieldStats = selectedPair?.let { (pg, _) ->
@@ -291,6 +317,8 @@ internal fun GameInteractiveDashboard(
                     0 -> if (useMobileTracker) {
                         MobileCourtList(
                             onCourt = onCourtParticipants,
+                            swapStandby = swapStandby,
+                            onSwapPair = ::swapPair,
                             positionName = { p ->
                                 snapshot.positions.find { it.positionId == p.positionId }?.positionName?.substringBefore(" ")
                                     ?: p.role.label
@@ -315,6 +343,8 @@ internal fun GameInteractiveDashboard(
                             autoSyncScore = autoSyncScore,
                             onCourtParticipants = onCourtParticipants,
                             benchParticipants = benchParticipants,
+                            swapStandby = swapStandby,
+                            onSwapPair = ::swapPair,
                             onTapPlayerForSubstitution = { playerId -> substitutionPlayerId = playerId },
                             showBench = isWideScreen,
                             canFillFreeSlot = courtEntryCandidates.isNotEmpty(),
@@ -472,7 +502,10 @@ internal fun GameInteractiveDashboard(
     substitutionPlayerId?.let { playerId ->
         val options = repository.substitutionOptions(game.gameId, playerId, snapshot)
         val tapped = snapshot.players.find { it.playerId == playerId }
-        if (options == null || tapped == null || !options.hasAnyOption) {
+        val tappedPg = snapshot.playerGames.find { it.gameId == game.gameId && it.playerId == playerId }
+        val swapCandidates = repository.swapPartnerCandidates(game.gameId, playerId, snapshot)
+        val canManagePair = tappedPg?.swapPartnerPlayerGameId != null || swapCandidates.isNotEmpty()
+        if (options == null || tapped == null || (!options.hasAnyOption && !canManagePair)) {
             LaunchedEffect(playerId) { substitutionPlayerId = null }
         } else {
             SubstitutionPicker(
@@ -505,7 +538,45 @@ internal fun GameInteractiveDashboard(
                     }
                     substitutionPlayerId = null
                 },
-                onDismiss = { substitutionPlayerId = null }
+                onDismiss = { substitutionPlayerId = null },
+                secondaryLabel = when {
+                    tappedPg?.swapPartnerPlayerGameId != null -> "Wechselpaar lösen"
+                    swapCandidates.isNotEmpty() -> "Wechselpaar bilden"
+                    else -> null
+                },
+                onSecondary = {
+                    if (tappedPg?.swapPartnerPlayerGameId != null) {
+                        track("Wechselpaar gelöst") { repository.clearSwapPartner(game.gameId, playerId) }
+                    } else {
+                        swapPairPickerPlayerId = playerId
+                    }
+                    substitutionPlayerId = null
+                }
+            )
+        }
+    }
+
+    // Wechselpaar Angriff/Abwehr bilden: Partner von der Bank wählen
+    swapPairPickerPlayerId?.let { playerId ->
+        val candidates = repository.swapPartnerCandidates(game.gameId, playerId, snapshot)
+        val tapped = snapshot.players.find { it.playerId == playerId }
+        if (tapped == null || candidates.isEmpty()) {
+            LaunchedEffect(playerId) { swapPairPickerPlayerId = null }
+        } else {
+            SubstitutionPicker(
+                asBottomSheet = !isWideScreen,
+                title = "Wechselpartner für ${tapped.shortLabel()}",
+                partnerIds = candidates,
+                emptyText = "Niemand auf der Bank passt.",
+                actAloneLabel = null,
+                snapshot = snapshot,
+                gameId = game.gameId,
+                onPickPartner = { partnerId ->
+                    track("Wechselpaar gebildet") { repository.setSwapPartner(game.gameId, playerId, partnerId) }
+                    swapPairPickerPlayerId = null
+                },
+                onActAlone = {},
+                onDismiss = { swapPairPickerPlayerId = null }
             )
         }
     }

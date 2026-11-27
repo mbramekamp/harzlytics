@@ -72,6 +72,7 @@ CREATE TABLE PLAYER_GAME (
     plus_minus INTEGER NOT NULL DEFAULT 0,
     seconds_played INTEGER NOT NULL DEFAULT 0,
     active_suspension_until_seconds INTEGER,
+    swap_partner_player_game_id INTEGER,
     FOREIGN KEY (game_id) REFERENCES GAME(game_id) ON DELETE CASCADE,
     FOREIGN KEY (player_id) REFERENCES PLAYER(player_id) ON DELETE CASCADE
 );

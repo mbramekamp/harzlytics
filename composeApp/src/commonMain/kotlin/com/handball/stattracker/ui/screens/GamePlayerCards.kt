@@ -50,11 +50,15 @@ internal fun FieldPlayerStatTrackerCard(
     onSubstitutionClick: () -> Unit,
     onAdjustPlusMinus: (Int) -> Unit,
     onUpdateStats: ((FieldPlayerGameStats) -> FieldPlayerGameStats) -> Unit,
-    onUpdateDisciplinary: (Int, Boolean, Boolean, Boolean) -> Unit
+    onUpdateDisciplinary: (Int, Boolean, Boolean, Boolean) -> Unit,
+    /** Wechselspieler (Angriff/Abwehr) eines Feldspielers: steht in der Feldansicht und darf Statistik bekommen. */
+    isSwapStandby: Boolean = false,
+    /** Gesetzt, wenn der Spieler in einem Wechselpaar ist: ein Tipp tauscht die beiden. */
+    onSwapPartner: (() -> Unit)? = null
 ) {
     val isOnCourt = playerGame.isOnCourt
-    // Nur aktive Spieler AUF DEM FELD (linke Seite) können im Bearbeitungsmodus Spielstatistiken hinzufügen!
-    val canEditStats = isEditMode && isOnCourt
+    // Statistik nur für Spieler auf dem Feld und für Wechselspieler eines Feldspielers
+    val canEditStats = isEditMode && (isOnCourt || isSwapStandby)
     var showDirectEdit by remember { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
 
@@ -79,13 +83,17 @@ internal fun FieldPlayerStatTrackerCard(
             containerColor = when {
                 isOnCourt -> MaterialTheme.colorScheme.surface
                 else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
-            }
+            },
+            // Halbtransparente Bankfarbe ist keine Theme-Farbe: Textfarbe ausdrücklich setzen (Dunkelmodus)
+            contentColor = MaterialTheme.colorScheme.onSurface
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (isOnCourt) 1f else 0.76f)
+            .alpha(if (isOnCourt || isSwapStandby) 1f else 0.76f)
             // Bank-Spieler: ganze Karte antippen = Wechsel (ihre Werte sind ohnehin gesperrt)
-            .let { mod -> if (isEditMode && !isOnCourt && canSubstitute) mod.clickable(onClick = onSubstitutionClick) else mod }
+            .let { mod ->
+                if (isEditMode && !isOnCourt && !isSwapStandby && canSubstitute) mod.clickable(onClick = onSubstitutionClick) else mod
+            }
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -145,6 +153,9 @@ internal fun FieldPlayerStatTrackerCard(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
+                            }
+                            if (onSwapPartner != null) {
+                                SwapPairChip(isStandby = isSwapStandby, enabled = isEditMode, onClick = onSwapPartner)
                             }
                         }
                         val shotPct = if (stats.goalesAttempted > 0) (stats.goalsScored * 100) / stats.goalesAttempted else 0
@@ -913,6 +924,40 @@ internal fun StatStepperBox(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Kennzeichen eines Wechselpaars (Angriff/Abwehr) an der Spielerkarte; im Bearbeitungsmodus tauscht ein Tipp die beiden.
+ * Beim Wechselspieler steht "Wechsel", beim Partner auf dem Feld nur das Symbol.
+ */
+@Composable
+internal fun SwapPairChip(isStandby: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = if (enabled) Modifier.clickable(onClick = onClick) else Modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(
+                Icons.Default.SwapVert,
+                contentDescription = if (isStandby) null else "Mit Wechselspieler tauschen",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            if (isStandby) {
+                Text(
+                    text = "Wechsel",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
         }

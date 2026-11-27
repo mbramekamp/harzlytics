@@ -48,11 +48,14 @@ internal fun SubstitutionPicker(
     gameId: Int,
     onPickPartner: (Int) -> Unit,
     onActAlone: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** Optionale Zweitaktion, z. B. "Wechselpaar bilden" / "Wechselpaar lösen". */
+    secondaryLabel: String? = null,
+    onSecondary: () -> Unit = {}
 ) {
     val list: @Composable () -> Unit = { SubstitutionPartnerList(partnerIds, emptyText, snapshot, gameId, onPickPartner) }
     if (asBottomSheet) {
-        SubstitutionBottomSheet(title, actAloneLabel, onActAlone, onDismiss, list)
+        SubstitutionBottomSheet(title, actAloneLabel, onActAlone, onDismiss, list, secondaryLabel, onSecondary)
     } else {
         AlertDialog(
             onDismissRequest = onDismiss,
@@ -66,7 +69,12 @@ internal fun SubstitutionPicker(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text("Abbrechen") }
+                Row {
+                    if (secondaryLabel != null) {
+                        TextButton(onClick = onSecondary) { Text(secondaryLabel) }
+                    }
+                    TextButton(onClick = onDismiss) { Text("Abbrechen") }
+                }
             }
         )
     }
@@ -83,7 +91,9 @@ internal fun SubstitutionPicker(
     onCourtCount: Int,
     onPickPartner: (Int) -> Unit,
     onActAlone: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    secondaryLabel: String? = null,
+    onSecondary: () -> Unit = {}
 ) {
     val number = tappedPlayer.jerseyNumberHomeKit?.let { "#$it " } ?: ""
     SubstitutionPicker(
@@ -100,7 +110,9 @@ internal fun SubstitutionPicker(
         gameId = gameId,
         onPickPartner = onPickPartner,
         onActAlone = onActAlone,
-        onDismiss = onDismiss
+        onDismiss = onDismiss,
+        secondaryLabel = secondaryLabel,
+        onSecondary = onSecondary
     )
 }
 
@@ -111,7 +123,9 @@ private fun SubstitutionBottomSheet(
     actAloneLabel: String?,
     onActAlone: () -> Unit,
     onDismiss: () -> Unit,
-    list: @Composable () -> Unit
+    list: @Composable () -> Unit,
+    secondaryLabel: String?,
+    onSecondary: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -130,6 +144,11 @@ private fun SubstitutionBottomSheet(
             if (actAloneLabel != null) {
                 FilledTonalButton(onClick = onActAlone, modifier = Modifier.fillMaxWidth()) {
                     Text(actAloneLabel)
+                }
+            }
+            if (secondaryLabel != null) {
+                TextButton(onClick = onSecondary, modifier = Modifier.fillMaxWidth()) {
+                    Text(secondaryLabel)
                 }
             }
         }

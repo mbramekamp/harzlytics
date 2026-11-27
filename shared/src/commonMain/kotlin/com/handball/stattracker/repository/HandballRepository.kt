@@ -567,6 +567,7 @@ class HandballRepository(
         val player = state.players.find { it.playerId == playerId } ?: return null
         if (player.role == PlayerRole.COACH) return null
 
+        val swapPartnerPlayerId = state.swapPartnerOf(pg)?.playerId
         val candidates = state.playerGames
             .filter { it.gameId == gameId && it.playerId != playerId && it.isOnCourt != pg.isOnCourt }
             .mapNotNull { other -> state.players.find { it.playerId == other.playerId && it.role != PlayerRole.COACH } }
@@ -579,7 +580,9 @@ class HandballRepository(
                 }
             }
             .sortedWith(
-                compareBy<Player> { it.role != player.role }
+                // Wechselpartner (Angriff/Abwehr) zuerst
+                compareBy<Player> { it.playerId != swapPartnerPlayerId }
+                    .thenBy { it.role != player.role }
                     .thenBy { player.positionId == null || it.positionId != player.positionId }
                     .thenBy { it.jerseyNumberHomeKit ?: 99 }
             )
@@ -740,6 +743,73 @@ class HandballRepository(
     }
 
     /**
+     * Feldspieler auf der Bank, die mit dem Feldspieler [playerId] ein Wechselpaar (Angriff/Abwehr) bilden können:
+     * nicht disqualifiziert, noch ohne Partner. Gleiche Position zuerst, dann Trikotnummer.
+     */
+    fun swapPartnerCandidates(gameId: Int, playerId: Int, state: DatabaseSnapshot = _snapshot.value): List<Int> {
+        val pg = state.playerGames.find { it.gameId == gameId && it.playerId == playerId } ?: return emptyList()
+        val player = state.players.find { it.playerId == playerId } ?: return emptyList()
+        if (player.role != PlayerRole.FIELD_PLAYER || !pg.isOnCourt || pg.isDisqualified) return emptyList()
+        return state.playerGames
+            .filter { it.gameId == gameId && !it.isOnCourt && !it.isDisqualified && state.swapPartnerOf(it) == null }
+            .mapNotNull { other -> state.players.find { it.playerId == other.playerId && it.role == PlayerRole.FIELD_PLAYER } }
+            .sortedWith(
+                compareBy<Player> { player.positionId == null || it.positionId != player.positionId }
+                    .thenBy { it.jerseyNumberHomeKit ?: 99 }
+            )
+            .map { it.playerId }
+    }
+
+    /**
+     * Bildet ein Wechselpaar aus zwei Feldspielern desselben Spiels, von denen genau einer auf dem Feld steht.
+     * Bisherige Paare der beiden werden gelöst.
+     */
+    fun setSwapPartner(gameId: Int, playerIdA: Int, playerIdB: Int): Boolean {
+        var success = false
+        mutate { state ->
+            if (playerIdA == playerIdB) return@mutate state
+            val pgA = state.playerGames.find { it.gameId == gameId && it.playerId == playerIdA } ?: return@mutate state
+            val pgB = state.playerGames.find { it.gameId == gameId && it.playerId == playerIdB } ?: return@mutate state
+            val bothField = listOf(playerIdA, playerIdB).all { id ->
+                state.players.find { it.playerId == id }?.role == PlayerRole.FIELD_PLAYER
+            }
+            if (!bothField || pgA.isOnCourt == pgB.isOnCourt || pgA.isDisqualified || pgB.isDisqualified) return@mutate state
+            val updated = state.playerGames.withoutSwapPairs(setOf(pgA.playerGameId, pgB.playerGameId)).map { pg ->
+                when (pg.playerGameId) {
+                    pgA.playerGameId -> pg.copy(swapPartnerPlayerGameId = pgB.playerGameId)
+                    pgB.playerGameId -> pg.copy(swapPartnerPlayerGameId = pgA.playerGameId)
+                    else -> pg
+                }
+            }
+            success = true
+            state.copy(playerGames = updated)
+        }
+        return success
+    }
+
+    /** Löst das Wechselpaar des Spielers [playerId]. */
+    fun clearSwapPartner(gameId: Int, playerId: Int) {
+        mutate { state ->
+            val pg = state.playerGames.find { it.gameId == gameId && it.playerId == playerId } ?: return@mutate state
+            if (pg.swapPartnerPlayerGameId == null) return@mutate state
+            state.copy(playerGames = state.playerGames.withoutSwapPairs(setOf(pg.playerGameId)))
+        }
+    }
+
+    /**
+     * Tauscht ein Wechselpaar mit einem Tipp: der Partner auf dem Feld geht raus, der andere kommt.
+     * Läuft über [substitutePlayer] (Aufstellungsregel, Sperren, Spielprotokoll).
+     */
+    fun swapWithPartner(gameId: Int, playerId: Int): Boolean {
+        val state = _snapshot.value
+        val pg = state.playerGames.find { it.gameId == gameId && it.playerId == playerId } ?: return false
+        val partner = state.swapPartnerOf(pg) ?: return false
+        if (pg.isOnCourt == partner.isOnCourt) return false
+        val (inPg, outPg) = if (pg.isOnCourt) partner to pg else pg to partner
+        return substitutePlayer(gameId, playerInId = inPg.playerId, playerOutId = outPg.playerId)
+    }
+
+    /**
      * Kurzname einer Position für die Startsieben-Anzeige ("LA - Linksaußen" → "LA").
      */
     fun positionShortName(position: Position?): String {
@@ -895,7 +965,7 @@ class HandballRepository(
             )
         }
 
-        return StartingSevenRecommendation(gameId, useSeventhFieldPlayer, slots)
+        return StartingSevenRecommendation(gameId, useSeventhFieldPlayer, slots, fieldCandidates = fieldCandidates)
     }
 
     /**
@@ -903,7 +973,7 @@ class HandballRepository(
      * sofern sie spielberechtigt sind und die Formation der 6+1 / 7+0 Regel ([isValidActiveCourtLineup]) entspricht.
      * Protokolliert die Aufstellung im Spielprotokoll (GAME_LOG).
      */
-    fun applyStartingSevenLineup(gameId: Int, playerIds: List<Int>): Boolean {
+    fun applyStartingSevenLineup(gameId: Int, playerIds: List<Int>, swapPair: Pair<Int, Int>? = null): Boolean {
         var success = false
         mutate { state ->
             val game = state.games.find { it.gameId == gameId } ?: return@mutate state
@@ -923,8 +993,24 @@ class HandballRepository(
             if (!isValidActiveCourtLineup(fieldCount, keeperCount)) return@mutate state
 
             val chosenPgIds = chosen.map { it.first.playerGameId }.toSet()
-            val updatedPgs = state.playerGames.map { pg ->
-                if (pg.gameId == gameId) pg.copy(isOnCourt = pg.playerGameId in chosenPgIds) else pg
+            // Neue Aufstellung = neue Wechselpaare: alte lösen, optional ein neues setzen
+            val gamePgIds = gamePgs.map { it.playerGameId }.toSet()
+            val pairIds = swapPair?.let { (standbyId, partnerId) ->
+                val standby = gamePgs.find { it.playerId == standbyId }
+                val partner = chosen.find { it.second.playerId == partnerId && it.second.role == PlayerRole.FIELD_PLAYER }?.first
+                val standbyPlayer = state.players.find { it.playerId == standbyId }
+                if (standby != null && partner != null && standby.playerGameId !in chosenPgIds &&
+                    standbyPlayer?.role == PlayerRole.FIELD_PLAYER && !standby.isDisqualified
+                ) standby.playerGameId to partner.playerGameId else null
+            }
+            val updatedPgs = state.playerGames.withoutSwapPairs(gamePgIds).map { pg ->
+                if (pg.gameId != gameId) return@map pg
+                val partnerPgId = when (pg.playerGameId) {
+                    pairIds?.first -> pairIds.second
+                    pairIds?.second -> pairIds.first
+                    else -> null
+                }
+                pg.copy(isOnCourt = pg.playerGameId in chosenPgIds, swapPartnerPlayerGameId = partnerPgId)
             }
 
             val chosenNames = chosen.joinToString(", ") { (_, p) -> "#${p.jerseyNumberHomeKit ?: "-"} ${p.lastName}" }
@@ -1195,8 +1281,8 @@ class HandballRepository(
     ) {
         mutate { state ->
             val pg = state.playerGames.find { it.playerGameId == playerGameId } ?: return@mutate state
-            // Bank-Spieler sind im inaktiven Zustand und können keine Spielstatistiken verbuchen
-            if (!pg.isOnCourt) return@mutate state
+            // Bank-Spieler sind inaktiv; Ausnahme: Wechselspieler (Angriff/Abwehr) eines Feldspielers
+            if (!state.canRecordStats(pg)) return@mutate state
 
             val game = state.games.find { it.gameId == pg.gameId }
             val player = state.players.find { it.playerId == pg.playerId }
