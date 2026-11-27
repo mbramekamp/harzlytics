@@ -105,7 +105,10 @@ internal fun MobileCourtList(
     onSelect: (Int) -> Unit,
     onOpenProfile: (Int) -> Unit,
     onOpenFreeSlot: () -> Unit,
-    onOpenStartingSeven: () -> Unit
+    onOpenStartingSeven: () -> Unit,
+    /** Freier 8. Platz (Wechselpaar Angriff/Abwehr) kann besetzt werden. */
+    showSwapSlot: Boolean = false,
+    onOpenSwapSlot: () -> Unit = {}
 ) {
     Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
         Column {
@@ -163,6 +166,17 @@ internal fun MobileCourtList(
                 ) {
                     Icon(Icons.Default.PersonAddAlt1, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Freier Platz (${onCourt.size}/7)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (showSwapSlot) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenSwapSlot).heightIn(min = 54.dp).padding(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.PersonAddAlt1, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Freier Platz (8.)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

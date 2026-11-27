@@ -58,6 +58,8 @@ internal fun SideBySideLineupAndBenchSection(
     showBench: Boolean,
     canFillFreeSlot: Boolean,
     onOpenFreeSlot: () -> Unit,
+    canFillSwapSlot: Boolean = false,
+    onOpenSwapSlot: () -> Unit = {},
     onApplyStartingSeven: (useSeventhFieldPlayer: Boolean) -> Unit,
     onNavigateToPlayer: (Int) -> Unit,
     onEnterEditAndManageSquad: () -> Unit
@@ -325,7 +327,11 @@ internal fun SideBySideLineupAndBenchSection(
 
                 // Handy ohne Bank-Liste: freien Platz hier besetzen
                 if (isEditMode && !showBench && canFillFreeSlot && onCourtParticipants.size < 7) {
-                    FreeCourtSlotRow(onCourtCount = onCourtParticipants.size, onClick = onOpenFreeSlot)
+                    FreeCourtSlotRow(label = "Freier Platz (${onCourtParticipants.size}/7)", onClick = onOpenFreeSlot)
+                }
+                // Freier 8. Platz (Wechselpaar Angriff/Abwehr)
+                if (isEditMode && canFillSwapSlot) {
+                    FreeCourtSlotRow(label = "Freier Platz (8.)", onClick = onOpenSwapSlot)
                 }
             }
         }
@@ -541,7 +547,7 @@ internal fun EmptySquadHint(
 
 /** Platzhalter für einen unbesetzten Platz auf dem Feld (weniger als 7 aktiv); öffnet die Auswahl der Bank. */
 @Composable
-private fun FreeCourtSlotRow(onCourtCount: Int, onClick: () -> Unit) {
+private fun FreeCourtSlotRow(label: String, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -555,7 +561,7 @@ private fun FreeCourtSlotRow(onCourtCount: Int, onClick: () -> Unit) {
         ) {
             Icon(Icons.Default.PersonAddAlt1, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                text = "Freier Platz ($onCourtCount/7)",
+                text = label,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )

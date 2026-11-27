@@ -74,6 +74,8 @@ internal fun GameInteractiveDashboard(
     var swapPairPickerPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
     // Auswahl für einen freien Platz auf dem Feld (Handy, weniger als 7 aktiv)
     var showFreeSlotPicker by remember(game.gameId) { mutableStateOf(false) }
+    // Auswahl für den freien 8. Platz (Wechselpaar Angriff/Abwehr)
+    var showSwapSlotPicker by remember(game.gameId) { mutableStateOf(false) }
 
     // Mobile Erfassung (Handy): gewählter Spieler, "Mehr"-Sheet, Rückgängig-Stapel und kurze Bestätigung
     var selectedPlayerId by remember(game.gameId) { mutableStateOf<Int?>(null) }
@@ -164,6 +166,7 @@ internal fun GameInteractiveDashboard(
         }
     }
 
+    val swapSlotOpen = remember(snapshot, game.gameId) { repository.isSwapSlotOpen(game.gameId, snapshot) }
     val courtEntryCandidates = remember(snapshot, game.gameId) {
         repository.courtEntryCandidates(game.gameId, snapshot)
     }
@@ -319,6 +322,8 @@ internal fun GameInteractiveDashboard(
                             onSelect = { selectedPlayerId = it },
                             onOpenProfile = onNavigateToPlayer,
                             onOpenFreeSlot = { showFreeSlotPicker = true },
+                            showSwapSlot = isEditMode && swapSlotOpen,
+                            onOpenSwapSlot = { showSwapSlotPicker = true },
                             onOpenStartingSeven = { startingSevenDialogVariant = false }
                         )
                     } else {
@@ -336,6 +341,8 @@ internal fun GameInteractiveDashboard(
                             showBench = isWideScreen,
                             canFillFreeSlot = courtEntryCandidates.isNotEmpty(),
                             onOpenFreeSlot = { showFreeSlotPicker = true },
+                            canFillSwapSlot = swapSlotOpen,
+                            onOpenSwapSlot = { showSwapSlotPicker = true },
                             onApplyStartingSeven = { useSeventh ->
                                 substitutionPlayerId = null
                                 startingSevenDialogVariant = useSeventh
@@ -490,9 +497,10 @@ internal fun GameInteractiveDashboard(
         val options = repository.substitutionOptions(game.gameId, playerId, snapshot)
         val tapped = snapshot.players.find { it.playerId == playerId }
         val tappedPg = snapshot.playerGames.find { it.gameId == game.gameId && it.playerId == playerId }
-        val swapCandidates = repository.swapPartnerCandidates(game.gameId, playerId, snapshot)
-        val canManagePair = tappedPg?.swapPartnerPlayerGameId != null || swapCandidates.isNotEmpty()
-        if (options == null || tapped == null || (!options.hasAnyOption && !canManagePair)) {
+        // Wechselpaar bilden: nur solange der 8. Platz frei ist
+        val canFormPair = tappedPg?.isOnCourt == true && swapSlotOpen &&
+            repository.swapPartnerCandidates(game.gameId, playerId, snapshot).isNotEmpty()
+        if (options == null || tapped == null || (!options.hasAnyOption && !canFormPair)) {
             LaunchedEffect(playerId) { substitutionPlayerId = null }
         } else {
             SubstitutionPicker(
@@ -526,17 +534,9 @@ internal fun GameInteractiveDashboard(
                     substitutionPlayerId = null
                 },
                 onDismiss = { substitutionPlayerId = null },
-                secondaryLabel = when {
-                    tappedPg?.swapPartnerPlayerGameId != null -> "Wechselpaar lösen"
-                    swapCandidates.isNotEmpty() -> "Wechselpaar bilden"
-                    else -> null
-                },
+                secondaryLabel = if (canFormPair) "Wechselpaar bilden" else null,
                 onSecondary = {
-                    if (tappedPg?.swapPartnerPlayerGameId != null) {
-                        track("Wechselpaar gelöst") { repository.clearSwapPartner(game.gameId, playerId) }
-                    } else {
-                        swapPairPickerPlayerId = playerId
-                    }
+                    swapPairPickerPlayerId = playerId
                     substitutionPlayerId = null
                 }
             )
@@ -564,6 +564,31 @@ internal fun GameInteractiveDashboard(
                 },
                 onActAlone = {},
                 onDismiss = { swapPairPickerPlayerId = null }
+            )
+        }
+    }
+
+    if (showSwapSlotPicker) {
+        val candidates = repository.swapSlotCandidates(game.gameId, snapshot)
+        if (!swapSlotOpen || candidates.isEmpty()) {
+            LaunchedEffect(Unit) { showSwapSlotPicker = false }
+        } else {
+            SubstitutionPicker(
+                asBottomSheet = !isWideScreen,
+                title = "Freier Platz (8.)",
+                partnerIds = candidates,
+                emptyText = "Niemand auf der Bank kann kommen.",
+                actAloneLabel = null,
+                snapshot = snapshot,
+                gameId = game.gameId,
+                onPickPartner = { playerId ->
+                    val label = snapshot.players.find { it.playerId == playerId }?.shortLabel() ?: ""
+                    track("$label aufs Feld") { repository.fillSwapSlot(game.gameId, playerId) }
+                    selectedPlayerId = playerId
+                    showSwapSlotPicker = false
+                },
+                onActAlone = {},
+                onDismiss = { showSwapSlotPicker = false }
             )
         }
     }

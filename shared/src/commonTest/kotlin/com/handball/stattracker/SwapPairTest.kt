@@ -98,6 +98,62 @@ class SwapPairTest {
     }
 
     @Test
+    fun eighthPlayerToBenchOpensSlotAndSlotCanBeFilledAgain() {
+        val repo = demoRepo()
+        repo.setSwapPartner(1, 3, 13)
+        assertFalse(repo.isSwapSlotOpen(1))
+
+        val options = repo.substitutionOptions(1, 13)!!
+        assertTrue(options.isOnCourt, "8. Spieler verhält sich wie ein Spieler auf dem Feld")
+        assertTrue(options.canActAlone)
+
+        repo.movePlayerToBench(1, 13)
+        assertFalse(repo.snapshot.value.isSwapStandby(repo.pg(13)))
+        assertEquals(7, repo.snapshot.value.playerGames.count { it.gameId == 1 && it.isOnCourt })
+        assertTrue(repo.isSwapSlotOpen(1), "8. Platz ist frei")
+
+        assertTrue(13 in repo.swapSlotCandidates(1))
+        assertTrue(repo.fillSwapSlot(1, 13))
+        assertTrue(repo.snapshot.value.isSwapStandby(repo.pg(13)))
+        assertFalse(repo.isSwapSlotOpen(1))
+    }
+
+    @Test
+    fun courtPartnerAloneToBenchLetsEighthPlayerTakeHisPlace() {
+        val repo = demoRepo()
+        repo.setSwapPartner(1, 3, 13)
+        repo.movePlayerToBench(1, 3)
+        assertTrue(repo.pg(13).isOnCourt, "8. Spieler spielt auf dem Platz weiter")
+        assertFalse(repo.pg(3).isOnCourt)
+        assertEquals(7, repo.snapshot.value.playerGames.count { it.gameId == 1 && it.isOnCourt })
+        assertTrue(repo.snapshot.value.swapStandbyByCourtPlayer(1).isEmpty())
+        assertTrue(repo.isSwapSlotOpen(1))
+    }
+
+    @Test
+    fun substitutingEitherPartnerKeepsEightActive() {
+        val repo = demoRepo()
+        repo.setSwapPartner(1, 3, 13)
+        val benchPlayer = repo.swapSlotCandidates(1).first()
+        assertTrue(13 !in repo.courtEntryCandidates(1), "8. Spieler ist schon aktiv")
+        assertTrue(13 in repo.substitutionOptions(1, benchPlayer)!!.partnerIds, "Bank-Spieler darf den 8. ersetzen")
+
+        // Feldspieler mit 8. Spieler wird ersetzt → der Neue übernimmt das Paar
+        assertTrue(repo.substitutePlayer(1, playerInId = benchPlayer, playerOutId = 3))
+        assertEquals(repo.pg(benchPlayer).playerGameId, repo.pg(13).swapPartnerPlayerGameId)
+        assertTrue(repo.snapshot.value.isSwapStandby(repo.pg(13)))
+        assertNull(repo.pg(3).swapPartnerPlayerGameId)
+
+        // 8. Spieler wird ersetzt → Paar bleibt beim Feldspieler
+        assertTrue(repo.substitutePlayer(1, playerInId = 3, playerOutId = 13))
+        assertTrue(repo.snapshot.value.isSwapStandby(repo.pg(3)))
+        assertEquals(repo.pg(benchPlayer).playerGameId, repo.pg(3).swapPartnerPlayerGameId)
+        assertNull(repo.pg(13).swapPartnerPlayerGameId)
+        assertFalse(repo.pg(13).isOnCourt)
+        assertEquals(7, repo.snapshot.value.playerGames.count { it.gameId == 1 && it.isOnCourt })
+    }
+
+    @Test
     fun invalidPairsAreRejected() {
         val repo = demoRepo()
         assertFalse(repo.setSwapPartner(1, 3, 4), "beide auf dem Feld")

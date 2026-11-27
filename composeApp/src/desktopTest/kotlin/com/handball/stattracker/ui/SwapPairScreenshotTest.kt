@@ -89,6 +89,29 @@ class SwapPairScreenshotTest {
         }
     }
 
+    /** Strategie gewechselt: der 8. Spieler ist raus, der 8. Platz ist frei. */
+    @Test
+    fun mobileListWithOpenEighthSlot() {
+        val repo = pairedRepo()
+        repo.movePlayerToBench(1, 13)
+        val s = repo.snapshot.value
+        val all = participants(repo)
+        shot("wechselpaar-mobil-frei", 400, 700) {
+            MobileCourtList(
+                onCourt = all.filter { it.first.isOnCourt },
+                swapStandby = standbyMap(repo, all),
+                positionName = { p -> s.positions.find { it.positionId == p.positionId }?.positionName?.substringBefore(" ") ?: p.role.label },
+                fieldStats = { pg -> s.fieldPlayerStats.find { it.playerGameId == pg.playerGameId } ?: FieldPlayerGameStats(0, pg.playerGameId) },
+                keeperStats = { pg -> s.goalKeeperStats.find { it.playerGameId == pg.playerGameId } ?: GoalKeeperGameStats(0, pg.playerGameId) },
+                isEditMode = true,
+                selectedPlayerId = 3,
+                showFreeSlot = false,
+                onSelect = {}, onOpenProfile = {}, onOpenFreeSlot = {}, onOpenStartingSeven = {},
+                showSwapSlot = repo.isSwapSlotOpen(1)
+            )
+        }
+    }
+
     @Test
     fun wideCourtView() {
         listOf(false to "wechselpaar-desktop-hell", true to "wechselpaar-desktop-dunkel").forEach { (dark, name) ->

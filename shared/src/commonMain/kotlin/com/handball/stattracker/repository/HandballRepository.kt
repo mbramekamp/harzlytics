@@ -519,6 +519,8 @@ class HandballRepository(
         if (playerIn.role == PlayerRole.COACH) return false
         if (pgIn.isOnCourt) return false
         if (pgIn.isDisqualified || pgIn.hasActiveSuspension(game.elapsedSeconds)) return false
+        // Der 8. Spieler (Wechselpaar) ist schon aktiv
+        if (state.isSwapStandby(pgIn)) return false
 
         val activeCourtPlayers = state.playerGames.mapNotNull { pg ->
             if (pg.gameId == gameId && pg.isOnCourt) {
@@ -567,10 +569,19 @@ class HandballRepository(
         val player = state.players.find { it.playerId == playerId } ?: return null
         if (player.role == PlayerRole.COACH) return null
 
-        val swapPartnerPlayerId = state.swapPartnerOf(pg)?.playerId
+        // Der 8. Spieler verhält sich wie ein Spieler auf dem Feld: ersetzen oder allein raus (Platz wird frei)
+        if (state.isSwapStandby(pg)) {
+            return SubstitutionOptions(playerId = playerId, isOnCourt = true, partnerIds = swapSlotCandidates(gameId, state), canActAlone = true)
+        }
+
         val candidates = state.playerGames
-            .filter { it.gameId == gameId && it.playerId != playerId && it.isOnCourt != pg.isOnCourt }
+            .filter { it.gameId == gameId && it.playerId != playerId && it.isOnCourt != pg.isOnCourt && !state.isSwapStandby(it) }
             .mapNotNull { other -> state.players.find { it.playerId == other.playerId && it.role != PlayerRole.COACH } }
+        // Bank-Feldspieler dürfen auch den 8. Spieler ersetzen
+        val standbyTargets = if (!pg.isOnCourt && pg.playerId in swapSlotCandidates(gameId, state)) {
+            state.playerGames.filter { it.gameId == gameId && state.isSwapStandby(it) }
+                .mapNotNull { other -> state.players.find { it.playerId == other.playerId } }
+        } else emptyList()
         val partners = candidates
             .filter { other ->
                 if (pg.isOnCourt) {
@@ -579,10 +590,9 @@ class HandballRepository(
                     canSubstituteOrEnterCourt(gameId, playerInId = playerId, playerOutId = other.playerId, state = state)
                 }
             }
+            .plus(standbyTargets)
             .sortedWith(
-                // Wechselpartner (Angriff/Abwehr) zuerst
-                compareBy<Player> { it.playerId != swapPartnerPlayerId }
-                    .thenBy { it.role != player.role }
+                compareBy<Player> { it.role != player.role }
                     .thenBy { player.positionId == null || it.positionId != player.positionId }
                     .thenBy { it.jerseyNumberHomeKit ?: 99 }
             )
@@ -616,6 +626,8 @@ class HandballRepository(
      * Protokolliert den Wechsel automatisch im Spielprotokoll (GAME_LOG).
      */
     fun substitutePlayer(gameId: Int, playerInId: Int, playerOutId: Int? = null): Boolean {
+        val outPg = playerOutId?.let { id -> _snapshot.value.playerGames.find { it.gameId == gameId && it.playerId == id } }
+        if (outPg != null && _snapshot.value.isSwapStandby(outPg)) return replaceSwapStandby(gameId, playerInId, playerOutId)
         var success = false
         mutate { state ->
             if (!canSubstituteOrEnterCourt(gameId, playerInId, playerOutId, state)) return@mutate state
@@ -642,10 +654,20 @@ class HandballRepository(
                     (if (playerOut.role == PlayerRole.GOALKEEPER) 1 else 0) +
                     (if (playerIn.role == PlayerRole.GOALKEEPER) 1 else 0)
 
+                // Hatte der Ausgewechselte einen 8. Spieler, übernimmt der Eingewechselte das Paar (nur Feldspieler)
+                val standby = state.swapPartnerOf(pgOut)?.takeIf { !it.isOnCourt }
+                val keepPair = standby != null && playerIn.role == PlayerRole.FIELD_PLAYER
                 val updatedPgs = state.playerGames.map { pg ->
                     when (pg.playerGameId) {
-                        pgIn.playerGameId -> pg.copy(isOnCourt = true)
-                        pgOut.playerGameId -> pg.copy(isOnCourt = false)
+                        pgIn.playerGameId -> pg.copy(
+                            isOnCourt = true,
+                            swapPartnerPlayerGameId = if (keepPair) standby?.playerGameId else null
+                        )
+                        pgOut.playerGameId -> pg.copy(
+                            isOnCourt = false,
+                            swapPartnerPlayerGameId = if (standby != null) null else pg.swapPartnerPlayerGameId
+                        )
+                        standby?.playerGameId -> pg.copy(swapPartnerPlayerGameId = if (keepPair) pgIn.playerGameId else null)
                         else -> pg
                     }
                 }
@@ -711,17 +733,47 @@ class HandballRepository(
         mutate { state ->
             val game = state.games.find { it.gameId == gameId } ?: return@mutate state
             val pgOut = state.playerGames.find { it.gameId == gameId && it.playerId == playerOutId } ?: return@mutate state
-            if (!pgOut.isOnCourt) return@mutate state
             val playerOut = state.players.find { it.playerId == playerOutId } ?: return@mutate state
+            val outNr0 = playerOut.jerseyNumberHomeKit?.let { "#$it " } ?: ""
 
+            // 8. Spieler allein raus: Paar lösen, der 8. Platz ist frei
+            if (state.isSwapStandby(pgOut)) {
+                return@mutate state.copy(
+                    playerGames = state.playerGames.withoutSwapPairs(setOf(pgOut.playerGameId)),
+                    gameLogs = state.gameLogs + GameLogEntry(
+                        logId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1,
+                        gameId = gameId,
+                        gameSecond = game.elapsedSeconds,
+                        eventType = GameLogEventType.SUBSTITUTION,
+                        primaryPlayerId = null,
+                        secondaryPlayerId = playerOut.playerId,
+                        homeScoreAtEvent = game.homeTeamScore,
+                        awayScoreAtEvent = game.awayTeamScore,
+                        description = "Auf die Bank: $outNr0${playerOut.fullName} (8. Platz frei)"
+                    )
+                )
+            }
+            if (!pgOut.isOnCourt) return@mutate state
+
+            // Hat er einen 8. Spieler, spielt dieser auf seinem Platz weiter; der 8. Platz wird frei
+            val standby = state.swapPartnerOf(pgOut)
+                ?.takeIf { !it.isOnCourt && !it.hasActiveSuspension(game.elapsedSeconds) }
             val updatedPgs = state.playerGames.map { pg ->
-                if (pg.playerGameId == pgOut.playerGameId) pg.copy(isOnCourt = false) else pg
+                when (pg.playerGameId) {
+                    pgOut.playerGameId -> pg.copy(
+                        isOnCourt = false,
+                        swapPartnerPlayerGameId = if (standby != null) null else pg.swapPartnerPlayerGameId
+                    )
+                    standby?.playerGameId -> pg.copy(isOnCourt = true, swapPartnerPlayerGameId = null)
+                    else -> pg
+                }
             }
             val remainingCount = updatedPgs.count { pg ->
                 pg.gameId == gameId && pg.isOnCourt &&
                     state.players.find { it.playerId == pg.playerId }?.role != PlayerRole.COACH
             }
             val outNr = playerOut.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+            val standbyPlayer = standby?.let { sb -> state.players.find { it.playerId == sb.playerId } }
             val extra = if (reasonSuffix.isNotBlank()) " ($reasonSuffix)" else ""
             val nextLogId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1
             val logEntry = GameLogEntry(
@@ -733,13 +785,105 @@ class HandballRepository(
                 secondaryPlayerId = playerOut.playerId,
                 homeScoreAtEvent = game.homeTeamScore,
                 awayScoreAtEvent = game.awayTeamScore,
-                description = "Auf die Bank: $outNr${playerOut.fullName}$extra ($remainingCount/7 auf dem Feld)"
+                description = "Auf die Bank: $outNr${playerOut.fullName}$extra" +
+                    (standbyPlayer?.let { " · ${it.jerseyNumberHomeKit?.let { n -> "#$n " } ?: ""}${it.fullName} spielt auf seinem Platz (8. Platz frei)" } ?: "") +
+                    " ($remainingCount/7 auf dem Feld)"
             )
             state.copy(
                 playerGames = updatedPgs,
                 gameLogs = state.gameLogs + logEntry
             )
         }
+    }
+
+    /**
+     * Bank-Feldspieler, die den 8. Platz (Wechselpaar) besetzen dürfen: nicht gesperrt, keine laufende Zeitstrafe,
+     * nicht schon 8. Spieler. Nach Trikotnummer.
+     */
+    fun swapSlotCandidates(gameId: Int, state: DatabaseSnapshot = _snapshot.value): List<Int> {
+        val game = state.games.find { it.gameId == gameId } ?: return emptyList()
+        return state.playerGames
+            .filter {
+                it.gameId == gameId && !it.isOnCourt && !it.isDisqualified &&
+                    !it.hasActiveSuspension(game.elapsedSeconds) && !state.isSwapStandby(it)
+            }
+            .mapNotNull { pg -> state.players.find { it.playerId == pg.playerId && it.role == PlayerRole.FIELD_PLAYER } }
+            .sortedBy { it.jerseyNumberHomeKit ?: 99 }
+            .map { it.playerId }
+    }
+
+    /**
+     * true = der 8. Platz ist frei und kann besetzt werden: 7 auf dem Feld, noch kein 8. Spieler,
+     * ein Feldspieler auf dem Feld und ein passender Bank-Feldspieler vorhanden.
+     */
+    fun isSwapSlotOpen(gameId: Int, state: DatabaseSnapshot = _snapshot.value): Boolean {
+        val onCourt = state.playerGames.filter { pg ->
+            pg.gameId == gameId && pg.isOnCourt && state.players.find { it.playerId == pg.playerId }?.role != PlayerRole.COACH
+        }
+        return onCourt.size == 7 &&
+            state.swapStandbyByCourtPlayer(gameId).isEmpty() &&
+            onCourt.any { pg -> state.players.find { it.playerId == pg.playerId }?.role == PlayerRole.FIELD_PLAYER } &&
+            swapSlotCandidates(gameId, state).isNotEmpty()
+    }
+
+    /**
+     * Besetzt den freien 8. Platz mit [playerId]. Partner wird ein Feldspieler auf dem Feld ohne 8. Spieler,
+     * bevorzugt auf derselben Position.
+     */
+    fun fillSwapSlot(gameId: Int, playerId: Int): Boolean {
+        val state = _snapshot.value
+        if (playerId !in swapSlotCandidates(gameId, state)) return false
+        val player = state.players.find { it.playerId == playerId } ?: return false
+        val taken = state.swapStandbyByCourtPlayer(gameId).keys
+        val partner = state.playerGames
+            .filter { it.gameId == gameId && it.isOnCourt && it.playerGameId !in taken }
+            .mapNotNull { pg -> state.players.find { it.playerId == pg.playerId && it.role == PlayerRole.FIELD_PLAYER } }
+            .sortedWith(
+                compareBy<Player> { player.positionId == null || it.positionId != player.positionId }
+                    .thenBy { it.jerseyNumberHomeKit ?: 99 }
+            )
+            .firstOrNull() ?: return false
+        return setSwapPartner(gameId, playerId, partner.playerId)
+    }
+
+    /** Ersetzt den 8. Spieler [standbyId] durch den Bank-Feldspieler [newId]; das Paar bleibt beim selben Feldspieler. */
+    private fun replaceSwapStandby(gameId: Int, newId: Int, standbyId: Int): Boolean {
+        var success = false
+        mutate { state ->
+            val game = state.games.find { it.gameId == gameId } ?: return@mutate state
+            if (newId !in swapSlotCandidates(gameId, state)) return@mutate state
+            val oldPg = state.playerGames.find { it.gameId == gameId && it.playerId == standbyId } ?: return@mutate state
+            val courtPg = state.swapPartnerOf(oldPg)?.takeIf { it.isOnCourt } ?: return@mutate state
+            val newPg = state.playerGames.find { it.gameId == gameId && it.playerId == newId } ?: return@mutate state
+            val newPlayer = state.players.find { it.playerId == newId } ?: return@mutate state
+            val oldPlayer = state.players.find { it.playerId == standbyId } ?: return@mutate state
+            val updated = state.playerGames.map { pg ->
+                when (pg.playerGameId) {
+                    oldPg.playerGameId -> pg.copy(swapPartnerPlayerGameId = null)
+                    newPg.playerGameId -> pg.copy(swapPartnerPlayerGameId = courtPg.playerGameId)
+                    courtPg.playerGameId -> pg.copy(swapPartnerPlayerGameId = newPg.playerGameId)
+                    else -> pg
+                }
+            }
+            val inNr = newPlayer.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+            val outNr = oldPlayer.jerseyNumberHomeKit?.let { "#$it " } ?: ""
+            success = true
+            state.copy(
+                playerGames = updated,
+                gameLogs = state.gameLogs + GameLogEntry(
+                    logId = (state.gameLogs.maxOfOrNull { it.logId } ?: 0) + 1,
+                    gameId = gameId,
+                    gameSecond = game.elapsedSeconds,
+                    eventType = GameLogEventType.SUBSTITUTION,
+                    primaryPlayerId = newPlayer.playerId,
+                    secondaryPlayerId = oldPlayer.playerId,
+                    homeScoreAtEvent = game.homeTeamScore,
+                    awayScoreAtEvent = game.awayTeamScore,
+                    description = "Wechsel (8. Platz): $inNr${newPlayer.fullName} rein für $outNr${oldPlayer.fullName}"
+                )
+            )
+        }
+        return success
     }
 
     /**
